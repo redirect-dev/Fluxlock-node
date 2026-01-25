@@ -1,0 +1,2 @@
+© 2026 Roger Pelletier. All rights reserved.
+FluxLock: Quantum-resilient evolving lock-key blockchain protocol.
