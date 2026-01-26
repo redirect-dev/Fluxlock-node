@@ -1,34 +1,38 @@
-use std::fs::OpenOptions;
+use rand::{Rng, SeedableRng};
+use rand::rngs::StdRng;
+use std::env;
+use std::fs::File;
 use std::io::Write;
-use std::thread;
-use std::time::Duration;
 
-// Simple evolving lock/key simulation
 fn main() {
-    let node_id = std::env::args().nth(1).unwrap_or("node0".to_string());
-    let mut key: u64 = 0;
+    // Get the node ID from command line arguments
+    let args: Vec<String> = env::args().collect();
+    let node_id = if args.len() > 1 {
+        &args[1]
+    } else {
+        "node0"
+    };
 
-    // Open log file for this node
-    let log_file_path = format!("{}_log.txt", node_id);
-    let mut log_file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_file_path)
-        .expect("Unable to open log file");
+    // Use node ID to generate a unique seed
+    let seed: u64 = node_id.bytes().map(|b| b as u64).sum();
+    let mut rng = StdRng::seed_from_u64(seed);
+
+    // Open a log file per node
+    let log_filename = format!("{}_log.txt", node_id);
+    let mut log_file = File::create(&log_filename)
+        .expect("Failed to create log file");
 
     println!("Starting FluxLock node: {}", node_id);
     writeln!(log_file, "Starting FluxLock node: {}", node_id).unwrap();
 
-    // Tick loop: evolve key every second
-    for tick in 0..20 {
-        key = key.wrapping_add(tick * 7 + 13); // simple evolving function
-        let log_line = format!("Tick {}: key = {}", tick, key);
-        println!("{}", log_line);
-        writeln!(log_file, "{}", log_line).unwrap();
-        thread::sleep(Duration::from_secs(1));
+    // Simulate 10 ticks of key evolution
+    let mut key = rng.gen_range(1..100);
+    for tick in 0..10 {
+        key = key ^ rng.gen_range(1..100); // simple evolving key
+        println!("Tick {}: key = {}", tick, key);
+        writeln!(log_file, "Tick {}: key = {}", tick, key).unwrap();
     }
 
     println!("Node {} finished.", node_id);
     writeln!(log_file, "Node {} finished.", node_id).unwrap();
 }
-
