@@ -1,11 +1,19 @@
 #!/bin/bash
-# Run 5 FluxLock nodes in parallel and log their states
 
+# Remove old network state
+rm -f network_state.txt
+
+# Number of ticks for simulation
+TICKS=50
+
+# Launch nodes
 for i in 1 2 3 4 5
 do
-    cargo run --release -- node$i > node${i}_log.txt 2>&1 &
-    echo "Node $i started..."
+    echo "Starting node$i"
+    ./target/release/fluxlock-node.exe node$i $TICKS &
 done
 
+# Wait for all nodes to finish
 wait
-echo "All nodes finished."
+
+echo "All nodes finished simulation."

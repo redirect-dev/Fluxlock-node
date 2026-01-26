@@ -1,74 +1,87 @@
-use rand::{Rng, SeedableRng};
-use rand::rngs::StdRng;
 use std::env;
-use std::fs::{File, OpenOptions};
-use std::io::{Write, BufRead, BufReader};
+use std::fs::{OpenOptions, read_to_string};
+use std::io::Write;
 use std::thread::sleep;
 use std::time::Duration;
 
-fn main() {
-    // Get node ID from command line arguments
-    let args: Vec<String> = env::args().collect();
-    let node_id = if args.len() > 1 { &args[1] } else { "node0" };
+const MIN_ENTROPY: i64 = 32;
+const MAX_ENTROPY: i64 = 255;
+const CONSENSUS_WEIGHT: f64 = 0.15; // soft pull, not convergence
+const TICKS: usize = 10;
 
-    // Unique seed per node
-    let seed: u64 = node_id.bytes().map(|b| b as u64).sum();
-    let mut rng = StdRng::seed_from_u64(seed);
+fn clamp(value: i64) -> i64 {
+    if value < MIN_ENTROPY {
+        MIN_ENTROPY
+    } else if value > MAX_ENTROPY {
+        MAX_ENTROPY
+    } else {
+        value
+    }
+}
 
-    // Log file per node
-    let log_filename = format!("{}_log.txt", node_id);
-    let mut log_file = File::create(&log_filename).expect("Failed to create log file");
+fn parse_network_state() -> Vec<i64> {
+    let mut values = Vec::new();
 
-    println!("Starting FluxLock consensus node: {}", node_id);
-    writeln!(log_file, "Starting FluxLock consensus node: {}", node_id).unwrap();
-
-    let network_file = "network_state.txt";
-
-    let mut key = rng.gen_range(1..100);
-    for tick in 0..10 {
-        // Evolve key locally
-        key = key ^ rng.gen_range(1..100);
-
-        // Read current network state
-        let mut network_snapshot = vec![];
-        if let Ok(file) = File::open(network_file) {
-            let reader = BufReader::new(file);
-            for line in reader.lines() {
-                if let Ok(l) = line {
-                    let parts: Vec<&str> = l.split(':').collect();
-                    if parts.len() == 3 && parts[1] != node_id {
-                        if let Ok(remote_key) = parts[2].parse::<u64>() {
-                            network_snapshot.push(remote_key);
-                        }
-                    }
+    if let Ok(contents) = read_to_string("network_state.txt") {
+        for line in contents.lines() {
+            let parts: Vec<&str> = line.split(':').collect();
+            if parts.len() == 3 {
+                if let Ok(v) = parts[2].parse::<i64>() {
+                    values.push(v);
                 }
             }
         }
-
-        // Simple consensus adjustment: average of other nodes
-        if !network_snapshot.is_empty() {
-            let avg: u64 = network_snapshot.iter().sum::<u64>() / network_snapshot.len() as u64;
-            key = (key + avg) / 2; // move slightly toward network average
-        }
-
-        // Append current key to network file
-        {
-            let mut nf = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(network_file)
-                .expect("Failed to open network file");
-            writeln!(nf, "{}:{}:{}", tick, node_id, key).unwrap();
-        }
-
-        // Log local key and network snapshot
-        println!("Tick {}: node {} key = {}, network snapshot: {:?}", tick, node_id, key, network_snapshot);
-        writeln!(log_file, "Tick {}: node {} key = {}, network snapshot: {:?}", tick, node_id, key, network_snapshot).unwrap();
-
-        // Small delay to simulate network tick
-        sleep(Duration::from_millis(200));
     }
 
-    println!("Node {} finished.", node_id);
-    writeln!(log_file, "Node {} finished.", node_id).unwrap();
+    values
+}
+
+fn average(values: &[i64]) -> i64 {
+    if values.is_empty() {
+        0
+    } else {
+        values.iter().sum::<i64>() / values.len() as i64
+    }
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    let node_id = args.get(1).cloned().unwrap_or("nodeX".to_string());
+
+    let mut entropy: i64 = 64 + (node_id.bytes().map(|b| b as i64).sum::<i64>() % 64);
+
+    let log_name = format!("{}_log.txt", node_id);
+    let mut log = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_name)
+        .unwrap();
+
+    for tick in 0..TICKS {
+        let network_values = parse_network_state();
+        let net_avg = average(&network_values);
+
+        // local entropy drift (pseudo-noise)
+        let drift = (tick as i64 * 7 + entropy) % 11 - 5;
+
+        // soft consensus pull
+        let consensus_pull =
+            ((net_avg - entropy) as f64 * CONSENSUS_WEIGHT) as i64;
+
+        entropy = clamp(entropy + drift + consensus_pull);
+
+        let line = format!("{}:{}:{}\n", tick, node_id, entropy);
+        let mut net = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("network_state.txt")
+            .unwrap();
+
+        net.write_all(line.as_bytes()).unwrap();
+        log.write_all(line.as_bytes()).unwrap();
+
+        sleep(Duration::from_millis(300));
+    }
+
+    writeln!(log, "FINISHED").unwrap();
 }
