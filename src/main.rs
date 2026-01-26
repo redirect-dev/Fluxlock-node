@@ -1,100 +1,144 @@
 use std::env;
-use std::fs::{OpenOptions, read_to_string};
+use std::fs::{OpenOptions};
 use std::io::Write;
-use std::thread::sleep;
+use std::thread;
 use std::time::Duration;
 
-const TICKS: i64 = 10;
-const CONSENSUS_WEIGHT: f64 = 0.25;
-const MIN_ENTROPY: i64 = 0;
-const MAX_ENTROPY: i64 = 255;
+use rand::{Rng, SeedableRng};
+use rand::rngs::StdRng;
 
-fn clamp(v: i64) -> i64 {
-    if v < MIN_ENTROPY {
-        MIN_ENTROPY
-    } else if v > MAX_ENTROPY {
-        MAX_ENTROPY
-    } else {
-        v
+// ===============================
+// Phase 6 Reputation Parameters
+// ===============================
+const REP_MIN: f64 = 0.10;
+const REP_MAX: f64 = 1.00;
+
+const PENALTY_MULTIPLIER: f64 = 0.85;
+const RECOVERY_RATE: f64 = 0.01;
+
+const CONSENSUS_TOLERANCE: i32 = 10;
+const PENALTY_THRESHOLD: i32 = 20;
+
+const MAX_TICKS: u32 = 10;
+
+// ===============================
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    let node_name = args.get(1).expect("Node name required");
+
+    let adversarial_nodes = vec!["node3"];
+
+    let mut rng = StdRng::from_entropy();
+    let mut reputation: f64 = 1.0;
+
+    let log_file = format!("{}_log.csv", node_name);
+    let mut log = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&log_file)
+        .unwrap();
+
+    writeln!(
+        log,
+        "tick,node,entropy,consensus,delta,reputation"
+    ).unwrap();
+
+    for tick in 0..MAX_TICKS {
+        // -------------------------------
+        // Entropy generation
+        // -------------------------------
+        let mut entropy: i32 = rng.gen_range(60..100);
+
+        if adversarial_nodes.contains(&node_name.as_str()) {
+            entropy += rng.gen_range(20..80); // spike
+        }
+
+        // -------------------------------
+        // Read network consensus
+        // -------------------------------
+        let consensus: i32 = read_consensus();
+
+        let delta = entropy - consensus;
+
+        // ===============================
+        // Phase 6 Reputation Update
+        // ===============================
+        if delta.abs() > PENALTY_THRESHOLD {
+            reputation *= PENALTY_MULTIPLIER;
+        } else if delta.abs() <= CONSENSUS_TOLERANCE {
+            reputation += RECOVERY_RATE;
+        }
+
+        // Clamp bounds
+        if reputation > REP_MAX {
+            reputation = REP_MAX;
+        }
+        if reputation < REP_MIN {
+            reputation = REP_MIN;
+        }
+
+        // -------------------------------
+        // Write network state
+        // -------------------------------
+        append_network_state(tick, node_name, entropy);
+
+        // -------------------------------
+        // Log output
+        // -------------------------------
+        writeln!(
+            log,
+            "{},{},{},{},{},{}",
+            tick,
+            node_name,
+            entropy,
+            consensus,
+            delta,
+            reputation
+        ).unwrap();
+
+        println!(
+            "{} | tick {} | entropy {} | consensus {} | rep {:.3}",
+            node_name, tick, entropy, consensus, reputation
+        );
+
+        thread::sleep(Duration::from_millis(300));
     }
+
+    println!("{} FINISHED", node_name);
 }
 
-fn median(values: &mut Vec<i64>) -> i64 {
-    if values.is_empty() {
-        return 0;
-    }
-    values.sort();
-    values[values.len() / 2]
+// ===============================
+// Helper Functions
+// ===============================
+
+fn append_network_state(tick: u32, node: &str, entropy: i32) {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("network_state.txt")
+        .unwrap();
+
+    writeln!(file, "{}:{}:{}", tick, node, entropy).unwrap();
 }
 
-fn parse_network_state() -> Vec<i64> {
-    let mut values = Vec::new();
+fn read_consensus() -> i32 {
+    let content = std::fs::read_to_string("network_state.txt").unwrap_or_default();
+    let mut values = vec![];
 
-    if let Ok(contents) = read_to_string("network_state.txt") {
-        for line in contents.lines() {
-            let parts: Vec<&str> = line.split(':').collect();
-            if parts.len() == 3 {
-                if let Ok(v) = parts[2].parse::<i64>() {
-                    values.push(v);
-                }
+    for line in content.lines() {
+        let parts: Vec<&str> = line.split(':').collect();
+        if parts.len() == 3 {
+            if let Ok(v) = parts[2].parse::<i32>() {
+                values.push(v);
             }
         }
     }
 
-    values
-}
-
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let node_id = args.get(1).cloned().unwrap_or("nodeX".to_string());
-
-    // adversarial nodes (for later fault-tolerance tests)
-    let adversarial_nodes = vec!["node3"];
-
-    // initial entropy seeded by node id
-    let mut entropy: i64 =
-        64 + (node_id.bytes().map(|b| b as i64).sum::<i64>() % 64);
-
-    let log_name = format!("{}_log.csv", node_id);
-    let mut log = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_name)
-        .unwrap();
-
-    writeln!(log, "tick,node,entropy,delta_from_median").unwrap();
-
-    for tick in 0..TICKS {
-        let mut network_values = parse_network_state();
-        let consensus = median(&mut network_values);
-
-        // natural drift
-        let mut drift = (tick * 7 + entropy) % 11 - 5;
-
-        // adversarial spike
-        if adversarial_nodes.contains(&node_id.as_str()) && tick % 3 == 0 {
-            drift += 50;
-        }
-
-        // consensus pull
-        let pull = ((consensus - entropy) as f64 * CONSENSUS_WEIGHT) as i64;
-
-        entropy = clamp(entropy + drift + pull);
-
-        // write to shared network state
-        let mut net = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open("network_state.txt")
-            .unwrap();
-
-        writeln!(net, "{}:{}:{}", tick, node_id, entropy).unwrap();
-
-        let delta = entropy - consensus;
-        writeln!(log, "{},{},{},{}", tick, node_id, entropy, delta).unwrap();
-
-        sleep(Duration::from_millis(300));
+    if values.is_empty() {
+        80
+    } else {
+        values.iter().sum::<i32>() / values.len() as i32
     }
-
-    writeln!(log, "FINISHED").unwrap();
 }

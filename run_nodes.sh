@@ -1,19 +1,9 @@
 #!/bin/bash
 
-# Remove old network state
-rm -f network_state.txt
+# Run only 3 nodes to test fault tolerance
+cargo run --release -- node1 &
+cargo run --release -- node3 &
+cargo run --release -- node5 &
 
-# Number of ticks for simulation
-TICKS=50
-
-# Launch nodes
-for i in 1 2 3 4 5
-do
-    echo "Starting node$i"
-    ./target/release/fluxlock-node.exe node$i $TICKS &
-done
-
-# Wait for all nodes to finish
+# Wait for all processes
 wait
-
-echo "All nodes finished simulation."
