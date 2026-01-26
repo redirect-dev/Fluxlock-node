@@ -23,6 +23,27 @@ fn main() {
 
     let adversarial = node_id == "node3";
 
+    // Define node stake for governance weighting
+    let node_stake: f64 = match node_id.as_str() {
+        "node1" => 2.0,
+        "node2" => 1.0,
+        "node3" => 0.5, // adversarial
+        "node4" => 1.5,
+        "node5" => 1.0,
+        _ => 1.0,
+    };
+
+    // Prepare CSV log
+    {
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(format!("{}_log.csv", node_id))
+            .unwrap();
+        writeln!(file, "tick,node,entropy,weighted_consensus,delta,reputation,stake").unwrap();
+    }
+
     for tick in 0..TICKS {
         // Generate entropy
         let mut entropy: i32 = rng.gen_range(70..100);
@@ -30,42 +51,54 @@ fn main() {
             entropy += rng.gen_range(40..80);
         }
 
-        // Write entropy + rep to shared state
+        // Append current state to network_state.txt
         {
             let mut file = OpenOptions::new()
                 .create(true)
                 .append(true)
                 .open("network_state.txt")
                 .unwrap();
-            writeln!(file, "{},{},{:.3}", tick, entropy, reputation).unwrap();
+            writeln!(file, "{},{},{:.3},{}", tick, node_id, entropy, reputation).unwrap();
         }
 
         thread::sleep(Duration::from_millis(50));
 
-        // Read network state
+        // Read network state and calculate weighted consensus
         let state = read_to_string("network_state.txt").unwrap_or_default();
 
         let mut weighted_sum = 0.0;
-        let mut rep_sum = 0.0;
+        let mut rep_stake_sum = 0.0;
 
         for line in state.lines() {
             let parts: Vec<&str> = line.split(',').collect();
-            if parts.len() != 3 {
+            if parts.len() != 4 {
                 continue;
             }
+
             let t: usize = parts[0].parse().unwrap_or(999);
             if t != tick {
                 continue;
             }
-            let ent: f64 = parts[1].parse().unwrap_or(0.0);
-            let rep: f64 = parts[2].parse().unwrap_or(0.0);
 
-            weighted_sum += ent * rep;
-            rep_sum += rep;
+            let ent: f64 = parts[2].parse().unwrap_or(0.0);
+            let rep: f64 = parts[3].parse().unwrap_or(0.0);
+
+            // Assign stake based on node
+            let stake: f64 = match parts[1] {
+                "node1" => 2.0,
+                "node2" => 1.0,
+                "node3" => 0.5,
+                "node4" => 1.5,
+                "node5" => 1.0,
+                _ => 1.0,
+            };
+
+            weighted_sum += ent * rep * stake;
+            rep_stake_sum += rep * stake;
         }
 
-        let consensus = if rep_sum > 0.0 {
-            (weighted_sum / rep_sum) as i32
+        let consensus = if rep_stake_sum > 0.0 {
+            (weighted_sum / rep_stake_sum) as i32
         } else {
             entropy
         };
@@ -81,9 +114,19 @@ fn main() {
 
         reputation = reputation.clamp(MIN_REP, MAX_REP);
 
+        // Log to CSV
+        {
+            let mut file = OpenOptions::new()
+                .append(true)
+                .open(format!("{}_log.csv", node_id))
+                .unwrap();
+            writeln!(file, "{},{},{},{},{},{:.3},{:.1}", 
+                tick, node_id, entropy, consensus, delta, reputation, node_stake).unwrap();
+        }
+
         println!(
-            "{} | tick {} | entropy {} | weighted_consensus {} | rep {:.3}",
-            node_id, tick, entropy, consensus, reputation
+            "{} | tick {} | entropy {} | weighted_consensus {} | rep {:.3} | stake {:.1}",
+            node_id, tick, entropy, consensus, reputation, node_stake
         );
 
         thread::sleep(Duration::from_millis(200));
