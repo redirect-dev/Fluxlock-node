@@ -1,22 +1,25 @@
-# Phase 11 – Node Architecture and Roles
+## Step 2: Reputation & Trust Model
 
-## Step 1: Define Node Roles
+To ensure network security and quantum resilience, Fluxlock implements a **reputation-based trust model**:
 
-Fluxlock operates with three primary node types:
+### Reputation Scoring
+- Each node earns reputation points for:
+  - Proposing valid updates (Proposer Nodes)
+  - Correctly validating proposals (Validator Nodes)
+  - Reporting anomalies accurately (Observer Nodes)
+- Points are deducted for:
+  - Invalid proposals or votes
+  - Failure to respond to consensus
+  - Misbehavior or detected anomalies
 
-### 1. Proposer Nodes
-- Responsible for suggesting new states, key rotations, or protocol updates.
-- Must adhere to protocol constraints to ensure network consistency.
-- Voting power is proportional to the node's reputation and stake.
+### Weighted Influence
+- Reputation directly affects **voting weight** for Proposer and Validator nodes.
+- High-reputation nodes have more influence on network consensus.
+- Low-reputation nodes are flagged, reducing their impact and prompting potential review or stake adjustment.
 
-### 2. Validator Nodes
-- Confirm and vote on proposals submitted by Proposer Nodes.
-- Weighted consensus determines whether proposals are accepted.
-- Reputation and stake influence voting weight, ensuring trust and accountability.
+### Dynamic Trust
+- Reputation is continuously recalculated based on node behavior.
+- Nodes with consistent positive contributions maintain strong influence.
+- Nodes with erratic or malicious behavior are gradually isolated, protecting the system from compromise.
 
-### 3. Observer Nodes
-- Monitor system health, entropy, and reputation metrics.
-- Report anomalies or irregular behavior to the network.
-- Do not participate in voting but provide oversight for network integrity.
-
-This structure ensures that Fluxlock maintains both **resilience** and **quantum-safe integrity** by distributing roles and responsibilities among nodes while providing a clear mechanism for proposal validation and monitoring.
+This trust model ensures that Fluxlock maintains **robust quantum-safe consensus** while minimizing the risk of malicious or faulty nodes influencing the network.
