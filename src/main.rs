@@ -1,95 +1,102 @@
-use std::fs::File;
+use std::env;
+use std::fs::OpenOptions;
 use std::io::Write;
-use rand::Rng;
 
-#[derive(Debug)]
-struct Node {
-    id: usize,
-    stake: f64,
-    trust: f64,
-    decision: f64, // Node's current vote/decision value
-}
+// --------------------
+// CONFIGURATION
+// --------------------
+const MAX_TICKS: u32 = 10;
+const MAX_KEY_AGE: u32 = 2;
 
-impl Node {
-    fn new(id: usize, stake: f64) -> Self {
-        Node {
-            id,
-            stake,
-            trust: 1.0, // initial trust factor
-            decision: 0.0,
-        }
-    }
+// Node that will intentionally skip key rotation
+const ADVERSARIAL_NODE: &str = "node3";
 
-    fn make_decision(&mut self) {
-        // Decision influenced by some randomness
-        let mut rng = rand::thread_rng();
-        self.decision = rng.gen_range(0.0..1.0);
-    }
-
-    fn update_trust(&mut self, consensus: f64) {
-        // Simple trust model: if decision close to consensus, trust increases
-        let diff = (self.decision - consensus).abs();
-        if diff < 0.1 {
-            self.trust += 0.05; // reward aligned nodes
-        } else {
-            self.trust -= 0.05; // penalize misaligned nodes
-        }
-        if self.trust < 0.1 {
-            self.trust = 0.1; // min trust
-        }
-        if self.trust > 2.0 {
-            self.trust = 2.0; // max trust
-        }
-    }
-}
-
+// --------------------
+// MAIN
+// --------------------
 fn main() {
-    let num_nodes = 5;
-    let num_ticks = 100;
-    let mut nodes: Vec<Node> = (0..num_nodes)
-        .map(|i| Node::new(i, 1.0 + i as f64)) // example stake
-        .collect();
+    let args: Vec<String> = env::args().collect();
+    let node_id = args.get(1).expect("Node ID required").clone();
 
-    let mut log_files = Vec::new();
-    for i in 0..num_nodes {
-        let file = File::create(format!("node{}_log.csv", i + 1)).expect("Cannot create log");
-        let mut writer = csv::Writer::from_writer(file);
-        writer
-            .write_record(&["tick", "node", "decision", "weighted_decision", "trust"])
-            .unwrap();
-        log_files.push(writer);
-    }
+    let log_file = format!("{}_log.csv", node_id);
+    let mut file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&log_file)
+        .expect("Unable to create log file");
 
-    for tick in 0..num_ticks {
-        // Step 1: each node makes a decision
-        for node in nodes.iter_mut() {
-            node.make_decision();
+    // CSV header
+    writeln!(
+        file,
+        "tick,node,decision,weighted_decision,trust,key_age"
+    )
+    .unwrap();
+
+    // --------------------
+    // INITIAL STATE
+    // --------------------
+    let mut trust: f64 = 0.75;
+    let mut key_age: u32 = 0;
+
+    // --------------------
+    // SIMULATION LOOP
+    // --------------------
+    for tick in 0..MAX_TICKS {
+        // Simulated decision (deterministic)
+        let decision = (tick + node_id.len() as u32) % 2;
+
+        // --------------------
+        // KEY ROTATION LOGIC
+        // --------------------
+        key_age += 1;
+
+        if key_age >= MAX_KEY_AGE {
+            if node_id != ADVERSARIAL_NODE {
+                // Honest node rotates key
+                key_age = 0;
+            } else {
+                // Adversarial node skips rotation
+                key_age += 1;
+            }
         }
 
-        // Step 2: compute weighted consensus
-        let total_weight: f64 = nodes.iter().map(|n| n.stake * n.trust).sum();
-        let weighted_consensus: f64 = nodes
-            .iter()
-            .map(|n| n.decision * n.stake * n.trust)
-            .sum::<f64>()
-            / total_weight;
-
-        // Step 3: update trust and log
-        for (i, node) in nodes.iter_mut().enumerate() {
-            node.update_trust(weighted_consensus);
-
-            log_files[i]
-                .write_record(&[
-                    tick.to_string(),
-                    node.id.to_string(),
-                    format!("{:.4}", node.decision),
-                    format!("{:.4}", node.decision * node.stake * node.trust),
-                    format!("{:.4}", node.trust),
-                ])
-                .unwrap();
-            log_files[i].flush().unwrap();
+        // --------------------
+        // TRUST UPDATE
+        // --------------------
+        if key_age > MAX_KEY_AGE {
+            // Penalize stale keys
+            trust -= 0.10;
+        } else {
+            // Reward healthy behavior slightly
+            trust += 0.05;
         }
+
+        // Clamp trust
+        if trust > 1.0 {
+            trust = 1.0;
+        }
+        if trust < 0.0 {
+            trust = 0.0;
+        }
+
+        let weighted_decision = (decision as f64 * trust).round() as u32;
+
+        // --------------------
+        // LOG OUTPUT
+        // --------------------
+        writeln!(
+            file,
+            "{},{},{},{},{:.3},{}",
+            tick, node_id, decision, weighted_decision, trust, key_age
+        )
+        .unwrap();
+
+        println!(
+            "{} | tick {} | decision {} | trust {:.3} | key_age {}",
+            node_id, tick, decision, trust, key_age
+        );
     }
 
-    println!("Simulation complete. Logs saved to nodeX_log.csv");
+    println!("{} FINISHED", node_id);
 }
