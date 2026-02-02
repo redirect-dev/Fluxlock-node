@@ -3,105 +3,99 @@ use std::env;
 #[derive(Debug, Clone, PartialEq)]
 enum NodeState {
     Active,
+    Degraded,
     Quarantined,
 }
 
 struct Node {
-    id: String,
+    name: String,
     trust: f64,
     key_age: u32,
     state: NodeState,
-    late_rotation_streak: u32,
 }
 
 impl Node {
-    fn new(id: &str) -> Self {
+    fn new(name: &str) -> Self {
         Self {
-            id: id.to_string(),
+            name: name.to_string(),
             trust: 0.80,
             key_age: 0,
             state: NodeState::Active,
-            late_rotation_streak: 0,
         }
     }
 
-    /// Honest nodes rotate every 2 ticks
-    /// Malicious nodes delay rotation
-    fn should_rotate(&self, tick: u32) -> bool {
-        if self.id.contains("3") {
-            // attacker rotates very late
-            self.key_age >= 10
+    fn should_rotate(&self) -> bool {
+        // Honest nodes rotate frequently, malicious ones don't
+        !self.name.contains("node3") && self.key_age >= 2
+    }
+
+    fn apply_rotation(&mut self) -> bool {
+        if self.should_rotate() {
+            self.key_age = 0;
+            self.trust = (self.trust + 0.05).min(1.0);
+            true
         } else {
-            // honest behavior
-            tick % 2 == 1
+            false
         }
     }
 
-    fn rotate_key(&mut self) {
-        self.key_age = 0;
-        self.late_rotation_streak = 0;
-        self.trust = (self.trust + 0.05).min(1.0);
+    fn apply_trust_decay(&mut self) {
+        // Progressive penalties
+        match self.key_age {
+            0..=2 => {} // no penalty
+            3..=5 => self.trust -= 0.05,
+            6..=8 => self.trust -= 0.08,
+            _ => self.trust -= 0.12,
+        }
+
+        if self.trust < 0.0 {
+            self.trust = 0.0;
+        }
     }
 
-    fn apply_trust_dynamics(&mut self) {
-        if self.key_age <= 2 {
-            // compliant behavior → protect trust
-            self.trust = (self.trust + 0.01).min(1.0);
+    fn update_state(&mut self) {
+        self.state = if self.trust < 0.20 {
+            NodeState::Quarantined
+        } else if self.trust < 0.50 {
+            NodeState::Degraded
         } else {
-            // late rotation → increasing penalty
-            self.late_rotation_streak += 1;
-            let decay = 0.04 + (self.late_rotation_streak as f64 * 0.02);
-            self.trust = (self.trust - decay).max(0.0);
-        }
+            NodeState::Active
+        };
     }
 
-    fn evaluate_state(&mut self) {
-        // Quarantine requires BOTH:
-        // 1. Low trust
-        // 2. Sustained late rotation
-        if self.trust < 0.25 && self.late_rotation_streak >= 3 {
-            self.state = NodeState::Quarantined;
+    fn tick(&mut self, tick: u32) -> bool {
+        self.key_age += 1;
+
+        let rotated = self.apply_rotation();
+        if !rotated {
+            self.apply_trust_decay();
         }
+
+        self.update_state();
+
+        println!(
+            "{} | tick {} | trust {:.3} | key_age {} | rotated {} | state {:?}",
+            self.name, tick, self.trust, self.key_age, rotated, self.state
+        );
+
+        self.state == NodeState::Quarantined
     }
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let node_id = args.get(1).unwrap_or(&"node1".to_string()).clone();
+    let node_name = args.get(1).unwrap_or(&"node1".to_string()).clone();
 
-    let mut node = Node::new(&node_id);
+    let mut node = Node::new(&node_name);
 
     for tick in 0..20 {
-        if node.state == NodeState::Quarantined {
-            println!(
-                "{} QUARANTINED at tick {}",
-                node.id, tick
-            );
+        let quarantined = node.tick(tick);
+
+        if quarantined {
+            println!("{} QUARANTINED at tick {}", node.name, tick);
             break;
         }
-
-        node.key_age += 1;
-
-        let rotated = if node.should_rotate(tick) {
-            node.rotate_key();
-            true
-        } else {
-            false
-        };
-
-        node.apply_trust_dynamics();
-        node.evaluate_state();
-
-        println!(
-            "{} | tick {} | trust {:.3} | key_age {} | rotated {} | state {:?}",
-            node.id,
-            tick,
-            node.trust,
-            node.key_age,
-            rotated,
-            node.state
-        );
     }
 
-    println!("{} FINISHED", node.id);
+    println!("{} FINISHED", node.name);
 }
