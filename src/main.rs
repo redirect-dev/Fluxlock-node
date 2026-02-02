@@ -1,6 +1,6 @@
 use std::env;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum NodeState {
     Active,
     Degraded,
@@ -11,131 +11,102 @@ struct Node {
     name: String,
     trust: f64,
     key_age: u32,
+    attacker_effort: f64,
     state: NodeState,
-}
-
-struct Attacker {
-    cost: f64,
-    efficiency: f64, // decays toward zero
 }
 
 impl Node {
     fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
-            trust: 0.8,
+            trust: 0.80,
             key_age: 0,
+            attacker_effort: 1.0,
             state: NodeState::Active,
         }
     }
 
-    fn should_rotate(&self) -> bool {
-        self.key_age >= 2 || self.trust < 0.6
+    fn should_rotate_key(&self) -> bool {
+        self.key_age >= 2
     }
 
     fn rotate_key(&mut self) {
         self.key_age = 0;
-        self.trust = (self.trust + 0.05).min(1.0);
+        // Rotation slightly increases attack cost
+        self.attacker_effort *= 1.15;
     }
 
-    fn degrade(&mut self) {
-        self.trust -= 0.08;
+    fn apply_attack(&mut self, base_attack: f64) {
+        // Adversary fatigue grows with key age
+        let fatigue_factor = 0.12;
+        self.attacker_effort += self.key_age as f64 * fatigue_factor;
+
+        // Diminishing returns on repeated attacks
+        let effective_attack = base_attack / self.attacker_effort;
+
+        // Non-linear trust damage (super-linear)
+        let damage = effective_attack.powf(1.3);
+
+        self.trust -= damage;
+        if self.trust < 0.0 {
+            self.trust = 0.0;
+        }
     }
 
     fn update_state(&mut self) {
-        self.state = if self.trust < 0.2 {
+        self.state = if self.trust < 0.20 {
             NodeState::Quarantined
-        } else if self.trust < 0.5 {
+        } else if self.trust < 0.50 {
             NodeState::Degraded
         } else {
             NodeState::Active
         };
     }
-}
 
-impl Attacker {
-    fn new() -> Self {
-        Self {
-            cost: 0.0,
-            efficiency: 1.0,
+    fn tick(&mut self, tick: u32) -> bool {
+        self.key_age += 1;
+
+        let mut rotated = false;
+        if self.should_rotate_key() {
+            self.rotate_key();
+            rotated = true;
         }
-    }
 
-    fn attempt_attack(&mut self, node: &Node) -> bool {
-        let base_cost = 1.0;
-        let age_factor = 1.0 + (node.key_age as f64 * 0.3);
-        let efficiency_penalty = 1.0 / self.efficiency.max(0.1);
+        // Simulated adversarial pressure
+        let base_attack = if tick % 2 == 0 { 0.08 } else { 0.10 };
+        self.apply_attack(base_attack);
 
-        self.cost += base_cost * age_factor * efficiency_penalty;
-        self.efficiency -= 0.05;
+        self.update_state();
 
-        // Attack success probability
-        let success_chance = self.efficiency * (1.0 - node.trust);
-        success_chance > 0.3
+        println!(
+            "{} | tick {} | trust {:.3} | key_age {} | effort {:.2} | rotated {} | state {:?}",
+            self.name,
+            tick,
+            self.trust,
+            self.key_age,
+            self.attacker_effort,
+            rotated,
+            self.state
+        );
+
+        self.state != NodeState::Quarantined
     }
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let node_name = args.get(1).expect("Provide node name");
+    let node_name = args.get(1).cloned().unwrap_or("node".to_string());
 
-    let mut node = Node::new(node_name);
-    let mut attacker = Attacker::new();
+    let mut node = Node::new(&node_name);
 
-    println!("Starting Phase 26-2 for {}", node.name);
+    println!("Starting Phase 26-3 (Adversary Fatigue) for {}", node.name);
 
     for tick in 0..30 {
-        if let NodeState::Quarantined = node.state {
-            println!("{} already quarantined — attacker wasting resources", node.name);
-            attacker.cost += 2.0;
-            continue;
-        }
-
-        node.key_age += 1;
-
-        let rotated = if node.should_rotate() {
-            node.rotate_key();
-            true
-        } else {
-            false
-        };
-
-        let attack_success = attacker.attempt_attack(&node);
-
-        if attack_success {
-            node.degrade();
-        }
-
-        node.update_state();
-
-        println!(
-            "{} | tick {} | trust {:.3} | key_age {} | rotated {} | state {:?} | attacker_cost {:.2} | attacker_eff {:.2} | attack_success {}",
-            node.name,
-            tick,
-            node.trust,
-            node.key_age,
-            rotated,
-            node.state,
-            attacker.cost,
-            attacker.efficiency.max(0.0),
-            attack_success
-        );
-
-        if let NodeState::Quarantined = node.state {
-            println!(
-                "{} QUARANTINED — attacker cost {:.2}, efficiency {:.2}",
-                node.name,
-                attacker.cost,
-                attacker.efficiency.max(0.0)
-            );
+        if !node.tick(tick) {
+            println!("{} QUARANTINED at tick {}", node.name, tick);
             break;
         }
     }
 
-    println!(
-        "{} FINISHED — total attacker cost {:.2}, final efficiency {:.2}",
-        node.name,
-        attacker.cost,
-        attacker.efficiency.max(0.0)
-    );
+    println!("{} FINISHED", node.name);
 }
