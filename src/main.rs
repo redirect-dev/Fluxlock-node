@@ -1,102 +1,107 @@
 use std::env;
-use std::fs::OpenOptions;
-use std::io::Write;
 
-// --------------------
-// CONFIGURATION
-// --------------------
-const MAX_TICKS: u32 = 10;
-const MAX_KEY_AGE: u32 = 2;
+#[derive(Debug, Clone, PartialEq)]
+enum NodeState {
+    Active,
+    Quarantined,
+}
 
-// Node that will intentionally skip key rotation
-const ADVERSARIAL_NODE: &str = "node3";
+struct Node {
+    id: String,
+    trust: f64,
+    key_age: u32,
+    state: NodeState,
+    late_rotation_streak: u32,
+}
 
-// --------------------
-// MAIN
-// --------------------
+impl Node {
+    fn new(id: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            trust: 0.80,
+            key_age: 0,
+            state: NodeState::Active,
+            late_rotation_streak: 0,
+        }
+    }
+
+    /// Honest nodes rotate every 2 ticks
+    /// Malicious nodes delay rotation
+    fn should_rotate(&self, tick: u32) -> bool {
+        if self.id.contains("3") {
+            // attacker rotates very late
+            self.key_age >= 10
+        } else {
+            // honest behavior
+            tick % 2 == 1
+        }
+    }
+
+    fn rotate_key(&mut self) {
+        self.key_age = 0;
+        self.late_rotation_streak = 0;
+        self.trust = (self.trust + 0.05).min(1.0);
+    }
+
+    fn apply_trust_dynamics(&mut self) {
+        if self.key_age <= 2 {
+            // compliant behavior → protect trust
+            self.trust = (self.trust + 0.01).min(1.0);
+        } else {
+            // late rotation → increasing penalty
+            self.late_rotation_streak += 1;
+            let decay = 0.04 + (self.late_rotation_streak as f64 * 0.02);
+            self.trust = (self.trust - decay).max(0.0);
+        }
+    }
+
+    fn evaluate_state(&mut self) {
+        // Quarantine requires BOTH:
+        // 1. Low trust
+        // 2. Sustained late rotation
+        if self.trust < 0.25 && self.late_rotation_streak >= 3 {
+            self.state = NodeState::Quarantined;
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let node_id = args.get(1).expect("Node ID required").clone();
+    let node_id = args.get(1).unwrap_or(&"node1".to_string()).clone();
 
-    let log_file = format!("{}_log.csv", node_id);
-    let mut file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(&log_file)
-        .expect("Unable to create log file");
+    let mut node = Node::new(&node_id);
 
-    // CSV header
-    writeln!(
-        file,
-        "tick,node,decision,weighted_decision,trust,key_age"
-    )
-    .unwrap();
-
-    // --------------------
-    // INITIAL STATE
-    // --------------------
-    let mut trust: f64 = 0.75;
-    let mut key_age: u32 = 0;
-
-    // --------------------
-    // SIMULATION LOOP
-    // --------------------
-    for tick in 0..MAX_TICKS {
-        // Simulated decision (deterministic)
-        let decision = (tick + node_id.len() as u32) % 2;
-
-        // --------------------
-        // KEY ROTATION LOGIC
-        // --------------------
-        key_age += 1;
-
-        if key_age >= MAX_KEY_AGE {
-            if node_id != ADVERSARIAL_NODE {
-                // Honest node rotates key
-                key_age = 0;
-            } else {
-                // Adversarial node skips rotation
-                key_age += 1;
-            }
+    for tick in 0..20 {
+        if node.state == NodeState::Quarantined {
+            println!(
+                "{} QUARANTINED at tick {}",
+                node.id, tick
+            );
+            break;
         }
 
-        // --------------------
-        // TRUST UPDATE
-        // --------------------
-        if key_age > MAX_KEY_AGE {
-            // Penalize stale keys
-            trust -= 0.10;
+        node.key_age += 1;
+
+        let rotated = if node.should_rotate(tick) {
+            node.rotate_key();
+            true
         } else {
-            // Reward healthy behavior slightly
-            trust += 0.05;
-        }
+            false
+        };
 
-        // Clamp trust
-        if trust > 1.0 {
-            trust = 1.0;
-        }
-        if trust < 0.0 {
-            trust = 0.0;
-        }
-
-        let weighted_decision = (decision as f64 * trust).round() as u32;
-
-        // --------------------
-        // LOG OUTPUT
-        // --------------------
-        writeln!(
-            file,
-            "{},{},{},{},{:.3},{}",
-            tick, node_id, decision, weighted_decision, trust, key_age
-        )
-        .unwrap();
+        node.apply_trust_dynamics();
+        node.evaluate_state();
 
         println!(
-            "{} | tick {} | decision {} | trust {:.3} | key_age {}",
-            node_id, tick, decision, trust, key_age
+            "{} | tick {} | trust {:.3} | key_age {} | rotated {} | state {:?}",
+            node.id,
+            tick,
+            node.trust,
+            node.key_age,
+            rotated,
+            node.state
         );
     }
 
-    println!("{} FINISHED", node_id);
+    println!("{} FINISHED", node.id);
 }
