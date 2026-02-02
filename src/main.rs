@@ -1,136 +1,95 @@
-use rand::{Rng, SeedableRng};
-use rand::rngs::StdRng;
-use std::env;
-use std::fs::{OpenOptions, read_to_string};
+use std::fs::File;
 use std::io::Write;
-use std::thread;
-use std::time::Duration;
+use rand::Rng;
 
-const TICKS: usize = 10;
-const PENALTY_THRESHOLD: i32 = 20;
-const RECOVERY_THRESHOLD: i32 = 10;
-const PENALTY_MULTIPLIER: f64 = 0.85;
-const RECOVERY_RATE: f64 = 0.01;
-const MIN_REP: f64 = 0.10;
-const MAX_REP: f64 = 1.00;
+#[derive(Debug)]
+struct Node {
+    id: usize,
+    stake: f64,
+    trust: f64,
+    decision: f64, // Node's current vote/decision value
+}
+
+impl Node {
+    fn new(id: usize, stake: f64) -> Self {
+        Node {
+            id,
+            stake,
+            trust: 1.0, // initial trust factor
+            decision: 0.0,
+        }
+    }
+
+    fn make_decision(&mut self) {
+        // Decision influenced by some randomness
+        let mut rng = rand::thread_rng();
+        self.decision = rng.gen_range(0.0..1.0);
+    }
+
+    fn update_trust(&mut self, consensus: f64) {
+        // Simple trust model: if decision close to consensus, trust increases
+        let diff = (self.decision - consensus).abs();
+        if diff < 0.1 {
+            self.trust += 0.05; // reward aligned nodes
+        } else {
+            self.trust -= 0.05; // penalize misaligned nodes
+        }
+        if self.trust < 0.1 {
+            self.trust = 0.1; // min trust
+        }
+        if self.trust > 2.0 {
+            self.trust = 2.0; // max trust
+        }
+    }
+}
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let node_id = args.get(1).expect("node id required").clone();
+    let num_nodes = 5;
+    let num_ticks = 100;
+    let mut nodes: Vec<Node> = (0..num_nodes)
+        .map(|i| Node::new(i, 1.0 + i as f64)) // example stake
+        .collect();
 
-    let mut rng = StdRng::from_entropy();
-    let mut reputation: f64 = 1.0;
-
-    let adversarial = node_id == "node3";
-
-    // Define node stake for governance weighting
-    let node_stake: f64 = match node_id.as_str() {
-        "node1" => 2.0,
-        "node2" => 1.0,
-        "node3" => 0.5, // adversarial
-        "node4" => 1.5,
-        "node5" => 1.0,
-        _ => 1.0,
-    };
-
-    // Prepare CSV log
-    {
-        let mut file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(format!("{}_log.csv", node_id))
+    let mut log_files = Vec::new();
+    for i in 0..num_nodes {
+        let file = File::create(format!("node{}_log.csv", i + 1)).expect("Cannot create log");
+        let mut writer = csv::Writer::from_writer(file);
+        writer
+            .write_record(&["tick", "node", "decision", "weighted_decision", "trust"])
             .unwrap();
-        writeln!(file, "tick,node,entropy,weighted_consensus,delta,reputation,stake").unwrap();
+        log_files.push(writer);
     }
 
-    for tick in 0..TICKS {
-        // Generate entropy
-        let mut entropy: i32 = rng.gen_range(70..100);
-        if adversarial && tick % 2 == 0 {
-            entropy += rng.gen_range(40..80);
+    for tick in 0..num_ticks {
+        // Step 1: each node makes a decision
+        for node in nodes.iter_mut() {
+            node.make_decision();
         }
 
-        // Append current state to network_state.txt
-        {
-            let mut file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("network_state.txt")
+        // Step 2: compute weighted consensus
+        let total_weight: f64 = nodes.iter().map(|n| n.stake * n.trust).sum();
+        let weighted_consensus: f64 = nodes
+            .iter()
+            .map(|n| n.decision * n.stake * n.trust)
+            .sum::<f64>()
+            / total_weight;
+
+        // Step 3: update trust and log
+        for (i, node) in nodes.iter_mut().enumerate() {
+            node.update_trust(weighted_consensus);
+
+            log_files[i]
+                .write_record(&[
+                    tick.to_string(),
+                    node.id.to_string(),
+                    format!("{:.4}", node.decision),
+                    format!("{:.4}", node.decision * node.stake * node.trust),
+                    format!("{:.4}", node.trust),
+                ])
                 .unwrap();
-            writeln!(file, "{},{},{:.3},{}", tick, node_id, entropy, reputation).unwrap();
+            log_files[i].flush().unwrap();
         }
-
-        thread::sleep(Duration::from_millis(50));
-
-        // Read network state and calculate weighted consensus
-        let state = read_to_string("network_state.txt").unwrap_or_default();
-
-        let mut weighted_sum = 0.0;
-        let mut rep_stake_sum = 0.0;
-
-        for line in state.lines() {
-            let parts: Vec<&str> = line.split(',').collect();
-            if parts.len() != 4 {
-                continue;
-            }
-
-            let t: usize = parts[0].parse().unwrap_or(999);
-            if t != tick {
-                continue;
-            }
-
-            let ent: f64 = parts[2].parse().unwrap_or(0.0);
-            let rep: f64 = parts[3].parse().unwrap_or(0.0);
-
-            // Assign stake based on node
-            let stake: f64 = match parts[1] {
-                "node1" => 2.0,
-                "node2" => 1.0,
-                "node3" => 0.5,
-                "node4" => 1.5,
-                "node5" => 1.0,
-                _ => 1.0,
-            };
-
-            weighted_sum += ent * rep * stake;
-            rep_stake_sum += rep * stake;
-        }
-
-        let consensus = if rep_stake_sum > 0.0 {
-            (weighted_sum / rep_stake_sum) as i32
-        } else {
-            entropy
-        };
-
-        let delta = (entropy - consensus).abs();
-
-        // Update reputation
-        if delta > PENALTY_THRESHOLD {
-            reputation *= PENALTY_MULTIPLIER;
-        } else if delta <= RECOVERY_THRESHOLD {
-            reputation += RECOVERY_RATE;
-        }
-
-        reputation = reputation.clamp(MIN_REP, MAX_REP);
-
-        // Log to CSV
-        {
-            let mut file = OpenOptions::new()
-                .append(true)
-                .open(format!("{}_log.csv", node_id))
-                .unwrap();
-            writeln!(file, "{},{},{},{},{},{:.3},{:.1}", 
-                tick, node_id, entropy, consensus, delta, reputation, node_stake).unwrap();
-        }
-
-        println!(
-            "{} | tick {} | entropy {} | weighted_consensus {} | rep {:.3} | stake {:.1}",
-            node_id, tick, entropy, consensus, reputation, node_stake
-        );
-
-        thread::sleep(Duration::from_millis(200));
     }
 
-    println!("{} FINISHED", node_id);
+    println!("Simulation complete. Logs saved to nodeX_log.csv");
 }
