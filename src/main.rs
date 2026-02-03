@@ -1,121 +1,153 @@
 use std::env;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 enum NodeState {
     Active,
     Degraded,
     Quarantined,
 }
 
+const MAX_TICKS: u32 = 40;
+
+// Trust thresholds
+const DEGRADED_THRESHOLD: f64 = 0.50;
+const QUARANTINE_THRESHOLD: f64 = 0.35;
+const RECOVERY_THRESHOLD: f64 = 0.55;
+
+// Behavior parameters
+const TRUST_DECAY: f64 = 0.04;
+const TRUST_REWARD: f64 = 0.02;
+const ROTATION_INTERVAL: u32 = 2;
+
+// Proof-of-behavior requirement
+const REQUIRED_GOOD_BEHAVIOR: u32 = 10;
+
+#[derive(Debug)]
 struct Node {
     name: String,
     trust: f64,
     key_age: u32,
-    effort: f64,
-
-    // Conservative recovery controls
-    proof_counter: u32,          // proof-of-good-behavior counter
-    max_recoverable_trust: f64,  // recovery cap by state
+    rotated: bool,
     state: NodeState,
+    good_behavior_streak: u32,
 }
 
 impl Node {
     fn new(name: &str) -> Self {
-        Self {
+        Node {
             name: name.to_string(),
             trust: 0.80,
             key_age: 0,
-            effort: 1.0,
-            proof_counter: 0,
-            max_recoverable_trust: 1.0,
+            rotated: false,
             state: NodeState::Active,
+            good_behavior_streak: 0,
         }
     }
 
     fn should_rotate(&self) -> bool {
-        self.key_age >= 2
+        self.key_age >= ROTATION_INTERVAL
     }
 
-    fn evaluate_state(&mut self) {
-        self.state = if self.trust < 0.25 {
+    fn rotate_key(&mut self) {
+        self.key_age = 0;
+        self.rotated = true;
+        self.trust = (self.trust + TRUST_REWARD).min(1.0);
+    }
+
+    fn decay_trust(&mut self) {
+        self.trust = (self.trust - TRUST_DECAY).max(0.0);
+    }
+
+    fn update_state(&mut self) {
+        self.state = if self.trust < QUARANTINE_THRESHOLD {
             NodeState::Quarantined
-        } else if self.trust < 0.50 {
+        } else if self.trust < DEGRADED_THRESHOLD {
             NodeState::Degraded
         } else {
             NodeState::Active
         };
-
-        // Conservative recovery ceilings
-        self.max_recoverable_trust = match self.state {
-            NodeState::Quarantined => 0.60,
-            NodeState::Degraded => 0.80,
-            NodeState::Active => 1.00,
-        };
     }
 
-    fn tick(&mut self, tick: u32) -> bool {
-        // Simulated behavior:
-        // even ticks = good behavior, odd ticks = noisy environment
-        let good_behavior = tick % 2 == 0;
+    fn attempt_recovery(&mut self) {
+        if self.state == NodeState::Quarantined {
+            println!(
+                "{} attempting recovery (good_behavior_streak = {})",
+                self.name, self.good_behavior_streak
+            );
 
-        // Adversary effort always rises over time
-        self.effort *= 1.12;
+            if self.good_behavior_streak >= REQUIRED_GOOD_BEHAVIOR {
+                self.trust = (self.trust + 0.10).min(1.0);
+                self.state = if self.trust >= RECOVERY_THRESHOLD {
+                    NodeState::Active
+                } else {
+                    NodeState::Degraded
+                };
 
-        let rotated = if self.should_rotate() {
-            self.key_age = 0;
-            true
-        } else {
-            self.key_age += 1;
-            false
-        };
-
-        if good_behavior && rotated {
-            // Conservative recovery path
-            self.proof_counter += 1;
-
-            if self.proof_counter >= 5 {
-                // Slow recovery
-                self.trust += 0.025;
+                println!(
+                    "{} partial recovery → trust {:.3}, state {:?}",
+                    self.name, self.trust, self.state
+                );
+            } else {
+                println!("{} recovery denied (insufficient proof)", self.name);
             }
-        } else {
-            // Fast decay on any failure
-            self.proof_counter = 0;
-            self.trust -= 0.08;
         }
-
-        self.evaluate_state();
-
-        // Clamp trust conservatively
-        if self.trust > self.max_recoverable_trust {
-            self.trust = self.max_recoverable_trust;
-        }
-        if self.trust < 0.0 {
-            self.trust = 0.0;
-        }
-
-        println!(
-            "{} | tick {:>2} | trust {:.3} | key_age {:>2} | effort {:.2} | rotated {:<5} | state {:?}",
-            self.name, tick, self.trust, self.key_age, self.effort, rotated, self.state
-        );
-
-        self.state == NodeState::Quarantined
     }
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let node_name = args.get(1).map(String::as_str).unwrap_or("node");
+    let node_name = args.get(1).unwrap_or(&"node".to_string()).clone();
 
-    println!("Starting Phase 27-2 (Conservative Trust Recovery) for {}", node_name);
+    let mut node = Node::new(&node_name);
 
-    let mut node = Node::new(node_name);
+    println!(
+        "Starting Phase 28-2B (Balanced Recovery w/ Proof of Good Behavior) for {}",
+        node.name
+    );
 
-    for tick in 0..30 {
-        let quarantined = node.tick(tick);
-        if quarantined {
-            println!("{} QUARANTINED at tick {}", node.name, tick);
-            break;
+    for tick in 0..MAX_TICKS {
+        node.rotated = false;
+
+        // --- Key aging ---
+        node.key_age += 1;
+
+        // --- Key rotation ---
+        if node.should_rotate() {
+            node.rotate_key();
         }
+
+        // --- Trust decay ---
+        let previous_trust = node.trust;
+        node.decay_trust();
+
+        // --- GOOD BEHAVIOR LOGIC (CRITICAL FIX) ---
+        // Good behavior only counts if trust is improving
+        if node.trust > previous_trust && node.state != NodeState::Quarantined {
+            node.good_behavior_streak += 1;
+        } else {
+            node.good_behavior_streak = 0;
+        }
+
+        // --- Update node state ---
+        node.update_state();
+
+        // --- Attempt recovery if quarantined ---
+        if node.state == NodeState::Quarantined {
+            println!("{} QUARANTINED at tick {}", node.name, tick);
+            node.good_behavior_streak = 0; // force fresh proof
+            node.attempt_recovery();
+        }
+
+        println!(
+            "{} | tick {:>2} | trust {:.3} | key_age {:>2} | rotated {:<5} | good {:>2} | state {:?}",
+            node.name,
+            tick,
+            node.trust,
+            node.key_age,
+            node.rotated,
+            node.good_behavior_streak,
+            node.state
+        );
     }
 
     println!("{} FINISHED", node.name);
