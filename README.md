@@ -1,47 +1,45 @@
 # Fluxlock
 
-Fluxlock is an experimental security protocol exploring **continuous key rotation**, **dynamic trust scoring**, and **self-locking network behavior** under sustained adversarial pressure.
+Fluxlock is a crypto-native security protocol designed to resist
+*sustained, adaptive, and asymmetric attacks* through time-based defense,
+continuous key rotation, and adversary fatigue.
 
-Rather than attempting to prevent breaches absolutely, Fluxlock assumes compromise is possible and focuses on **containment, degradation, and recovery**.
-
----
-
-## Core Concept
-
-> A lock whose keys are always changing — and which locks itself when trust collapses.
-
-Fluxlock models security as a living system:
-- Keys rotate continuously
-- Trust decays and recovers over time
-- Nodes self-isolate when behavior degrades
-- The network can enter a *soft lock* state while keys continue rotating
+Rather than preventing failure, Fluxlock assumes failure is inevitable
+and designs recovery, trust, and liveness around that assumption.
 
 ---
 
-## Current Status
+## Core Design Principles
 
-- **Stage:** Research / Simulation
-- **Language:** Rust
-- **Latest Milestone:** Phase 29 — Network Soft Lock
-- **Focus:** Protocol behavior, not production deployment
+Fluxlock is built on the following invariants:
 
----
+- **Continuous key rotation** — keys are disposable, identity continuity is not
+- **Trust decays over time** — trust must be actively maintained
+- **Failure-first security** — degradation is expected and controlled
+- **Adversary fatigue** — attack cost grows super-linearly over time
+- **Lock-based defense** — the network hardens under pressure, not after breach
+- **Recovery is earned** — naive or instantaneous recovery is denied
 
-## Documentation
-
-- [Phase 29 — Soft Lock](docs/phase29/README.md)
-
-Earlier phases document trust decay, quarantine, recovery, and adversary fatigue models.
+Security is always prioritized over liveness during sustained attack.
 
 ---
 
-## Disclaimer
+## Project Status
 
-Fluxlock is experimental research software.  
-Do not use in production systems.
+### Phase 0 — Simulation (Complete, Frozen)
 
----
+Phase 0 validated Fluxlock’s core mechanics via a Rust-based simulation:
 
-## License
+- Node lifecycle: **Active → Degraded → Quarantined**
+- Network-wide lock escalation:
+  **Unlocked → Restricted → Soft Lock → Locked**
+- Continuous key rotation in all states
+- Trust decay under sustained pressure
+- Adversary cost escalation
+- Denial of naive recovery
+- Failure-first behavior under attack
 
-MIT
+📌 **Phase 0 is now frozen** and exists as a historical reference only.
+
+All Phase 0 code and artifacts live under:
+
