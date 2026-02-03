@@ -11,7 +11,11 @@ struct Node {
     name: String,
     trust: f64,
     key_age: u32,
-    attacker_effort: f64,
+    effort: f64,
+
+    // Conservative recovery controls
+    proof_counter: u32,          // proof-of-good-behavior counter
+    max_recoverable_trust: f64,  // recovery cap by state
     state: NodeState,
 }
 
@@ -21,88 +25,94 @@ impl Node {
             name: name.to_string(),
             trust: 0.80,
             key_age: 0,
-            attacker_effort: 1.0,
+            effort: 1.0,
+            proof_counter: 0,
+            max_recoverable_trust: 1.0,
             state: NodeState::Active,
         }
     }
 
-    fn should_rotate_key(&self) -> bool {
+    fn should_rotate(&self) -> bool {
         self.key_age >= 2
     }
 
-    fn rotate_key(&mut self) {
-        self.key_age = 0;
-        // Rotation slightly increases attack cost
-        self.attacker_effort *= 1.15;
-    }
-
-    fn apply_attack(&mut self, base_attack: f64) {
-        // Adversary fatigue grows with key age
-        let fatigue_factor = 0.12;
-        self.attacker_effort += self.key_age as f64 * fatigue_factor;
-
-        // Diminishing returns on repeated attacks
-        let effective_attack = base_attack / self.attacker_effort;
-
-        // Non-linear trust damage (super-linear)
-        let damage = effective_attack.powf(1.3);
-
-        self.trust -= damage;
-        if self.trust < 0.0 {
-            self.trust = 0.0;
-        }
-    }
-
-    fn update_state(&mut self) {
-        self.state = if self.trust < 0.20 {
+    fn evaluate_state(&mut self) {
+        self.state = if self.trust < 0.25 {
             NodeState::Quarantined
         } else if self.trust < 0.50 {
             NodeState::Degraded
         } else {
             NodeState::Active
         };
+
+        // Conservative recovery ceilings
+        self.max_recoverable_trust = match self.state {
+            NodeState::Quarantined => 0.60,
+            NodeState::Degraded => 0.80,
+            NodeState::Active => 1.00,
+        };
     }
 
     fn tick(&mut self, tick: u32) -> bool {
-        self.key_age += 1;
+        // Simulated behavior:
+        // even ticks = good behavior, odd ticks = noisy environment
+        let good_behavior = tick % 2 == 0;
 
-        let mut rotated = false;
-        if self.should_rotate_key() {
-            self.rotate_key();
-            rotated = true;
+        // Adversary effort always rises over time
+        self.effort *= 1.12;
+
+        let rotated = if self.should_rotate() {
+            self.key_age = 0;
+            true
+        } else {
+            self.key_age += 1;
+            false
+        };
+
+        if good_behavior && rotated {
+            // Conservative recovery path
+            self.proof_counter += 1;
+
+            if self.proof_counter >= 5 {
+                // Slow recovery
+                self.trust += 0.025;
+            }
+        } else {
+            // Fast decay on any failure
+            self.proof_counter = 0;
+            self.trust -= 0.08;
         }
 
-        // Simulated adversarial pressure
-        let base_attack = if tick % 2 == 0 { 0.08 } else { 0.10 };
-        self.apply_attack(base_attack);
+        self.evaluate_state();
 
-        self.update_state();
+        // Clamp trust conservatively
+        if self.trust > self.max_recoverable_trust {
+            self.trust = self.max_recoverable_trust;
+        }
+        if self.trust < 0.0 {
+            self.trust = 0.0;
+        }
 
         println!(
-            "{} | tick {} | trust {:.3} | key_age {} | effort {:.2} | rotated {} | state {:?}",
-            self.name,
-            tick,
-            self.trust,
-            self.key_age,
-            self.attacker_effort,
-            rotated,
-            self.state
+            "{} | tick {:>2} | trust {:.3} | key_age {:>2} | effort {:.2} | rotated {:<5} | state {:?}",
+            self.name, tick, self.trust, self.key_age, self.effort, rotated, self.state
         );
 
-        self.state != NodeState::Quarantined
+        self.state == NodeState::Quarantined
     }
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let node_name = args.get(1).cloned().unwrap_or("node".to_string());
+    let node_name = args.get(1).map(String::as_str).unwrap_or("node");
 
-    let mut node = Node::new(&node_name);
+    println!("Starting Phase 27-2 (Conservative Trust Recovery) for {}", node_name);
 
-    println!("Starting Phase 26-3 (Adversary Fatigue) for {}", node.name);
+    let mut node = Node::new(node_name);
 
     for tick in 0..30 {
-        if !node.tick(tick) {
+        let quarantined = node.tick(tick);
+        if quarantined {
             println!("{} QUARANTINED at tick {}", node.name, tick);
             break;
         }
