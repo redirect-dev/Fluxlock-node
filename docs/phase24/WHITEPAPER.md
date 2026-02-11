@@ -207,3 +207,87 @@ Over time, honest participation becomes the dominant survival and economic strat
 
 git commit -m "Expand whitepaper with adversary fatigue model and sustained attack economic asymmetry narrative"
 
+---
+
+## Security Resource and Survivability-Based Value
+
+Fluxlock introduces the concept of a security resource:
+a protocol-native measurement of long-term survivability and verified participation.
+
+This resource is not inherently economic.  
+It is a measurement of defensive reliability over time.
+
+---
+
+### Survivability as Signal
+
+Fluxlock assumes that long-term honest operation under adversarial pressure
+is the strongest signal of network reliability.
+
+Security resource accumulation reflects:
+
+- Sustained compliant participation
+- Operation during elevated lock states
+- Successful recovery from degraded states
+- Long-duration trust stability
+
+---
+
+### Separation of Trust and Survivability
+
+Fluxlock distinguishes between:
+
+Trust:
+A short-term operational confidence measurement.
+
+Security Resource:
+A long-term historical survivability measurement.
+
+This prevents short-term behavior manipulation from producing long-term advantage.
+
+---
+
+### Security Resource Accumulation Dynamics
+
+Security resource increases through:
+
+- Honest operation during normal conditions
+- Accelerated accumulation during network lock states
+- Verified recovery completion after compromise events
+
+Security resource may decay through:
+
+- Extended quarantine
+- Confirmed malicious behavior
+- Failed recovery validation
+
+---
+
+### Time-Based Defensive Advantage
+
+Over long time horizons:
+
+Honest participants accumulate survivability signal.  
+Adversarial participants accumulate trust penalties and resource decay.
+
+This creates structural defensive advantage without requiring immediate adversary detection.
+
+---
+
+### Proto-Economic Meaning
+
+Security resource provides a foundation for future economic mapping.
+
+Any economic layer built on Fluxlock SHOULD:
+
+Reward long-term survivability.  
+Penalize repeated compromise cycles.  
+Prevent short-term attack success from producing durable economic gain.  
+
+---
+
+### Security Outcome
+
+Fluxlock aligns long-term network health with long-term participant advantage,
+ensuring that the most reliable participants naturally gain the greatest influence over time.
+
