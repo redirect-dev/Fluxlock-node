@@ -371,3 +371,71 @@ Fluxlock testnets measure:
 Fluxlock ensures that security guarantees are not theoretical,
 but are validated under deterministic, replayable, adversarial testnet conditions.
 
+---
+
+## Realistic Threat Model and Adversary Assumptions
+
+Fluxlock is designed under the assumption that adversaries are persistent,
+adaptive, and economically motivated.
+
+Unlike systems that assume short-lived or opportunistic attacks,
+Fluxlock assumes that successful attackers will attempt to maintain access
+for as long as possible.
+
+---
+
+### Persistent Adversary Assumption
+
+Fluxlock assumes adversaries will:
+
+- Maintain long-term presence attempts
+- Adapt behavior in response to defensive changes
+- Attempt repeated reinsertion after removal
+- Attempt to exploit recovery pathways
+- Attempt to coordinate multi-node attacks
+
+Security is therefore optimized for long-term defensive endurance,
+not short-term attack rejection.
+
+---
+
+### Partial Compromise Reality
+
+Fluxlock does not assume perfect compromise prevention.
+
+Instead, Fluxlock assumes:
+
+Some nodes will eventually be compromised.  
+Some attacks will temporarily succeed.  
+
+The protocol is designed to ensure that compromise cannot scale
+into systemic or durable advantage.
+
+---
+
+### Economic Adversary Behavior
+
+Fluxlock assumes attackers may attempt to:
+
+- Accumulate economic advantage before detection
+- Cycle identities to bypass trust decay
+- Manipulate recovery to regain influence quickly
+
+The protocol is designed to make these strategies economically unstable over time.
+
+---
+
+### Network-Level Attack Expectations
+
+Fluxlock is designed to resist:
+
+- Coordinated Sybil cluster attacks
+- Trust poisoning campaigns
+- Recovery manipulation campaigns
+- Long-duration low-signal infiltration attempts
+
+---
+
+### Sec
+
+
