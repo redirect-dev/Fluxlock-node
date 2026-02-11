@@ -205,3 +205,5 @@ Compromise does not create durable advantage.
 
 Over time, honest participation becomes the dominant survival and economic strategy.
 
+git commit -m "Expand whitepaper with adversary fatigue model and sustained attack economic asymmetry narrative"
+
