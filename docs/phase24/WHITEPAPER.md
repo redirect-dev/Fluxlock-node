@@ -291,3 +291,83 @@ Prevent short-term attack success from producing durable economic gain.
 Fluxlock aligns long-term network health with long-term participant advantage,
 ensuring that the most reliable participants naturally gain the greatest influence over time.
 
+---
+
+## Implementation Path and Testnet Validation Strategy
+
+Fluxlock is designed to move from specification to implementation
+through deterministic, replayable, and testnet-validated execution stages.
+
+---
+
+### Reference Protocol Engine
+
+Fluxlock implementations are expected to follow a deterministic evaluation pipeline:
+
+1. Input normalization
+2. Trust evaluation
+3. Lifecycle transition evaluation
+4. Lock state evaluation
+5. Recovery validation
+6. Security resource update
+7. State publication
+
+This deterministic ordering ensures that all nodes produce identical
+defensive decisions given identical inputs.
+
+---
+
+### Replay-Driven Validation
+
+Fluxlock requires replay compatibility across simulation and production environments.
+
+Replay validation allows:
+
+- Verification of trust decay behavior under attack
+- Verification of lock escalation correctness
+- Verification of recovery behavior
+- Verification of adversary fatigue cost curves
+
+---
+
+### Testnet Simulation Environment
+
+Fluxlock testnets are designed to validate protocol behavior under realistic adversarial conditions.
+
+Testnet environments support:
+
+- Multi-node deterministic protocol execution
+- Controlled adversarial scenario injection
+- Metrics collection for trust, lock state, recovery, and resource behavior
+- Replay capture for regression validation
+
+---
+
+### Adversarial Scenario Validation
+
+Testnets MUST support simulation of:
+
+- Sustained multi-node attack pressure
+- Identity churn attempts
+- Coordinated recovery manipulation attempts
+- Lock state stress conditions
+
+---
+
+### Metrics-Driven Security Verification
+
+Fluxlock testnets measure:
+
+- Trust decay curves under pressure
+- Lock escalation timing and stability
+- Recovery success and failure rates
+- Security resource accumulation behavior
+- Attack cost growth over time
+
+---
+
+### Implementation Security Goal
+
+Fluxlock ensures that security guarantees are not theoretical,
+but are validated under deterministic, replayable, adversarial testnet conditions.
+
