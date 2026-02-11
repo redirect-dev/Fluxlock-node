@@ -130,3 +130,78 @@ while defenders accumulate survivability signal and security resource.
 
 This produces a structural asymmetry favoring long-term honest participants.
 
+---
+
+## Adversary Fatigue and Sustained Attack Economics
+
+Traditional distributed systems often assume attacks are burst events.
+Fluxlock assumes attacks are persistent, adaptive, and economically motivated.
+
+The protocol is designed such that sustained adversarial presence becomes
+increasingly expensive over time.
+
+---
+
+### Sustained Pressure Assumption
+
+Fluxlock assumes adversaries will:
+
+- Maintain long-duration attack campaigns
+- Attempt repeated reinsertion after detection
+- Adapt behavior in response to defensive escalation
+- Attempt to manipulate recovery pathways
+
+The protocol is therefore optimized for adversary endurance exhaustion,
+not short-term attack rejection.
+
+---
+
+### Cost Escalation Through Defensive Coordination
+
+As adversarial pressure increases, Fluxlock increases:
+
+- Verification strictness
+- Participation requirements
+- Recovery difficulty
+- Trust reinforcement thresholds
+
+These increases are coordinated at the network level via lock escalation states.
+
+---
+
+### Time-Based Attack Inefficiency
+
+Fluxlock intentionally creates conditions where:
+
+Maintaining attack presence requires continuous resource expenditure,
+while defensive survivability signals accumulate passively through honest operation.
+
+This produces a long-term economic asymmetry.
+
+---
+
+### Repeated Attack Marginal Cost
+
+Each repeated attack attempt becomes more expensive due to:
+
+- Lower baseline trust
+- Increased recovery observation requirements
+- Increased lock participation verification
+- Increased monitoring sensitivity
+
+Over time, adversarial reinsertion becomes economically irrational.
+
+---
+
+### Security Outcome
+
+Fluxlock does not attempt to prevent all compromise events.
+
+Instead, Fluxlock ensures:
+
+Compromise does not scale.  
+Compromise does not compound.  
+Compromise does not create durable advantage.
+
+Over time, honest participation becomes the dominant survival and economic strategy.
+
