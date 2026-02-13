@@ -63,6 +63,7 @@ impl LockState {
 pub struct RecoveryState {
     pub is_recovering: bool,
     pub recovery_ticks: u64,
+    pub grace_ticks_remaining: u64,
 }
 
 impl RecoveryState {
@@ -70,6 +71,7 @@ impl RecoveryState {
         Self {
             is_recovering: false,
             recovery_ticks: 0,
+            grace_ticks_remaining: 0,
         }
     }
 }

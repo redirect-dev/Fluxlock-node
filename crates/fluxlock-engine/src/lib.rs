@@ -1,5 +1,3 @@
-/// Fluxlock Engine Skeleton
-
 use fluxlock_core::EngineCompositeState;
 
 pub struct FluxlockEngine;
@@ -7,6 +5,20 @@ pub struct FluxlockEngine;
 impl FluxlockEngine {
 
     pub fn execute_tick(state: &mut EngineCompositeState) {
+
+        // ===============================
+        // RECOVERY GRACE WINDOW ACTIVE
+        // ===============================
+        if state.recovery.grace_ticks_remaining > 0 {
+
+            state.recovery.grace_ticks_remaining -= 1;
+
+            // During grace:
+            // No decay
+            // No lock escalation
+            // No lifecycle downgrade
+            return;
+        }
 
         // ===============================
         // TRUST DECAY
@@ -36,24 +48,25 @@ impl FluxlockEngine {
         }
 
         // ===============================
-        // RECOVERY COMPLETION (NEW)
+        // RECOVERY COMPLETION
         // ===============================
         if state.recovery.is_recovering && state.recovery.recovery_ticks >= 5 {
 
-            // Lower lock level
+            // Unlock
             state.lock.level = 0;
-
-            // Reset lifecycle
             state.lifecycle.stage = 0;
 
             // Exit recovery
             state.recovery.is_recovering = false;
             state.recovery.recovery_ticks = 0;
 
-            // Restore minimal trust floor (placeholder behavior)
+            // Restore trust floor
             if state.trust.trust_score < 25.0 {
                 state.trust.trust_score = 25.0;
             }
+
+            // Activate grace window
+            state.recovery.grace_ticks_remaining = 5;
         }
     }
 }
