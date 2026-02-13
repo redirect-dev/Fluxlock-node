@@ -1,25 +1,25 @@
 /// Fluxlock Engine Skeleton
-///
-/// Engine now operates on composite protocol state.
 
-use fluxlock_core::{EngineCompositeState};
+use fluxlock_core::EngineCompositeState;
 
 pub struct FluxlockEngine;
 
 impl FluxlockEngine {
-    /// Execute one simple protocol tick.
-    ///
-    /// Current behavior:
-    /// - Applies trust decay
-    /// - Placeholder for lifecycle evaluation
+
     pub fn execute_tick(state: &mut EngineCompositeState) {
 
-        // Simple trust decay placeholder
+        // Trust decay
         state.trust.decay(5.0);
 
-        // Placeholder lifecycle logic
+        // Lifecycle placeholder logic
         if state.trust.trust_score < 50.0 {
             state.lifecycle.stage = 1;
         }
+
+        // Lock placeholder logic
+        if state.trust.trust_score < 30.0 {
+            state.lock.level = 1;
+        }
     }
+
 }
