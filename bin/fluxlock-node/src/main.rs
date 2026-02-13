@@ -9,7 +9,7 @@ fn main() {
 
     println!("Initial State: {:?}", state);
 
-    for _ in 0..20 {
+   for _ in 0..25 {
         clock.advance();
         FluxlockEngine::execute_tick(&mut state);
 

@@ -1,5 +1,9 @@
 /// Fluxlock Core State Definitions
 
+// ===============================
+// TRUST STATE
+// ===============================
+
 #[derive(Debug, Clone)]
 pub struct TrustState {
     pub trust_score: f64,
@@ -21,7 +25,10 @@ impl TrustState {
     }
 }
 
-/// Lifecycle State (very early placeholder version)
+// ===============================
+// LIFECYCLE STATE
+// ===============================
+
 #[derive(Debug, Clone)]
 pub struct LifecycleState {
     pub stage: u8,
@@ -32,7 +39,11 @@ impl LifecycleState {
         Self { stage: 0 }
     }
 }
-/// Network Lock State (early stub)
+
+// ===============================
+// LOCK STATE
+// ===============================
+
 #[derive(Debug, Clone)]
 pub struct LockState {
     pub level: u8,
@@ -44,31 +55,29 @@ impl LockState {
     }
 }
 
-/// Composite Engine State
-///
-/// This is the beginning of the full protocol state container.
+// ===============================
+// RECOVERY STATE
+// ===============================
+
 #[derive(Debug, Clone)]
-pub struct EngineCompositeState {
-    pub trust: TrustState,
-    pub lifecycle: LifecycleState,
-    pub lock: LockState,
+pub struct RecoveryState {
+    pub is_recovering: bool,
+    pub recovery_ticks: u64,
 }
 
-
-impl EngineCompositeState {
+impl RecoveryState {
     pub fn new() -> Self {
         Self {
-            trust: TrustState::new(100.0),
-            lifecycle: LifecycleState::new(),
-            lock: LockState::new(),
+            is_recovering: false,
+            recovery_ticks: 0,
         }
     }
 }
 
-/// Deterministic Protocol Tick Clock
-///
-/// This represents protocol time progression.
-/// This will later support replay alignment and network sync.
+// ===============================
+// TICK CLOCK
+// ===============================
+
 #[derive(Debug, Clone)]
 pub struct TickClock {
     pub current_tick: u64,
@@ -81,5 +90,28 @@ impl TickClock {
 
     pub fn advance(&mut self) {
         self.current_tick += 1;
+    }
+}
+
+// ===============================
+// COMPOSITE ENGINE STATE
+// ===============================
+
+#[derive(Debug, Clone)]
+pub struct EngineCompositeState {
+    pub trust: TrustState,
+    pub lifecycle: LifecycleState,
+    pub lock: LockState,
+    pub recovery: RecoveryState,
+}
+
+impl EngineCompositeState {
+    pub fn new() -> Self {
+        Self {
+            trust: TrustState::new(100.0),
+            lifecycle: LifecycleState::new(),
+            lock: LockState::new(),
+            recovery: RecoveryState::new(),
+        }
     }
 }
