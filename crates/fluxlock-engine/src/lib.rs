@@ -6,19 +6,29 @@ impl FluxlockEngine {
 
     pub fn execute_tick(state: &mut EngineCompositeState) {
 
-        // ===============================
-        // RECOVERY GRACE WINDOW ACTIVE
-        // ===============================
-        if state.recovery.grace_ticks_remaining > 0 {
+       // ===============================
+       // RECOVERY GRACE WINDOW ACTIVE
+       // ===============================
+if state.recovery.grace_ticks_remaining > 0 {
 
-            state.recovery.grace_ticks_remaining -= 1;
+    // Trust rebuild during grace
+    if state.trust.trust_score < 50.0 {
+        state.trust.trust_score += 3.0;
 
-            // During grace:
-            // No decay
-            // No lock escalation
-            // No lifecycle downgrade
-            return;
+        if state.trust.trust_score > 50.0 {
+            state.trust.trust_score = 50.0;
         }
+    }
+
+    state.recovery.grace_ticks_remaining -= 1;
+
+    // During grace:
+    // No decay
+    // No lock escalation
+    // No lifecycle downgrade
+    return;
+}
+
 
         // ===============================
         // TRUST DECAY
