@@ -76,7 +76,15 @@ if state.recovery.grace_ticks_remaining > 0 {
             }
 
             // Activate grace window
-            state.recovery.grace_ticks_remaining = 5;
+            // Activate adaptive grace window based on recovery severity
+state.recovery.grace_ticks_remaining = if state.trust.trust_score <= 10.0 {
+    8
+} else if state.trust.trust_score <= 20.0 {
+    6
+} else {
+    4
+};
+
         }
     }
 }
