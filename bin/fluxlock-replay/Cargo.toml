@@ -3,9 +3,16 @@ name = "fluxlock-replay-bin"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "fluxlock-replay-bin"
+path = "src/main.rs"
+
 [dependencies]
 fluxlock-core = { path = "../../crates/fluxlock-core" }
 fluxlock-engine = { path = "../../crates/fluxlock-engine" }
 fluxlock-replay = { path = "../../crates/fluxlock-replay" }
+
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+blake3 = "1.5"
+hex = "0.4"
