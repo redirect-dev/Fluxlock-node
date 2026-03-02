@@ -117,3 +117,22 @@ impl EngineCompositeState {
         }
     }
 }
+#[derive(Debug, Clone)]
+pub struct TickRecord {
+    pub tick: u64,
+    pub trust_score: f64,
+    pub lifecycle_stage: u8,
+    pub lock_level: u8,
+    pub is_recovering: bool,
+}
+
+#[derive(Debug, Default)]
+pub struct TickLog {
+    pub records: Vec<TickRecord>,
+}
+
+impl TickLog {
+    pub fn record(&mut self, record: TickRecord) {
+        self.records.push(record);
+    }
+}
