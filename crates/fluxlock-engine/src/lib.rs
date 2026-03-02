@@ -1,76 +1,58 @@
-use fluxlock_core::{
-    EngineCompositeState,
-};
+﻿use fluxlock_core::EngineCompositeState;
 
-/// ============================
-/// Fluxlock Engine
-/// ============================
-pub struct FluxlockEngine;
+#[derive(Default)]
+pub struct FluxlockEngine {
+    /// Used ONLY for divergence testing
+    pub divergence_mode: bool,
+}
 
 impl FluxlockEngine {
-    /// Create a new engine instance
     pub fn new() -> Self {
-        FluxlockEngine
+        Self {
+            divergence_mode: false,
+        }
     }
 
-    /// Execute one deterministic protocol tick
     pub fn execute_tick(&mut self, state: &mut EngineCompositeState) {
-        // ----------------------------
-        // Trust decay (baseline pressure)
-        // ----------------------------
-        if !state.recovery.is_recovering {
-            state.trust.decay(5.0);
+        // Base trust decay
+        state.trust.trust_score -= 5.0;
+
+        // 🔥 INTENTIONAL DIVERGENCE
+        // This changes behavior ONLY when enabled
+        if self.divergence_mode && state.trust.trust_score == 75.0 {
+            state.trust.trust_score -= 1.0; // subtle, deterministic fault
         }
 
-        // ----------------------------
-        // Lifecycle transitions
-        // ----------------------------
-        if state.trust.trust_score < 50.0 {
-            state.lifecycle.stage = 1; // Degraded
+        // Lifecycle transition
+        if state.trust.trust_score <= 50.0 {
+            state.lifecycle.stage = 1;
         }
 
-        // ----------------------------
         // Lock escalation
-        // ----------------------------
-        if state.trust.trust_score < 25.0 {
-            state.lock.level = 1; // Restricted
+        if state.trust.trust_score <= 20.0 {
+            state.lock.level = 1;
         }
 
-        // ----------------------------
-        // Enter recovery
-        // ----------------------------
-        if state.trust.trust_score < 20.0 && !state.recovery.is_recovering {
+        // Recovery trigger
+        if state.trust.trust_score <= 15.0 {
             state.recovery.is_recovering = true;
-            state.recovery.recovery_ticks = 0;
-        }
-
-        // ----------------------------
-        // Recovery execution
-        // ----------------------------
-        if state.recovery.is_recovering {
             state.recovery.recovery_ticks += 1;
-
-            // Recovery completes after 4 ticks
-            if state.recovery.recovery_ticks >= 4 {
-                state.recovery.is_recovering = false;
-                state.recovery.recovery_ticks = 0;
-                state.recovery.grace_ticks_remaining = 5;
-
-                // Partial trust restoration
-                state.trust.trust_score = 25.0;
-
-                // Reset defensive posture
-                state.lifecycle.stage = 0;
-                state.lock.level = 0;
-            }
         }
 
-        // ----------------------------
-        // Grace window (slow trust recovery)
-        // ----------------------------
+        // Recovery completion
+        if state.recovery.recovery_ticks >= 3 {
+            state.trust.trust_score = 25.0;
+            state.lifecycle.stage = 0;
+            state.lock.level = 0;
+            state.recovery.is_recovering = false;
+            state.recovery.recovery_ticks = 0;
+            state.recovery.grace_ticks_remaining = 4;
+        }
+
+        // Grace window logic
         if state.recovery.grace_ticks_remaining > 0 {
             state.recovery.grace_ticks_remaining -= 1;
-            state.trust.recover(3.0);
+            state.trust.trust_score += 2.0;
         }
     }
 }
