@@ -1,0 +1,479 @@
+{
+  "records": [
+    {
+      "tick": 1,
+      "state": {
+        "trust": {
+          "trust_score": 95.0
+        },
+        "lifecycle": {
+          "stage": 0
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 2,
+      "state": {
+        "trust": {
+          "trust_score": 90.0
+        },
+        "lifecycle": {
+          "stage": 0
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 3,
+      "state": {
+        "trust": {
+          "trust_score": 85.0
+        },
+        "lifecycle": {
+          "stage": 0
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 4,
+      "state": {
+        "trust": {
+          "trust_score": 80.0
+        },
+        "lifecycle": {
+          "stage": 0
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 5,
+      "state": {
+        "trust": {
+          "trust_score": 75.0
+        },
+        "lifecycle": {
+          "stage": 0
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 6,
+      "state": {
+        "trust": {
+          "trust_score": 70.0
+        },
+        "lifecycle": {
+          "stage": 0
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 7,
+      "state": {
+        "trust": {
+          "trust_score": 65.0
+        },
+        "lifecycle": {
+          "stage": 0
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 8,
+      "state": {
+        "trust": {
+          "trust_score": 60.0
+        },
+        "lifecycle": {
+          "stage": 0
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 9,
+      "state": {
+        "trust": {
+          "trust_score": 55.0
+        },
+        "lifecycle": {
+          "stage": 0
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 10,
+      "state": {
+        "trust": {
+          "trust_score": 50.0
+        },
+        "lifecycle": {
+          "stage": 0
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 11,
+      "state": {
+        "trust": {
+          "trust_score": 45.0
+        },
+        "lifecycle": {
+          "stage": 1
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 12,
+      "state": {
+        "trust": {
+          "trust_score": 40.0
+        },
+        "lifecycle": {
+          "stage": 1
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 13,
+      "state": {
+        "trust": {
+          "trust_score": 35.0
+        },
+        "lifecycle": {
+          "stage": 1
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 14,
+      "state": {
+        "trust": {
+          "trust_score": 30.0
+        },
+        "lifecycle": {
+          "stage": 1
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 15,
+      "state": {
+        "trust": {
+          "trust_score": 25.0
+        },
+        "lifecycle": {
+          "stage": 1
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 16,
+      "state": {
+        "trust": {
+          "trust_score": 20.0
+        },
+        "lifecycle": {
+          "stage": 1
+        },
+        "lock": {
+          "level": 1
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 17,
+      "state": {
+        "trust": {
+          "trust_score": 15.0
+        },
+        "lifecycle": {
+          "stage": 1
+        },
+        "lock": {
+          "level": 1
+        },
+        "recovery": {
+          "is_recovering": true,
+          "recovery_ticks": 1,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 18,
+      "state": {
+        "trust": {
+          "trust_score": 15.0
+        },
+        "lifecycle": {
+          "stage": 1
+        },
+        "lock": {
+          "level": 1
+        },
+        "recovery": {
+          "is_recovering": true,
+          "recovery_ticks": 2,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 19,
+      "state": {
+        "trust": {
+          "trust_score": 15.0
+        },
+        "lifecycle": {
+          "stage": 1
+        },
+        "lock": {
+          "level": 1
+        },
+        "recovery": {
+          "is_recovering": true,
+          "recovery_ticks": 3,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 20,
+      "state": {
+        "trust": {
+          "trust_score": 28.0
+        },
+        "lifecycle": {
+          "stage": 0
+        },
+        "lock": {
+          "level": 0
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 4
+        }
+      }
+    },
+    {
+      "tick": 21,
+      "state": {
+        "trust": {
+          "trust_score": 26.0
+        },
+        "lifecycle": {
+          "stage": 1
+        },
+        "lock": {
+          "level": 1
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 3
+        }
+      }
+    },
+    {
+      "tick": 22,
+      "state": {
+        "trust": {
+          "trust_score": 24.0
+        },
+        "lifecycle": {
+          "stage": 1
+        },
+        "lock": {
+          "level": 1
+        },
+        "recovery": {
+          "is_recovering": false,
+          "recovery_ticks": 0,
+          "grace_ticks_remaining": 2
+        }
+      }
+    },
+    {
+      "tick": 23,
+      "state": {
+        "trust": {
+          "trust_score": 22.0
+        },
+        "lifecycle": {
+          "stage": 1
+        },
+        "lock": {
+          "level": 1
+        },
+        "recovery": {
+          "is_recovering": true,
+          "recovery_ticks": 1,
+          "grace_ticks_remaining": 1
+        }
+      }
+    },
+    {
+      "tick": 24,
+      "state": {
+        "trust": {
+          "trust_score": 25.0
+        },
+        "lifecycle": {
+          "stage": 1
+        },
+        "lock": {
+          "level": 1
+        },
+        "recovery": {
+          "is_recovering": true,
+          "recovery_ticks": 2,
+          "grace_ticks_remaining": 0
+        }
+      }
+    },
+    {
+      "tick": 25,
+      "state": {
+        "trust": {
+          "trust_score": 25.0
+        },
+        "lifecycle": {
+          "stage": 1
+        },
+        "lock": {
+          "level": 1
+        },
+        "recovery": {
+          "is_recovering": true,
+          "recovery_ticks": 3,
+          "grace_ticks_remaining": 0
+        }
+      }
+    }
+  ]
+}

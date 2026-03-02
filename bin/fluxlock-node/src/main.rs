@@ -1,64 +1,42 @@
 use fluxlock_core::{
     EngineCompositeState,
-    TrustState,
-    LifecycleState,
-    LockState,
-    RecoveryState,
+    TickClock,
     TickLog,
-    TickRecord,
 };
-
 use fluxlock_engine::FluxlockEngine;
+
+use std::fs::File;
+use std::io::Write;
 
 fn main() {
     println!("Fluxlock Node Starting...");
 
-    // =========================================
-    // INITIAL STATE
-    // =========================================
-    let mut state = EngineCompositeState {
-        trust: TrustState { trust_score: 100.0 },
-        lifecycle: LifecycleState { stage: 0 },
-        lock: LockState { level: 0 },
-        recovery: RecoveryState {
-            is_recovering: false,
-            recovery_ticks: 0,
-            grace_ticks_remaining: 0,
-        },
-    };
+    let mut clock = TickClock::new();
+    let mut state = EngineCompositeState::new();
+    let mut engine = FluxlockEngine::new();
 
-    // =========================================
-    // TICK LOG (NEW)
-    // =========================================
-    let mut tick_log = TickLog::default();
+    let mut tick_log = TickLog::new();
 
     println!("Initial State: {:?}", state);
 
-    // =========================================
-    // MAIN TICK LOOP
-    // =========================================
-    let total_ticks = 25;
+    for _ in 0..25 {
+        clock.advance();
+        engine.execute_tick(&mut state);
 
-    for tick in 1..=total_ticks {
-        FluxlockEngine::execute_tick(&mut state);
+        tick_log.push(clock.tick, &state);
 
-        // -------------------------------------
-        // RECORD TICK (DETERMINISTIC LOG)
-        // -------------------------------------
-        tick_log.record(TickRecord {
-            tick,
-            trust_score: state.trust.trust_score,
-            lifecycle_stage: state.lifecycle.stage,
-            lock_level: state.lock.level,
-            is_recovering: state.recovery.is_recovering,
-        });
-
-        println!("Tick {}: {:?}", tick, state);
+        println!("Tick {}: {:?}", clock.tick, state);
     }
 
-    // =========================================
-    // END
-    // =========================================
+    // Persist tick log for replay
+    let json = serde_json::to_string_pretty(&tick_log)
+        .expect("Failed to serialize tick log");
+
+    let mut file = File::create("tick_log.json")
+        .expect("Failed to create tick_log.json");
+
+    file.write_all(json.as_bytes())
+        .expect("Failed to write tick_log.json");
+
     println!("Fluxlock Node Finished.");
-    println!("Total ticks logged: {}", tick_log.records.len());
 }

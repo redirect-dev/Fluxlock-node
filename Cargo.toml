@@ -4,12 +4,13 @@ resolver = "2"
 members = [
     "crates/fluxlock-core",
     "crates/fluxlock-engine",
+    "crates/fluxlock-network",
     "crates/fluxlock-protocol",
     "crates/fluxlock-replay",
     "crates/fluxlock-persistence",
-    "crates/fluxlock-network",
     "crates/fluxlock-node-lib",
     "crates/fluxlock-testnet",
     "crates/fluxlock-metrics",
-    "bin/fluxlock-node"
+    "bin/fluxlock-replay",
+    "bin/fluxlock-node",
 ]
