@@ -1,4 +1,6 @@
-#[derive(Clone, Debug, PartialEq, Eq)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AlgorithmId {
     Ed25519,
     Secp256k1,
@@ -6,13 +8,13 @@ pub enum AlgorithmId {
     Hybrid,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RotationPolicy {
     /// Number of ticks before rotation is allowed.
     pub epoch_length: u64,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KeyState {
     /// Monotonically increasing epoch counter.
     pub key_epoch: u64,
