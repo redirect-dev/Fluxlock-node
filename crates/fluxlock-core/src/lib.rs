@@ -12,8 +12,12 @@ impl EngineCompositeState {
     pub fn new() -> Self {
         Self {
             key_state: KeyState {
-                current_pubkey: None,
-                pending_commitment: None,
+                current_classical_pubkey: None,
+                current_pq_pubkey: None,
+
+                pending_classical_commitment: None,
+                pending_pq_commitment: None,
+
                 commitment_tick: None,
             },
         }
@@ -22,10 +26,14 @@ impl EngineCompositeState {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TickInput {
-    pub commit_pubkey: Option<Vec<u8>>,
-    pub reveal_pubkey: Option<Vec<u8>>,
-    pub payload: Option<Vec<u8>>,
-    pub signature: Option<Vec<u8>>,
+    pub commit_classical: Option<Vec<u8>>,
+    pub commit_pq: Option<Vec<u8>>,
+
+    pub reveal_classical: Option<Vec<u8>>,
+    pub reveal_pq: Option<Vec<u8>>,
+
+    pub classical_signature: Option<Vec<u8>>,
+    pub pq_signature: Option<Vec<u8>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -35,7 +43,6 @@ pub struct TickRecord {
     pub state: EngineCompositeState,
     pub parent_hash: String,
     pub state_hash: String,
-    pub signature: Option<Vec<u8>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -45,6 +52,8 @@ pub struct TickLog {
 
 impl TickLog {
     pub fn new() -> Self {
-        Self { records: Vec::new() }
+        Self {
+            records: Vec::new(),
+        }
     }
 }
