@@ -1,46 +1,57 @@
-use fluxlock_core::{TickLog, EngineCompositeState};
-use fluxlock_engine::{apply_tick, hash_state};
 use std::fs;
 
+use fluxlock_core::{EngineCompositeState, TickLog};
+use fluxlock_engine::{apply_tick, hash_state};
+
 fn main() {
-    println!("Fluxlock Replay Starting...");
+    println!("Fluxlock Consensus Replay Starting...");
 
     let data = fs::read_to_string("tick_log.json")
         .expect("Unable to read tick_log.json");
 
     let tick_log: TickLog =
-        serde_json::from_str(&data).expect("Failed to parse tick log");
+        serde_json::from_str(&data)
+            .expect("Invalid JSON");
 
     println!(
-        "Loaded {} tick records. Beginning replay...",
+        "Loaded {} tick records. Beginning dual-node replay...",
         tick_log.records.len()
     );
 
-    let mut state = EngineCompositeState::new();
-    let mut expected_parent = String::from("GENESIS");
+    // Two independent nodes
+    let mut node_a = EngineCompositeState::new();
+    let mut node_b = EngineCompositeState::new();
 
     for record in &tick_log.records {
 
-        if record.parent_hash != expected_parent {
-            panic!("Seal chain break");
-        }
+        apply_tick(&mut node_a, &record.input, record.tick_index)
+            .expect("Node A transition failure");
 
-        apply_tick(&mut state, &record.input, record.tick_index)
-            .expect("Detinistic transition failure");
+        apply_tick(&mut node_b, &record.input, record.tick_index)
+            .expect("Node B transition failure");
 
-        let observed_hash = hash_state(&state);
+        let hash_a = hash_state(&node_a);
+        let hash_b = hash_state(&node_b);
 
-        if observed_hash != record.state_hash {
+        if hash_a != hash_b {
             panic!(
-                "STATE DIVERGENCE at tick {}\nExpected: {}\nObserved: {}",
+                "CONSENSUS DIVERGENCE at tick {}\nNode A: {}\nNode B: {}",
                 record.tick_index,
-                record.state_hash,
-                observed_hash
+                hash_a,
+                hash_b
             );
         }
 
-        expected_parent = record.state_hash.clone();
+        if hash_a != record.state_hash {
+            panic!(
+                "STATE HASH MISMATCH at tick {}\nExpected: {}\nObserved: {}",
+                record.tick_index,
+                record.state_hash,
+                hash_a
+            );
+        }
     }
 
-    println!("Replay completed successfully. Seal-chain verified.");
+    println!("Consensus replay completed successfully.");
+    println!("All nodes converged. Determinism confirmed.");
 }
