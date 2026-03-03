@@ -155,6 +155,7 @@ checksum = "70e796c081cee67dc755e1a36a0a172b897fab85fc3f6bc48307991f64e4eca9"
 dependencies = [
  "curve25519-dalek",
  "ed25519",
+ "rand_core",
  "serde",
  "sha2",
  "subtle",
@@ -177,13 +178,17 @@ checksum = "5baebc0774151f905a1a2cc41989300b1e6fbb29aff0ceffa1064fdd3088d582"
 name = "fluxlock-core"
 version = "0.1.0"
 dependencies = [
+ "ed25519-dalek",
  "serde",
+ "sha2",
 ]
 
 [[package]]
 name = "fluxlock-engine"
 version = "0.1.0"
 dependencies = [
+ "blake3",
+ "ed25519-dalek",
  "fluxlock-core",
 ]
 
@@ -226,10 +231,9 @@ name = "fluxlock-replay"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "ed25519-dalek",
  "fluxlock-core",
  "fluxlock-engine",
- "serde",
- "serde_json",
 ]
 
 [[package]]

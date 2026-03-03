@@ -1,5 +1,8 @@
 use serde::{Serialize, Deserialize};
+
 pub mod keystate;
+
+use keystate::{KeyState, RotationPolicy, AlgorithmId};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TrustState {
@@ -29,6 +32,7 @@ pub struct EngineCompositeState {
     pub lifecycle: LifecycleState,
     pub lock: LockState,
     pub recovery: RecoveryState,
+    pub key_state: KeyState,
 }
 
 impl EngineCompositeState {
@@ -42,13 +46,21 @@ impl EngineCompositeState {
                 recovery_ticks: 0,
                 grace_ticks_remaining: 0,
             },
+            key_state: KeyState {
+                key_epoch: 0,
+                activated_at_tick: 0,
+                algorithm: AlgorithmId::Ed25519,
+                current_pubkey: vec![],
+                next_pubkey_commitment: None,
+                rotation_policy: RotationPolicy { epoch_length: 100 },
+                rotation_override: false,
+                not_before_tick: 0,
+                not_after_tick: None,
+                parent_key_hash: None,
+            },
         }
     }
 }
-
-/* ================================
-   Invariants (AUTHORITATIVE)
-   ================================ */
 
 #[derive(Debug)]
 pub enum InvariantViolation {
@@ -58,19 +70,25 @@ pub enum InvariantViolation {
     TrustIncreasedOutsideRecovery,
 }
 
-/* ================================
-   Tick Log
-   ================================ */
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TickInput {
+    pub revealed_pubkey: Option<Vec<u8>>,
+
+    // NEW: signature authorizing this input
+    pub signature: Option<Vec<u8>>,
+
+    pub payload: Option<Vec<u8>>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TickRecord {
     pub tick_index: u64,
+    pub input: TickInput,
     pub state: EngineCompositeState,
     pub parent_hash: String,
     pub state_hash: String,
-    pub signature: Option<String>, // Phase 2.5
+    pub signature: Option<String>,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TickLog {

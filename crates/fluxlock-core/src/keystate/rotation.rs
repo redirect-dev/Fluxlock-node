@@ -1,47 +1,25 @@
-use sha2::{Digest, Sha256};
+use super::types::KeyState;
 
-use super::{KeyState, KeyStateError};
-
-pub fn should_rotate(state: &KeyState, current_tick: u64) -> bool {
-    let epoch_elapsed =
-        current_tick.saturating_sub(state.activated_at_tick) >= state.rotation_policy.epoch_length;
-
-    epoch_elapsed || state.rotation_override
+/// Determines if rotation is allowed at this tick
+pub fn should_rotate(state: &KeyState, tick_index: u64) -> bool {
+    tick_index > state.activated_at_tick
 }
 
+/// Performs deterministic key rotation
 pub fn rotate_key(
-    prev: &KeyState,
-    revealed_pubkey: Vec<u8>,
-    current_tick: u64,
-) -> Result<KeyState, KeyStateError> {
-    if !should_rotate(prev, current_tick) {
-        return Err(KeyStateError::RotationNotAllowed);
-    }
+    previous: &KeyState,
+    new_pubkey: Vec<u8>,
+    tick_index: u64,
+) -> Result<KeyState, String> {
 
-    let commitment = match &prev.next_pubkey_commitment {
-        Some(c) => c,
-        None => return Err(KeyStateError::MissingCommitment),
-    };
+    let mut new_state = previous.clone();
 
-    let mut hasher = Sha256::new();
-    hasher.update((revealed_pubkey.len() as u64).to_le_bytes());
-    hasher.update(&revealed_pubkey);
-    let calculated = hasher.finalize();
+    new_state.current_pubkey = new_pubkey;
+    new_state.key_epoch += 1;
+    new_state.activated_at_tick = tick_index;
 
-    if commitment.as_slice() != calculated.as_slice() {
-        return Err(KeyStateError::CommitmentMismatch);
-    }
+    // No commitment logic for now
+    new_state.next_pubkey_commitment = None;
 
-    Ok(KeyState {
-        key_epoch: prev.key_epoch + 1,
-        activated_at_tick: current_tick,
-        algorithm: prev.algorithm.clone(),
-        current_pubkey: revealed_pubkey,
-        next_pubkey_commitment: None,
-        rotation_policy: prev.rotation_policy.clone(),
-        rotation_override: false,
-        not_before_tick: current_tick,
-        not_after_tick: None,
-        parent_key_hash: Some(prev.hash().to_vec()),
-    })
+    Ok(new_state)
 }

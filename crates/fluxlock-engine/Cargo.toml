@@ -5,3 +5,5 @@ edition = "2024"
 
 [dependencies]
 fluxlock-core = { path = "../fluxlock-core" }
+ed25519-dalek = "2"
+blake3 = "1"

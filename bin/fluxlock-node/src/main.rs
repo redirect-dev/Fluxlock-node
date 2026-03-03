@@ -1,67 +1,98 @@
-use fluxlock_core::{EngineCompositeState, TickLog, TickRecord};
-use fluxlock_engine::FluxlockEngine;
+use fluxlock_core::{
+    EngineCompositeState,
+    TickLog,
+    TickRecord,
+    TickInput,
+};
 
-use blake3;
-use serde_json;
-use hex;
+use fluxlock_engine::{apply_tick, hash_state};
+
+use ed25519_dalek::{SigningKey, VerifyingKey, Signer};
+use rand::rngs::OsRng;
 
 fn main() {
-    println!("Fluxlock Node Starting...");
 
-    // ⬅️ MUST be mutable because execute_tick mutates engine internals
-    let mut engine = FluxlockEngine;
+    // -------------------------------------------------------
+    // Deterministic Initial State
+    // -------------------------------------------------------
     let mut state = EngineCompositeState::new();
     let mut tick_log = TickLog::new();
-
-    // Genesis parent hash
     let mut parent_hash = String::from("GENESIS");
 
-    for tick in 1..=25 {
-        let prev_state = state.clone();
+    // Generate initial keypair
+    let signing_key = SigningKey::generate(&mut OsRng);
+    let verifying_key: VerifyingKey = signing_key.verifying_key();
 
-        engine
-            .execute_tick(&mut state, &prev_state)
-            .expect("INVARIANT VIOLATION");
+    // -------------------------------------------------------
+    // Tick Simulation
+    // -------------------------------------------------------
+    for tick_index in 0u64..20u64 {
 
-        // --- Hash state deterministically ---
-        let state_bytes =
-            serde_json::to_vec(&state).expect("State serialization failed");
+        let mut input = TickInput {
+            revealed_pubkey: None,
+            payload: None,
+            signature: None,
+        };
 
-        let state_hash = blake3::hash(&state_bytes);
-        let state_hash_hex = hex::encode(state_hash.as_bytes());
+        // ---------------------------------------------------
+        // GENESIS KEY INJECTION (tick 0 only)
+        // ---------------------------------------------------
+        if tick_index == 0 {
+            input.revealed_pubkey = Some(verifying_key.to_bytes().to_vec());
+        }
 
-        // --- Chain hash = H(parent || state_hash) ---
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(parent_hash.as_bytes());
-        hasher.update(state_hash.as_bytes());
-        let chain_hash = hasher.finalize();
-        let chain_hash_hex = hex::encode(chain_hash.as_bytes());
+        // ---------------------------------------------------
+        // ROTATION AT TICK 5
+        // ---------------------------------------------------
+        if tick_index == 5 {
 
-        println!(
-            "Tick {} | trust={:.3} | lock={} | stage={} | seal={}",
-            tick,
-            state.trust.trust_score,
-            state.lock.level,
-            state.lifecycle.stage,
-            &chain_hash_hex[..8]
-        );
+            let new_signing = SigningKey::generate(&mut OsRng);
+            let new_verifying = new_signing.verifying_key();
 
+            let revealed = new_verifying.to_bytes().to_vec();
+
+            let mut message = Vec::new();
+            message.extend(&revealed);
+            message.extend(tick_index.to_le_bytes());
+
+            let signature = signing_key.sign(&message);
+
+            input.revealed_pubkey = Some(revealed);
+            input.signature = Some(signature.to_bytes().to_vec());
+        }
+
+        // ---------------------------------------------------
+        // Apply Deterministic Transition
+        // ---------------------------------------------------
+        apply_tick(&mut state, &input, tick_index)
+            .expect("Deterministic transition failure");
+
+        let state_hash = hash_state(&state);
+
+        // ---------------------------------------------------
+        // Record Tick
+        // ---------------------------------------------------
         tick_log.records.push(TickRecord {
-            tick_index: tick,
+            tick_index,
+            input,
             state: state.clone(),
             parent_hash: parent_hash.clone(),
-            state_hash: state_hash_hex,
-            signature: None, // Phase 2: unsigned hash chain
+            state_hash: state_hash.clone(),
+            signature: None,
         });
 
-        parent_hash = chain_hash_hex;
+        parent_hash = state_hash;
     }
 
+    println!(
+        "Fluxlock node simulation complete. Generated {} ticks.",
+        tick_log.records.len()
+    );
+
+    // Persist tick log
     std::fs::write(
         "tick_log.json",
         serde_json::to_string_pretty(&tick_log).unwrap(),
     )
-    .expect("Failed to write tick_log.json");
-
-    println!("Fluxlock Node Finished.");
+    .unwrap();
 }
