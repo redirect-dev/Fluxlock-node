@@ -1,125 +1,102 @@
-﻿use fluxlock_core::{
-    EngineCompositeState,
-    TickInput,
-};
-
-use fluxlock_core::keystate::{
-    should_rotate,
-    rotate_key,
-    validate_transition,
-};
-
-use blake3;
+﻿use blake3::Hasher;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
-use std::convert::TryInto;
 
-//
-// ============================================================
-// Deterministic State Hash
-// ============================================================
-//
+use fluxlock_core::{EngineCompositeState, TickInput};
+
+/// Deterministic state hashing
 pub fn hash_state(state: &EngineCompositeState) -> String {
+    let mut hasher = Hasher::new();
 
-    let mut hasher = blake3::Hasher::new();
-
-    hasher.update(&state.trust.trust_score.to_le_bytes());
-    hasher.update(&[state.lifecycle.stage]);
-    hasher.update(&[state.lock.level]);
-    hasher.update(&[state.recovery.is_recovering as u8]);
-    hasher.update(&state.recovery.recovery_ticks.to_le_bytes());
-    hasher.update(&state.recovery.grace_ticks_remaining.to_le_bytes());
-
-    hasher.update(&state.key_state.key_epoch.to_le_bytes());
-    hasher.update(&state.key_state.activated_at_tick.to_le_bytes());
-    hasher.update(&state.key_state.current_pubkey);
-
-    if let Some(commitment) = &state.key_state.next_pubkey_commitment {
-        hasher.update(commitment);
+    if let Some(pk) = &state.key_state.current_pubkey {
+        hasher.update(pk);
     }
 
-    hasher.finalize().to_hex().to_string()
+    if let Some(commit) = &state.key_state.pending_commitment {
+        hasher.update(commit);
+    }
+
+    hex::encode(hasher.finalize().as_bytes())
 }
 
-//
-// ============================================================
-// Apply Tick
-// ============================================================
-//
+/// Deterministic tick transition
 pub fn apply_tick(
     state: &mut EngineCompositeState,
     input: &TickInput,
     tick_index: u64,
 ) -> Result<(), String> {
 
-    let previous = state.clone();
-
-    if let Some(revealed) = &input.revealed_pubkey {
-
-        // -----------------------------------------
-        // GENESIS INITIALIZATION
-        // -----------------------------------------
-        if state.key_state.current_pubkey.is_empty() {
-
-            state.key_state.current_pubkey = revealed.clone();
-            state.key_state.activated_at_tick = tick_index;
-            state.key_state.key_epoch = 0;
-
-        } else {
-
-            // -------------------------------------
-            // NORMAL ROTATION
-            // -------------------------------------
-            if let Some(signature_bytes) = &input.signature {
-
-                let mut message = Vec::new();
-                message.extend(revealed);
-                message.extend(tick_index.to_le_bytes());
-
-                let pubkey_array: [u8; 32] =
-                    state.key_state.current_pubkey
-                        .clone()
-                        .try_into()
-                        .map_err(|_| "Invalid public key length")?;
-
-                let verifying_key =
-                    VerifyingKey::from_bytes(&pubkey_array)
-                        .map_err(|_| "Invalid public key")?;
-
-                let sig_array: [u8; 64] =
-                    signature_bytes
-                        .clone()
-                        .try_into()
-                        .map_err(|_| "Invalid signature length")?;
-
-                let signature = Signature::from_bytes(&sig_array);
-
-                verifying_key
-                    .verify(&message, &signature)
-                    .map_err(|_| "Signature verification failed")?;
-            }
-
-            if should_rotate(&state.key_state, tick_index) {
-
-                let rotated =
-                    rotate_key(&state.key_state, revealed.clone(), tick_index)?;
-
-                state.key_state = rotated;
-            }
-        }
+    // -----------------------------------------
+    // COMMIT PHASE
+    // -----------------------------------------
+    if let Some(commit) = &input.commit_pubkey {
+        state.key_state.pending_commitment = Some(commit.clone());
     }
 
-    validate_transition(&previous.key_state, &state.key_state, tick_index)
-        .map_err(|_| "KeyState invariant violation".to_string())?;
+    // -----------------------------------------
+    // REVEAL PHASE
+    // -----------------------------------------
+    if let Some(reveal) = &input.reveal_pubkey {
 
-    if state.trust.trust_score <= 0.0 {
+        // Genesis reveal
+        if state.key_state.current_pubkey.is_none() {
+            state.key_state.current_pubkey = Some(reveal.clone());
+            return Ok(());
+        }
 
-        let preserved_lock = state.lock.level;
+        // Must have commitment
+        let pending = state.key_state
+            .pending_commitment
+            .as_ref()
+            .ok_or("Missing commitment")?;
 
-        *state = EngineCompositeState::new();
+        if pending != reveal {
+            return Err("Commitment mismatch".into());
+        }
 
-        state.lock.level = preserved_lock;
-        state.trust.trust_score = 25.0;
-        state.recovery.grace_ticks_remaining = 5;
+        let sig_bytes = input.signature
+            .as_ref()
+            .ok_or("Missing signature")?;
+
+        if sig_bytes.len() != 64 {
+            return Err("Invalid signature length".into());
+        }
+
+        let pk_bytes = state.key_state
+            .current_pubkey
+            .as_ref()
+            .ok_or("Missing current pubkey")?;
+
+        if pk_bytes.len() != 32 {
+            return Err("Invalid public key length".into());
+        }
+
+        // Convert to fixed-size arrays safely
+        let pk_array: [u8; 32] = pk_bytes
+            .as_slice()
+            .try_into()
+            .map_err(|_| "Key conversion failed")?;
+
+        let sig_array: [u8; 64] = sig_bytes
+            .as_slice()
+            .try_into()
+            .map_err(|_| "Sig conversion failed")?;
+
+        let verifying_key =
+            VerifyingKey::from_bytes(&pk_array)
+                .map_err(|_| "Invalid verifying key")?;
+
+        let signature = Signature::from_bytes(&sig_array);
+
+        let mut message = Vec::new();
+        message.extend(reveal);
+        message.extend(tick_index.to_le_bytes());
+
+        verifying_key
+            .verify(&message, &signature)
+            .map_err(|_| "Signature verification failed")?;
+
+        state.key_state.current_pubkey = Some(reveal.clone());
+        state.key_state.pending_commitment = None;
     }
 
     Ok(())

@@ -12,66 +12,74 @@ use rand::rngs::OsRng;
 
 fn main() {
 
-    // -------------------------------------------------------
-    // Deterministic Initial State
-    // -------------------------------------------------------
     let mut state = EngineCompositeState::new();
     let mut tick_log = TickLog::new();
     let mut parent_hash = String::from("GENESIS");
 
-    // Generate initial keypair
     let signing_key = SigningKey::generate(&mut OsRng);
     let verifying_key: VerifyingKey = signing_key.verifying_key();
 
-    // -------------------------------------------------------
-    // Tick Simulation
-    // -------------------------------------------------------
+    let mut next_signing: Option<SigningKey> = None;
+    let mut next_verifying: Option<VerifyingKey> = None;
+
     for tick_index in 0u64..20u64 {
 
         let mut input = TickInput {
-            revealed_pubkey: None,
+            commit_pubkey: None,
+            reveal_pubkey: None,
             payload: None,
             signature: None,
         };
 
-        // ---------------------------------------------------
-        // GENESIS KEY INJECTION (tick 0 only)
-        // ---------------------------------------------------
+        // -----------------------------
+        // GENESIS REVEAL
+        // -----------------------------
         if tick_index == 0 {
-            input.revealed_pubkey = Some(verifying_key.to_bytes().to_vec());
+            input.reveal_pubkey = Some(verifying_key.to_bytes().to_vec());
         }
 
-        // ---------------------------------------------------
-        // ROTATION AT TICK 5
-        // ---------------------------------------------------
-        if tick_index == 5 {
-
+        // -----------------------------
+        // COMMIT AT TICK 4
+        // -----------------------------
+        if tick_index == 4 {
             let new_signing = SigningKey::generate(&mut OsRng);
             let new_verifying = new_signing.verifying_key();
 
-            let revealed = new_verifying.to_bytes().to_vec();
+            next_signing = Some(new_signing);
+            next_verifying = Some(new_verifying);
+
+            input.commit_pubkey =
+                Some(new_verifying.to_bytes().to_vec());
+        }
+
+        // -----------------------------
+        // REVEAL AT TICK 5
+        // -----------------------------
+        if tick_index == 5 {
+
+            let reveal_key =
+                next_verifying
+                    .as_ref()
+                    .expect("Missing next verifying key")
+                    .to_bytes()
+                    .to_vec();
 
             let mut message = Vec::new();
-            message.extend(&revealed);
+            message.extend(&reveal_key);
             message.extend(tick_index.to_le_bytes());
 
-            let signature = signing_key.sign(&message);
+            let signature =
+                signing_key.sign(&message);
 
-            input.revealed_pubkey = Some(revealed);
+            input.reveal_pubkey = Some(reveal_key);
             input.signature = Some(signature.to_bytes().to_vec());
         }
 
-        // ---------------------------------------------------
-        // Apply Deterministic Transition
-        // ---------------------------------------------------
         apply_tick(&mut state, &input, tick_index)
             .expect("Deterministic transition failure");
 
         let state_hash = hash_state(&state);
 
-        // ---------------------------------------------------
-        // Record Tick
-        // ---------------------------------------------------
         tick_log.records.push(TickRecord {
             tick_index,
             input,
@@ -89,10 +97,8 @@ fn main() {
         tick_log.records.len()
     );
 
-    // Persist tick log
     std::fs::write(
         "tick_log.json",
         serde_json::to_string_pretty(&tick_log).unwrap(),
-    )
-    .unwrap();
+    ).unwrap();
 }
