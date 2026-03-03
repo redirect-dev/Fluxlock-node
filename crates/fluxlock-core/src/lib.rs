@@ -14,6 +14,7 @@ impl EngineCompositeState {
             key_state: KeyState {
                 current_pubkey: None,
                 pending_commitment: None,
+                commitment_tick: None,
             },
         }
     }

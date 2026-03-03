@@ -55,7 +55,7 @@ fn main() {
         // -----------------------------
         // REVEAL AT TICK 5
         // -----------------------------
-        if tick_index == 5 {
+        if tick_index == 6{
 
             let reveal_key =
                 next_verifying
