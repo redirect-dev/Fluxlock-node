@@ -4,6 +4,7 @@ use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use fluxlock_core::{EngineCompositeState, TickInput};
 
 const MIN_DELAY: u64 = 2;
+const MAX_DELAY: u64 = 6;
 
 pub fn hash_state(state: &EngineCompositeState) -> String {
     let mut hasher = Hasher::new();
@@ -29,17 +30,29 @@ pub fn apply_tick(
     tick_index: u64,
 ) -> Result<(), String> {
 
-    // -----------------------------
+    // --------------------------------------------------
+    // EXPIRE COMMITMENT IF TOO OLD
+    // --------------------------------------------------
+    if let (Some(commit_tick), Some(_)) =
+        (state.key_state.commitment_tick, &state.key_state.pending_commitment)
+    {
+        if tick_index > commit_tick + MAX_DELAY {
+            state.key_state.pending_commitment = None;
+            state.key_state.commitment_tick = None;
+        }
+    }
+
+    // --------------------------------------------------
     // COMMIT
-    // -----------------------------
+    // --------------------------------------------------
     if let Some(commit) = &input.commit_pubkey {
         state.key_state.pending_commitment = Some(commit.clone());
         state.key_state.commitment_tick = Some(tick_index);
     }
 
-    // -----------------------------
+    // --------------------------------------------------
     // REVEAL
-    // -----------------------------
+    // --------------------------------------------------
     if let Some(reveal) = &input.reveal_pubkey {
 
         if state.key_state.current_pubkey.is_none() {
@@ -58,6 +71,10 @@ pub fn apply_tick(
 
         if tick_index < commit_tick + MIN_DELAY {
             return Err("Reveal too early".into());
+        }
+
+        if tick_index > commit_tick + MAX_DELAY {
+            return Err("Reveal after expiry window".into());
         }
 
         if pending != reveal {
