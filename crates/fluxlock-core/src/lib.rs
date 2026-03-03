@@ -1,4 +1,5 @@
 use serde::{Serialize, Deserialize};
+pub mod keystate;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TrustState {
