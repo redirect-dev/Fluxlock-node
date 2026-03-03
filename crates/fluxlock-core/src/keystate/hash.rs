@@ -3,36 +3,23 @@ use sha2::{Digest, Sha256};
 use super::{AlgorithmId, KeyState};
 
 impl KeyState {
-    /// Deterministic SHA256 hash of KeyState.
-    /// This MUST remain stable across compiler versions and platforms.
     pub fn hash(&self) -> [u8; 32] {
         let mut hasher = Sha256::new();
 
-        // --- key_epoch (u64 LE)
         hasher.update(self.key_epoch.to_le_bytes());
-
-        // --- activated_at_tick (u64 LE)
         hasher.update(self.activated_at_tick.to_le_bytes());
-
-        // --- algorithm (1 byte fixed mapping)
         hasher.update([algorithm_to_u8(&self.algorithm)]);
 
-        // --- current_pubkey (length + bytes)
         hash_vec(&mut hasher, &self.current_pubkey);
-
-        // --- next_pubkey_commitment (option)
         hash_option_vec(&mut hasher, &self.next_pubkey_commitment);
 
-        // --- rotation_policy.epoch_length
         hasher.update(self.rotation_policy.epoch_length.to_le_bytes());
 
-        // --- not_before_tick
+        // NEW: rotation_override flag
+        hasher.update([self.rotation_override as u8]);
+
         hasher.update(self.not_before_tick.to_le_bytes());
-
-        // --- not_after_tick (option)
         hash_option_u64(&mut hasher, &self.not_after_tick);
-
-        // --- parent_key_hash (option)
         hash_option_vec(&mut hasher, &self.parent_key_hash);
 
         hasher.finalize().into()

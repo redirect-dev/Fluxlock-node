@@ -32,6 +32,9 @@ pub struct KeyState {
     /// Deterministic rotation rules.
     pub rotation_policy: RotationPolicy,
 
+    /// Allows deterministic early rotation when true.
+    pub rotation_override: bool,
+
     /// Optional validity bounds.
     pub not_before_tick: u64,
     pub not_after_tick: Option<u64>,
