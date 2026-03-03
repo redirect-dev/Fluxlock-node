@@ -2,10 +2,29 @@ use fluxlock_core::{EngineCompositeState, TickLog};
 use fluxlock_engine::FluxlockEngine;
 use blake3;
 
-/// Canonical state hash (must match node)
+/// Canonical deterministic state hash (consensus critical)
 fn hash_state(state: &EngineCompositeState) -> String {
-    let bytes = serde_json::to_vec(state).expect("state serialization failed");
-    blake3::hash(&bytes).to_hex()[..8].to_string()
+    let mut hasher = blake3::Hasher::new();
+
+    // --- TrustState
+    hasher.update(&state.trust.trust_score.to_le_bytes());
+
+    // --- LifecycleState
+    hasher.update(&[state.lifecycle.stage]);
+
+    // --- LockState
+    hasher.update(&[state.lock.level]);
+
+    // --- RecoveryState
+    hasher.update(&[state.recovery.is_recovering as u8]);
+    hasher.update(&state.recovery.recovery_ticks.to_le_bytes());
+    hasher.update(&state.recovery.grace_ticks_remaining.to_le_bytes());
+
+    // --- KeyState (use deterministic internal hash)
+    let key_hash = state.key_state.hash();
+    hasher.update(&key_hash);
+
+    hasher.finalize().to_hex()[..8].to_string()
 }
 
 pub fn replay_and_verify(tick_log: &TickLog) {
@@ -33,7 +52,7 @@ pub fn replay_and_verify(tick_log: &TickLog) {
             .execute_tick(&prev, &mut state)
             .expect("Engine invariant violation during replay");
 
-        // Recovery reset must match node rules
+        // Recovery reset logic
         if state.trust.trust_score <= 0.0 {
             let preserved_lock = state.lock.level;
             state = EngineCompositeState::new();
@@ -42,7 +61,7 @@ pub fn replay_and_verify(tick_log: &TickLog) {
             state.recovery.grace_ticks_remaining = 5;
         }
 
-        // 3️⃣ State hash integrity
+        // 3️⃣ Deterministic state hash integrity
         let observed_hash = hash_state(&state);
         if observed_hash != record.state_hash {
             panic!(
