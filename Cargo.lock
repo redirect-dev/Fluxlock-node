@@ -209,6 +209,7 @@ dependencies = [
  "ed25519-dalek",
  "fluxlock-core",
  "fluxlock-engine",
+ "fluxlock-pq",
  "hex",
  "rand",
  "serde",
@@ -218,10 +219,20 @@ dependencies = [
 [[package]]
 name = "fluxlock-node-lib"
 version = "0.1.0"
+dependencies = [
+ "fluxlock-pq",
+]
 
 [[package]]
 name = "fluxlock-persistence"
 version = "0.1.0"
+
+[[package]]
+name = "fluxlock-pq"
+version = "0.1.0"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "fluxlock-protocol"

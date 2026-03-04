@@ -13,4 +13,6 @@ members = [
     "crates/fluxlock-metrics",
     "bin/fluxlock-replay",
     "bin/fluxlock-node",
+    "crates/fluxlock-pq",
 ]
+

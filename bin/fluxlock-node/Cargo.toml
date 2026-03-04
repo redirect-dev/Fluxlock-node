@@ -13,4 +13,5 @@ blake3 = "1.5"
 hex = "0.4"
 rand = "0.8"
 ed25519-dalek = "2"
+fluxlock-pq = { path = "../../crates/fluxlock-pq" }
 
