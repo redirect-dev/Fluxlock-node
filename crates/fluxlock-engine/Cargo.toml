@@ -8,3 +8,4 @@ fluxlock-core = { path = "../fluxlock-core" }
 ed25519-dalek = "2"
 blake3 = "1"
 hex = "0.4"
+fluxlock-pq = { path = "../fluxlock-pq" }

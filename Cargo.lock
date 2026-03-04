@@ -190,6 +190,7 @@ dependencies = [
  "blake3",
  "ed25519-dalek",
  "fluxlock-core",
+ "fluxlock-pq",
  "hex",
 ]
 

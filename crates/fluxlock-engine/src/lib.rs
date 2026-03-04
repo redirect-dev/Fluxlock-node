@@ -2,6 +2,7 @@
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 
 use fluxlock_core::{EngineCompositeState, TickInput};
+use fluxlock_pq::dilithium_verify;
 
 const MIN_DELAY: u64 = 2;
 const MAX_DELAY: u64 = 6;
@@ -47,6 +48,7 @@ pub fn apply_tick(
     // Reveal
     if input.reveal_classical.is_some() && input.reveal_pq.is_some() {
 
+        // Initial bootstrap (first key install)
         if state.key_state.current_classical_pubkey.is_none() {
             state.key_state.current_classical_pubkey =
                 input.reveal_classical.clone();
@@ -79,21 +81,25 @@ pub fn apply_tick(
             return Err("PQ commitment mismatch".into());
         }
 
+        // ---------- HYBRID ENFORCEMENT START ----------
+
         // Verify classical signature
-        verify_sig(
+        verify_classical_sig(
             state.key_state.current_classical_pubkey.as_ref().unwrap(),
             input.reveal_classical.as_ref().unwrap(),
-            input.classical_signature.as_ref().unwrap(),
+            input.classical_signature.as_ref().ok_or("Missing classical signature")?,
             tick_index,
         )?;
 
-        // Verify PQ signature (simulated with ed25519)
-        verify_sig(
+        // Verify PQ signature (REAL Dilithium)
+        verify_pq_sig(
             state.key_state.current_pq_pubkey.as_ref().unwrap(),
             input.reveal_pq.as_ref().unwrap(),
-            input.pq_signature.as_ref().unwrap(),
+            input.pq_signature.as_ref().ok_or("Missing PQ signature")?,
             tick_index,
         )?;
+
+        // ---------- HYBRID ENFORCEMENT END ----------
 
         state.key_state.current_classical_pubkey =
             input.reveal_classical.clone();
@@ -108,7 +114,7 @@ pub fn apply_tick(
     Ok(())
 }
 
-fn verify_sig(
+fn verify_classical_sig(
     pubkey: &Vec<u8>,
     reveal: &Vec<u8>,
     sig: &Vec<u8>,
@@ -136,7 +142,31 @@ fn verify_sig(
 
     verifying_key
         .verify(&message, &signature)
-        .map_err(|_| "Signature verification failed")?;
+        .map_err(|_| "Classical signature verification failed")?;
+
+    Ok(())
+}
+
+fn verify_pq_sig(
+    pubkey: &Vec<u8>,
+    reveal: &Vec<u8>,
+    sig: &Vec<u8>,
+    tick_index: u64,
+) -> Result<(), String> {
+
+    let mut message = Vec::new();
+    message.extend(reveal);
+    message.extend(tick_index.to_le_bytes());
+
+    let verified = dilithium_verify(
+        pubkey,
+        &message,
+        sig,
+    );
+
+    if !verified {
+        return Err("PQ signature verification failed".into());
+    }
 
     Ok(())
 }
