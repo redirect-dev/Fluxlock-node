@@ -1,3 +1,4 @@
+// src/lib.rs
+
 pub mod state;
 pub mod genesis;
-pub mod block;
