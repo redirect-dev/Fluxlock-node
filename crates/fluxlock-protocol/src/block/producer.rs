@@ -4,8 +4,11 @@ use crate::block::structure::{Block, HybridSignature};
 use crate::state::validator::Validator;
 use crate::state::account::Account;
 use crate::state::transition::apply_transfer;
+use crate::state::rotation::apply_rotation_commit;
+use crate::state::reveal::apply_rotation_reveal;
 use crate::state::hasher::hash_accounts;
-use crate::tx::transaction::TransferTx;
+
+use crate::tx::transaction::Tx;
 
 /// Select validator using round-robin
 pub fn select_validator(validators: &Vec<Validator>, tick: u64) -> Validator {
@@ -13,27 +16,37 @@ pub fn select_validator(validators: &Vec<Validator>, tick: u64) -> Validator {
     validators[index].clone()
 }
 
-/// Produce next block with full state hashing
+/// Produce next block with full execution + enforcement
 pub fn produce_block(
     previous_block: &Block,
     validators: &Vec<Validator>,
     accounts: &mut Vec<Account>,
-    txs: Vec<TransferTx>,
+    txs: Vec<Tx>,
     state_counter: u64,
 ) -> (Block, u64) {
     let next_tick = previous_block.tick + 1;
 
     let validator = select_validator(validators, next_tick);
 
-    // 🔥 Apply transactions
+    // 🔥 Execute all transaction types
     for tx in &txs {
-        let _ = apply_transfer(accounts, tx);
+        match tx {
+            Tx::Transfer(t) => {
+                let _ = apply_transfer(accounts, t, next_tick);
+            }
+            Tx::RotationCommit(r) => {
+                let _ = apply_rotation_commit(accounts, r, next_tick);
+            }
+            Tx::RotationReveal(r) => {
+                let _ = apply_rotation_reveal(accounts, r);
+            }
+        }
     }
 
-    // Temporary counter (still exists but no longer used for hashing)
+    // temporary counter (still used)
     let new_counter = state_counter + 1;
 
-    // 🔐 REAL STATE ROOT
+    // 🔐 full state root
     let new_state_root = hash_accounts(accounts);
 
     let new_block = Block {
@@ -58,7 +71,7 @@ pub fn produce_block(
     (new_block, new_counter)
 }
 
-/// Hash the block (minimal version)
+/// Hash block (minimal deterministic hash)
 fn hash_block(block: &Block) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
 

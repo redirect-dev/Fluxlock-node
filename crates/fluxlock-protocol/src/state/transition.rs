@@ -1,15 +1,21 @@
 use crate::state::account::Account;
 use crate::tx::transaction::TransferTx;
+use crate::tx::verify::verify_transfer;
 
 /// Apply a transfer transaction to accounts
 pub fn apply_transfer(
     accounts: &mut Vec<Account>,
     tx: &TransferTx,
+    current_tick: u64,
 ) -> Result<(), String> {
+    // 🔐 Verify signature
+    if !verify_transfer(tx) {
+        return Err("Invalid signature".into());
+    }
+
     let mut sender_index = None;
     let mut receiver_index = None;
 
-    // Find accounts
     for (i, acc) in accounts.iter().enumerate() {
         if acc.current_classical_pubkey == tx.from {
             sender_index = Some(i);
@@ -24,12 +30,19 @@ pub fn apply_transfer(
 
     let sender = &mut accounts[sender_i];
 
-    // 🔐 Check nonce
+    // 🔥 ENFORCEMENT FIX (inclusive deadline)
+    if let Some(deadline) = sender.rotation_deadline_tick {
+        if current_tick >= deadline {
+            return Err("Rotation required before transfer".into());
+        }
+    }
+
+    // Nonce check
     if sender.nonce != tx.nonce {
         return Err("Invalid nonce".into());
     }
 
-    // 💰 Check balance
+    // Balance check
     if sender.balance < tx.amount {
         return Err("Insufficient balance".into());
     }

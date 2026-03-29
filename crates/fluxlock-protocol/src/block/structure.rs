@@ -1,4 +1,4 @@
-use crate::tx::transaction::TransferTx;
+use crate::tx::transaction::Tx;
 
 #[derive(Clone, Debug)]
 pub struct HybridSignature {
@@ -15,7 +15,7 @@ pub struct Block {
     pub state_root: [u8; 32],
     pub tx_root: [u8; 32],
 
-    pub txs: Vec<TransferTx>, // 🔥 NEW
+    pub txs: Vec<Tx>, // 🔥 UPDATED
 
     pub validator_classical_key: Vec<u8>,
 
