@@ -1,34 +1,31 @@
+use blake3;
+
 use crate::genesis::state::GenesisState;
 use crate::genesis::GenesisConfig;
-
 use crate::state::account::Account;
 use crate::state::validator::Validator;
 
+/// Build deterministic genesis state
 pub fn build_genesis_state(config: GenesisConfig) -> GenesisState {
-    let mut accounts: Vec<Account> = config.initial_accounts.clone();
-    let mut validators: Vec<Validator> = Vec::new();
+    let accounts: Vec<Account> = config.initial_accounts;
+    let validators: Vec<Validator> = config.initial_validators;
 
-    for v in config.initial_validators.iter() {
-        if v.stake < config.min_validator_stake {
-            panic!("Validator stake below minimum requirement");
-        }
+    let state_root = compute_state_root(&accounts, &validators);
 
-        validators.push(v.clone());
+    GenesisState::new(accounts, validators, state_root)
+}
 
-        // Create validator account mirror
-        let account = Account::new(
-            v.stake,
-            v.classical_pubkey.clone(),
-            v.pq_pubkey.clone(),
-        );
+/// Simple deterministic state root (placeholder)
+fn compute_state_root(
+    accounts: &Vec<Account>,
+    validators: &Vec<Validator>,
+) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
 
-        accounts.push(account);
-    }
+    hasher.update(&(accounts.len() as u64).to_le_bytes());
+    hasher.update(&(validators.len() as u64).to_le_bytes());
 
-    // Deterministic ordering by classical pubkey
-    accounts.sort_by(|a, b| a.current_classical_pubkey.cmp(&b.current_classical_pubkey));
+    let hash = hasher.finalize();
 
-    validators.sort_by(|a, b| a.classical_pubkey.cmp(&b.classical_pubkey));
-
-    GenesisState::new(accounts, validators)
+    *hash.as_bytes()
 }

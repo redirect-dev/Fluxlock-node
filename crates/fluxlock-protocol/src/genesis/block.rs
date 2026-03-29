@@ -1,15 +1,16 @@
 use crate::block::structure::{Block, HybridSignature};
 use crate::genesis::state::GenesisState;
 
-pub fn build_genesis_block(genesis_state: &GenesisState) -> Block {
+pub fn build_genesis_block(state: &GenesisState) -> Block {
     Block {
         parent_hash: [0u8; 32],
 
         tick: 0,
 
-        state_root: genesis_state.state_root,
-
+        state_root: state.state_root,
         tx_root: [0u8; 32],
+
+        txs: vec![], // 🔥 NEW
 
         validator_classical_key: vec![],
 
