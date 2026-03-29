@@ -1,6 +1,6 @@
 use blake3;
 
-use crate::state::account::Account;
+use crate::state::account::{Account, FLAG_IDENTITY_EXPIRED};
 use crate::tx::transaction::RotationRevealTx;
 
 /// Apply rotation reveal (commit → reveal → switch)
@@ -39,13 +39,16 @@ pub fn apply_rotation_reveal(
         return Err("Commitment mismatch".into());
     }
 
-    // 🔥 IMMEDIATE KEY SWITCH
+    // 🔥 KEY SWITCH
     sender.current_classical_pubkey = tx.new_classical_key.clone();
     sender.current_pq_pubkey = tx.new_pq_key.clone();
 
     // clear rotation state
     sender.rotation_commitment = None;
     sender.rotation_deadline_tick = None;
+
+    // 🔥 CLEAR EXPIRED FLAG
+    sender.clear_flag(FLAG_IDENTITY_EXPIRED);
 
     sender.rotation_epoch += 1;
     sender.nonce += 1;

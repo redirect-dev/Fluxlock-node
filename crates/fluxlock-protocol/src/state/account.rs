@@ -1,3 +1,5 @@
+pub const FLAG_IDENTITY_EXPIRED: u32 = 1;
+
 #[derive(Clone, Debug)]
 pub struct Account {
     pub balance: u128,
@@ -29,5 +31,17 @@ impl Account {
             rotation_deadline_tick: None,
             flags: 0,
         }
+    }
+
+    pub fn set_flag(&mut self, flag: u32) {
+        self.flags |= flag;
+    }
+
+    pub fn clear_flag(&mut self, flag: u32) {
+        self.flags &= !flag;
+    }
+
+    pub fn has_flag(&self, flag: u32) -> bool {
+        (self.flags & flag) != 0
     }
 }

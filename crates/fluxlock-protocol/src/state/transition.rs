@@ -1,4 +1,4 @@
-use crate::state::account::Account;
+use crate::state::account::{Account, FLAG_IDENTITY_EXPIRED};
 use crate::tx::transaction::TransferTx;
 use crate::tx::verify::verify_transfer;
 
@@ -30,9 +30,10 @@ pub fn apply_transfer(
 
     let sender = &mut accounts[sender_i];
 
-    // 🔥 ENFORCEMENT FIX (inclusive deadline)
+    // 🔥 ENFORCEMENT + FLAGGING
     if let Some(deadline) = sender.rotation_deadline_tick {
         if current_tick >= deadline {
+            sender.set_flag(FLAG_IDENTITY_EXPIRED);
             return Err("Rotation required before transfer".into());
         }
     }
