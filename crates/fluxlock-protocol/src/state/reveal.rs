@@ -3,55 +3,53 @@ use blake3;
 use crate::state::account::{Account, FLAG_IDENTITY_EXPIRED};
 use crate::tx::transaction::RotationRevealTx;
 
-/// Apply rotation reveal (commit → reveal → switch)
+/// Apply rotation reveal (FULL HYBRID KEY REPLACEMENT)
 pub fn apply_rotation_reveal(
     accounts: &mut Vec<Account>,
     tx: &RotationRevealTx,
 ) -> Result<(), String> {
-    let mut sender_index = None;
+    let acc = accounts
+        .iter_mut()
+        .find(|a| a.current_classical_pubkey == tx.from)
+        .ok_or("Account not found")?;
 
-    for (i, acc) in accounts.iter().enumerate() {
-        if acc.current_classical_pubkey == tx.from {
-            sender_index = Some(i);
-        }
-    }
-
-    let sender_i = sender_index.ok_or("Account not found")?;
-    let sender = &mut accounts[sender_i];
-
-    // nonce check
-    if sender.nonce != tx.nonce {
+    // 🔐 Enforce nonce
+    if tx.nonce != acc.nonce {
         return Err("Invalid nonce".into());
     }
 
-    // must have prior commitment
-    let commitment = sender
+    acc.nonce += 1;
+
+    // 🔐 Must have a commit
+    let commitment = acc
         .rotation_commitment
         .clone()
-        .ok_or("No rotation commitment")?;
+        .ok_or("No commit found")?;
 
-    // hash new key
+    // 🔐 Rebuild commitment
     let mut hasher = blake3::Hasher::new();
     hasher.update(&tx.new_classical_key);
-    let computed = hasher.finalize();
+    hasher.update(&tx.new_pq_key);
 
-    if commitment != computed.as_bytes() {
+    let calculated = hasher.finalize().as_bytes().to_vec();
+
+    if calculated != commitment {
         return Err("Commitment mismatch".into());
     }
 
-    // 🔥 KEY SWITCH
-    sender.current_classical_pubkey = tx.new_classical_key.clone();
-    sender.current_pq_pubkey = tx.new_pq_key.clone();
+    // 🔐 Replace BOTH keys
+    acc.current_classical_pubkey = tx.new_classical_key.clone();
+    acc.current_pq_pubkey = tx.new_pq_key.clone();
 
-    // clear rotation state
-    sender.rotation_commitment = None;
-    sender.rotation_deadline_tick = None;
+    // 🔄 Advance epoch
+    acc.rotation_epoch += 1;
 
-    // 🔥 CLEAR EXPIRED FLAG
-    sender.clear_flag(FLAG_IDENTITY_EXPIRED);
+    // 🧹 Clear rotation state
+    acc.rotation_commitment = None;
+    acc.rotation_deadline_tick = None;
 
-    sender.rotation_epoch += 1;
-    sender.nonce += 1;
+    // 🔥 Reset expiration
+    acc.clear_flag(FLAG_IDENTITY_EXPIRED);
 
     Ok(())
 }

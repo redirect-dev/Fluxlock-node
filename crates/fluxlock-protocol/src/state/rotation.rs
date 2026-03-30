@@ -7,29 +7,23 @@ pub fn apply_rotation_commit(
     tx: &RotationCommitTx,
     current_tick: u64,
 ) -> Result<(), String> {
-    let mut sender_index = None;
+    let acc = accounts
+        .iter_mut()
+        .find(|a| a.current_classical_pubkey == tx.from)
+        .ok_or("Account not found")?;
 
-    for (i, acc) in accounts.iter().enumerate() {
-        if acc.current_classical_pubkey == tx.from {
-            sender_index = Some(i);
-        }
-    }
-
-    let sender_i = sender_index.ok_or("Account not found")?;
-    let sender = &mut accounts[sender_i];
-
-    // nonce check
-    if sender.nonce != tx.nonce {
+    // 🔐 Enforce nonce
+    if tx.nonce != acc.nonce {
         return Err("Invalid nonce".into());
     }
 
-    // set commitment
-    sender.rotation_commitment = Some(tx.new_key_commitment.clone());
+    acc.nonce += 1;
 
-    // set deadline (simple window)
-    sender.rotation_deadline_tick = Some(current_tick + 10);
+    // 🔐 Store commitment
+    acc.rotation_commitment = Some(tx.new_key_commitment.clone());
 
-    sender.nonce += 1;
+    // ⏱ Set deadline (10 ticks window)
+    acc.rotation_deadline_tick = Some(current_tick + 10);
 
     Ok(())
 }

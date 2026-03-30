@@ -9,24 +9,30 @@ use crate::state::reveal::apply_rotation_reveal;
 use crate::state::hasher::hash_accounts;
 
 use crate::tx::transaction::Tx;
+use crate::tx::verify::{
+    verify_transfer,
+    verify_rotation_commit,
+    verify_rotation_reveal,
+};
 
-/// Select validator using round-robin (returns index too)
+/// 🔥 Epoch config
+const EPOCH_LENGTH: u64 = 5;
+
+/// Select validator
 pub fn select_validator(validators: &Vec<Validator>, tick: u64) -> (usize, Validator) {
     let index = (tick as usize) % validators.len();
     (index, validators[index].clone())
 }
 
-/// 🔥 APPLY TIME EFFECTS (ALWAYS RUNS)
+/// 🔥 Time effects (unchanged)
 fn apply_time_effects(accounts: &mut Vec<Account>, current_tick: u64) {
     for acc in accounts.iter_mut() {
-        // expiration
         if let Some(deadline) = acc.rotation_deadline_tick {
             if current_tick >= deadline {
                 acc.set_flag(FLAG_IDENTITY_EXPIRED);
             }
         }
 
-        // decay
         if acc.has_flag(FLAG_IDENTITY_EXPIRED) {
             let decay = acc.balance / 100;
             acc.balance -= decay;
@@ -34,19 +40,30 @@ fn apply_time_effects(accounts: &mut Vec<Account>, current_tick: u64) {
     }
 }
 
-/// 🔥 SLASH VALIDATOR (5%)
+/// 🔥 Epoch enforcement (NEW)
+fn enforce_epoch(account: &Account, current_tick: u64) -> Result<(), String> {
+    let required_epoch = current_tick / EPOCH_LENGTH;
+
+    if account.rotation_epoch < required_epoch {
+        return Err("Account not rotated for current epoch".into());
+    }
+
+    Ok(())
+}
+
+/// 🔥 Slash validator
 fn slash_validator(validators: &mut Vec<Validator>, index: usize) {
     let v = &mut validators[index];
-    let slash = v.stake / 20; // 5%
+    let slash = v.stake / 20;
     v.stake -= slash;
 
     println!("⚔️ Validator slashed! New stake: {}", v.stake);
 }
 
-/// Produce next block with time + validation + slashing
+/// Produce block
 pub fn produce_block(
     previous_block: &Block,
-    validators: &mut Vec<Validator>, // 🔥 now mutable
+    validators: &mut Vec<Validator>,
     accounts: &mut Vec<Account>,
     txs: Vec<Tx>,
     state_counter: u64,
@@ -55,28 +72,64 @@ pub fn produce_block(
 
     let (validator_index, validator) = select_validator(validators, next_tick);
 
-    // 🔥 STEP 1: TIME ALWAYS ADVANCES
+    // 🔥 STEP 1 — time always moves
     apply_time_effects(accounts, next_tick);
 
-    // 🔥 STEP 2: SIMULATE TX EXECUTION
+    // 🔥 STEP 2 — simulate
     let mut temp_accounts = accounts.clone();
 
     for tx in &txs {
         let result = match tx {
-            Tx::Transfer(t) => apply_transfer(&mut temp_accounts, t, next_tick),
-            Tx::RotationCommit(r) => apply_rotation_commit(&mut temp_accounts, r, next_tick),
-            Tx::RotationReveal(r) => apply_rotation_reveal(&mut temp_accounts, r),
+            Tx::Transfer(t) => {
+                let sender = temp_accounts.iter()
+                    .find(|a| a.current_classical_pubkey == t.from)
+                    .ok_or("Sender not found")?;
+
+                // 🔥 NEW — epoch enforcement
+                enforce_epoch(sender, next_tick)?;
+
+                if !verify_transfer(t, &sender.current_pq_pubkey) {
+                    slash_validator(validators, validator_index);
+                    return Err("Invalid transfer signature".into());
+                }
+
+                apply_transfer(&mut temp_accounts, t, next_tick)
+            }
+
+            Tx::RotationCommit(r) => {
+                let sender = temp_accounts.iter()
+                    .find(|a| a.current_classical_pubkey == r.from)
+                    .ok_or("Sender not found")?;
+
+                if !verify_rotation_commit(r, &sender.current_pq_pubkey) {
+                    slash_validator(validators, validator_index);
+                    return Err("Invalid rotation commit signature".into());
+                }
+
+                apply_rotation_commit(&mut temp_accounts, r, next_tick)
+            }
+
+            Tx::RotationReveal(r) => {
+                let sender = temp_accounts.iter()
+                    .find(|a| a.current_classical_pubkey == r.from)
+                    .ok_or("Sender not found")?;
+
+                if !verify_rotation_reveal(r, &sender.current_pq_pubkey) {
+                    slash_validator(validators, validator_index);
+                    return Err("Invalid rotation reveal signature".into());
+                }
+
+                apply_rotation_reveal(&mut temp_accounts, r)
+            }
         };
 
         if result.is_err() {
-            // 🔥 SLASH VALIDATOR
             slash_validator(validators, validator_index);
-
             return Err("Block rejected: invalid transaction".into());
         }
     }
 
-    // 🔥 STEP 3: COMMIT STATE
+    // 🔥 commit
     *accounts = temp_accounts;
 
     let new_counter = state_counter + 1;

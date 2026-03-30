@@ -1,58 +1,35 @@
-use crate::state::account::{Account, FLAG_IDENTITY_EXPIRED};
+use crate::state::account::Account;
 use crate::tx::transaction::TransferTx;
-use crate::tx::verify::verify_transfer;
 
-/// Apply a transfer transaction to accounts
+/// Apply transfer (ASSUMES already verified)
 pub fn apply_transfer(
     accounts: &mut Vec<Account>,
     tx: &TransferTx,
-    current_tick: u64,
+    _current_tick: u64,
 ) -> Result<(), String> {
-    // 🔐 Verify signature
-    if !verify_transfer(tx) {
-        return Err("Invalid signature".into());
-    }
+    let sender = accounts
+        .iter_mut()
+        .find(|a| a.current_classical_pubkey == tx.from)
+        .ok_or("Sender not found")?;
 
-    let mut sender_index = None;
-    let mut receiver_index = None;
-
-    for (i, acc) in accounts.iter().enumerate() {
-        if acc.current_classical_pubkey == tx.from {
-            sender_index = Some(i);
-        }
-        if acc.current_classical_pubkey == tx.to {
-            receiver_index = Some(i);
-        }
-    }
-
-    let sender_i = sender_index.ok_or("Sender not found")?;
-    let receiver_i = receiver_index.ok_or("Receiver not found")?;
-
-    let sender = &mut accounts[sender_i];
-
-    // 🔥 ENFORCEMENT + FLAGGING
-    if let Some(deadline) = sender.rotation_deadline_tick {
-        if current_tick >= deadline {
-            sender.set_flag(FLAG_IDENTITY_EXPIRED);
-            return Err("Rotation required before transfer".into());
-        }
-    }
-
-    // Nonce check
-    if sender.nonce != tx.nonce {
+    // 🔐 Nonce check
+    if tx.nonce != sender.nonce {
         return Err("Invalid nonce".into());
     }
 
-    // Balance check
+    // 🔐 Balance check
     if sender.balance < tx.amount {
         return Err("Insufficient balance".into());
     }
 
-    // Apply transfer
     sender.balance -= tx.amount;
     sender.nonce += 1;
 
-    let receiver = &mut accounts[receiver_i];
+    let receiver = accounts
+        .iter_mut()
+        .find(|a| a.current_classical_pubkey == tx.to)
+        .ok_or("Receiver not found")?;
+
     receiver.balance += tx.amount;
 
     Ok(())

@@ -6,25 +6,41 @@ use crate::block::producer::produce_block;
 use crate::state::validator::Validator;
 use crate::state::account::{Account, FLAG_IDENTITY_EXPIRED};
 
-use crate::tx::transaction::{Tx, TransferTx, RotationCommitTx};
+use crate::tx::transaction::{
+    Tx,
+    TransferTx,
+    RotationCommitTx,
+    RotationRevealTx,
+};
 
 use ed25519_dalek::{SigningKey, Signer};
 
 use blake3;
 
 pub fn run_genesis_test() {
-    println!("--- Fluxlock Enforcement Test ---");
+    println!("--- Fluxlock FULL Rotation Test ---");
 
+    // 🔐 ORIGINAL classical key
     let signing_key = SigningKey::from_bytes(&[1u8; 32]);
     let verify_key = signing_key.verifying_key();
     let alice_key = verify_key.to_bytes().to_vec();
 
     let bob_key = vec![2; 32];
 
-    // commitment
-    let new_key = vec![7; 32];
+    // 🔐 ORIGINAL PQ
+    let (pq_public, pq_secret) = crate::pq::generate_keypair();
+
+    // 🔐 NEW KEYS FOR ROTATION
+    let new_signing_key = SigningKey::from_bytes(&[7u8; 32]);
+    let new_verify_key = new_signing_key.verifying_key();
+    let new_classical = new_verify_key.to_bytes().to_vec();
+
+    let (new_pq_public, new_pq_secret) = crate::pq::generate_keypair();
+
+    // 🔐 COMMITMENT = hash(new_classical + new_pq)
     let mut hasher = blake3::Hasher::new();
-    hasher.update(&new_key);
+    hasher.update(&new_classical);
+    hasher.update(&new_pq_public);
     let commitment = hasher.finalize().as_bytes().to_vec();
 
     let validator = Validator::new(
@@ -35,7 +51,7 @@ pub fn run_genesis_test() {
         100_000,
     );
 
-    let alice = Account::new(1_000, alice_key.clone(), vec![0]);
+    let alice = Account::new(1_000, alice_key.clone(), pq_public.clone());
     let bob = Account::new(0, bob_key.clone(), vec![0]);
 
     let mut config = GenesisConfig::default();
@@ -52,30 +68,67 @@ pub fn run_genesis_test() {
 
     for i in 1..=12 {
         let txs = if i == 1 {
+            // 🔐 COMMIT
+
+            let mut message = vec![];
+            message.extend(&alice_key);
+            message.extend(&commitment);
+            message.extend(&0u64.to_le_bytes());
+
+            let classical_sig = signing_key.sign(&message).to_bytes().to_vec();
+            let pq_sig = crate::pq::sign(&message, &pq_secret);
+
             vec![
                 Tx::RotationCommit(RotationCommitTx {
                     from: alice_key.clone(),
                     new_key_commitment: commitment.clone(),
                     nonce: 0,
-                    signature: vec![0; 64],
+                    classical_signature: classical_sig,
+                    pq_signature: pq_sig,
+                }),
+            ]
+        } else if i == 3 {
+            // 🔐 REVEAL (THIS IS THE BIG MOMENT)
+
+            let mut message = vec![];
+            message.extend(&alice_key);
+            message.extend(&new_classical);
+            message.extend(&new_pq_public);
+            message.extend(&1u64.to_le_bytes());
+
+            let classical_sig = signing_key.sign(&message).to_bytes().to_vec();
+            let pq_sig = crate::pq::sign(&message, &pq_secret);
+
+            vec![
+                Tx::RotationReveal(RotationRevealTx {
+                    from: alice_key.clone(),
+                    new_classical_key: new_classical.clone(),
+                    new_pq_key: new_pq_public.clone(),
+                    nonce: 1,
+                    classical_signature: classical_sig,
+                    pq_signature: pq_sig,
                 }),
             ]
         } else if i == 11 {
+            // 🔐 TRANSFER USING NEW KEYS (SHOULD WORK IF ROTATION SUCCEEDED)
+
             let mut message = vec![];
-            message.extend(&alice_key);
+            message.extend(&new_classical);
             message.extend(&bob_key);
             message.extend(&100u128.to_le_bytes());
-            message.extend(&1u64.to_le_bytes());
+            message.extend(&2u64.to_le_bytes());
 
-            let sig = signing_key.sign(&message);
+            let classical_sig = new_signing_key.sign(&message).to_bytes().to_vec();
+            let pq_sig = crate::pq::sign(&message, &new_pq_secret);
 
             vec![
                 Tx::Transfer(TransferTx {
-                    from: alice_key.clone(),
+                    from: new_classical.clone(),
                     to: bob_key.clone(),
                     amount: 100,
-                    nonce: 1,
-                    signature: sig.to_bytes().to_vec(),
+                    nonce: 2,
+                    classical_signature: classical_sig,
+                    pq_signature: pq_sig,
                 }),
             ]
         } else {
@@ -103,13 +156,13 @@ pub fn run_genesis_test() {
         let alice = &genesis_state.accounts[0];
 
         println!(
-            "Block {} | Balance: {} | Deadline: {:?} | Expired: {}",
+            "Block {} | Balance: {} | Expired: {} | Epoch: {}",
             i,
             alice.balance,
-            alice.rotation_deadline_tick,
-            alice.has_flag(FLAG_IDENTITY_EXPIRED)
+            alice.has_flag(FLAG_IDENTITY_EXPIRED),
+            alice.rotation_epoch
         );
     }
 
-    println!("--- Enforcement test complete ---");
+    println!("--- FULL rotation test complete ---");
 }
