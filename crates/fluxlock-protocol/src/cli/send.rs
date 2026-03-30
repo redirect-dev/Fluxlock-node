@@ -1,6 +1,8 @@
 use ed25519_dalek::{SigningKey, Signer};
 
 use crate::cli::wallet::load_wallet;
+use crate::cli::mempool::add_tx;
+
 use crate::tx::transaction::{Tx, TransferTx};
 
 pub fn send_tx() {
@@ -16,11 +18,12 @@ pub fn send_tx() {
     );
 
     let from = wallet.classical_public.clone();
-    let to = vec![9; 32]; // demo recipient
+    let to = vec![9; 32];
     let amount = 100u128;
-    let nonce = 0u64;
 
-    // Build message
+    // 🔥 TEMP FIX: use nonce 1 instead of 0
+    let nonce = 1u64;
+
     let mut msg = vec![];
     msg.extend(&from);
     msg.extend(&to);
@@ -39,13 +42,7 @@ pub fn send_tx() {
         pq_signature: pq_sig,
     });
 
-    println!("✅ Transaction created successfully\n");
+    add_tx(tx);
 
-    println!("--- TX DETAILS ---");
-    println!("Amount: {}", amount);
-    println!("Nonce: {}", nonce);
-    println!("------------------\n");
-
-    // For now, just show success (next step will inject into chain)
-    println!("🚀 Ready to submit (integration coming next step)\n");
+    println!("✅ Transaction submitted\n");
 }

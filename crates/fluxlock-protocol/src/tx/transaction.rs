@@ -1,37 +1,35 @@
-#[derive(Clone, Debug)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TransferTx {
     pub from: Vec<u8>,
     pub to: Vec<u8>,
     pub amount: u128,
     pub nonce: u64,
-
-    // 🔐 Hybrid signatures
     pub classical_signature: Vec<u8>,
     pub pq_signature: Vec<u8>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RotationCommitTx {
     pub from: Vec<u8>,
     pub new_key_commitment: Vec<u8>,
     pub nonce: u64,
-
     pub classical_signature: Vec<u8>,
     pub pq_signature: Vec<u8>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RotationRevealTx {
     pub from: Vec<u8>,
     pub new_classical_key: Vec<u8>,
     pub new_pq_key: Vec<u8>,
     pub nonce: u64,
-
     pub classical_signature: Vec<u8>,
     pub pq_signature: Vec<u8>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Tx {
     Transfer(TransferTx),
     RotationCommit(RotationCommitTx),
