@@ -1,6 +1,6 @@
 use ed25519_dalek::{SigningKey, Signer};
 
-use crate::cli::wallet::load_wallet;
+use crate::cli::wallet::{load_wallet, save_wallet};
 use crate::cli::mempool::add_tx;
 
 use crate::tx::transaction::{Tx, TransferTx};
@@ -9,7 +9,7 @@ use crate::tx::message::build_transfer_message;
 pub fn send_tx() {
     println!("💸 Preparing transaction...\n");
 
-    let wallet = match load_wallet() {
+    let mut wallet = match load_wallet() {
         Some(w) => w,
         None => return,
     };
@@ -22,10 +22,9 @@ pub fn send_tx() {
     let to = vec![9; 32];
     let amount = 100u128;
 
-    // ✅ correct starting nonce
-    let nonce = 0u64;
+    // ✅ REAL NONCE
+    let nonce = wallet.nonce;
 
-    // 🔥 unified message
     let msg = build_transfer_message(
         &from,
         &to,
@@ -46,6 +45,10 @@ pub fn send_tx() {
     });
 
     add_tx(tx);
+
+    // ✅ increment nonce locally
+    wallet.nonce += 1;
+    save_wallet(&wallet);
 
     println!("✅ Transaction submitted\n");
 }
