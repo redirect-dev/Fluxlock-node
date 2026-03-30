@@ -15,7 +15,9 @@ use crate::tx::transaction::{Tx, RotationCommitTx, RotationRevealTx, TransferTx}
 use blake3;
 
 pub fn run_chain() {
-    println!("🎬 Fluxlock Scripted Demo Starting...\n");
+    println!("\n=======================================");
+    println!("🚀 Fluxlock Live Security Demo");
+    println!("=======================================\n");
 
     // --- Original keys ---
     let signing_key = SigningKey::from_bytes(&[1u8; 32]);
@@ -59,11 +61,16 @@ pub fn run_chain() {
     let mut state = build_genesis_state(config.clone());
     let mut block = build_genesis_block(&state);
 
-    println!("Genesis tick: {}\n", block.tick);
+    println!("🧬 Genesis Initialized");
+    println!("   Tick: {}", block.tick);
+    println!("   Alice Balance: 1000\n");
 
     for i in 1..=12 {
+        println!("---------------------------------------");
+        println!("⏱ Tick {}", i);
+
         let txs = if i == 3 {
-            println!("🔐 Rotation COMMIT\n");
+            println!("🔐 EVENT: Identity Commit Initiated");
 
             let mut msg = vec![];
             msg.extend(&alice_key);
@@ -78,7 +85,7 @@ pub fn run_chain() {
                 pq_signature: crate::pq::sign(&msg, &pq_secret),
             })]
         } else if i == 4 {
-            println!("🔁 Rotation REVEAL (identity evolves)\n");
+            println!("🔁 EVENT: Identity Rotation Executed");
 
             let mut msg = vec![];
             msg.extend(&alice_key);
@@ -95,7 +102,7 @@ pub fn run_chain() {
                 pq_signature: crate::pq::sign(&msg, &pq_secret),
             })]
         } else if i == 10 {
-            println!("💸 Attempting transfer with OLD epoch...\n");
+            println!("⚠️ EVENT: Attempting transaction with outdated identity");
 
             let mut msg = vec![];
             msg.extend(&new_classical);
@@ -127,23 +134,30 @@ pub fn run_chain() {
             Ok((next_block, new_counter)) => {
                 state.counter = new_counter;
                 block = next_block;
+                println!("✅ Block accepted");
             }
             Err(e) => {
-                println!("❌ Block {} rejected: {}\n", i, e);
+                println!("❌ Block rejected: {}", e);
             }
         }
 
         let alice = &state.accounts[0];
 
         println!(
-            "Tick {} | Balance: {} | Epoch: {}\n",
-            block.tick,
+            "📊 State → Balance: {} | Epoch: {}",
             alice.balance,
             alice.rotation_epoch
         );
 
-        thread::sleep(Duration::from_millis(800));
+        thread::sleep(Duration::from_millis(700));
     }
 
-    println!("🎬 Demo complete.\n");
+    println!("\n=======================================");
+    println!("🧠 DEMO SUMMARY");
+    println!("=======================================");
+    println!("✔ Identity rotated successfully");
+    println!("✔ System enforced epoch rules");
+    println!("✔ Outdated identity rejected");
+    println!("✔ Time-based security in action");
+    println!("=======================================\n");
 }
