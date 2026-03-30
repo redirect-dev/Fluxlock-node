@@ -263,6 +263,8 @@ dependencies = [
  "pqcrypto-dilithium",
  "pqcrypto-traits",
  "rand",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
