@@ -20,8 +20,7 @@ pub fn load_mempool() -> Mempool {
     let data = fs::read_to_string(MEMPOOL_PATH)
         .expect("Failed to read mempool");
 
-    serde_json::from_str(&data)
-        .unwrap_or(Mempool { txs: vec![] })
+    serde_json::from_str(&data).unwrap_or(Mempool { txs: vec![] })
 }
 
 pub fn save_mempool(pool: &Mempool) {

@@ -4,6 +4,7 @@ use crate::cli::wallet::load_wallet;
 use crate::cli::mempool::add_tx;
 
 use crate::tx::transaction::{Tx, TransferTx};
+use crate::tx::message::build_transfer_message;
 
 pub fn send_tx() {
     println!("💸 Preparing transaction...\n");
@@ -21,14 +22,16 @@ pub fn send_tx() {
     let to = vec![9; 32];
     let amount = 100u128;
 
-    // 🔥 TEMP FIX: use nonce 1 instead of 0
-    let nonce = 1u64;
+    // ✅ correct starting nonce
+    let nonce = 0u64;
 
-    let mut msg = vec![];
-    msg.extend(&from);
-    msg.extend(&to);
-    msg.extend(&amount.to_le_bytes());
-    msg.extend(&nonce.to_le_bytes());
+    // 🔥 unified message
+    let msg = build_transfer_message(
+        &from,
+        &to,
+        amount,
+        nonce,
+    );
 
     let classical_sig = signing_key.sign(&msg).to_bytes().to_vec();
     let pq_sig = crate::pq::sign(&msg, &wallet.pq_secret);
