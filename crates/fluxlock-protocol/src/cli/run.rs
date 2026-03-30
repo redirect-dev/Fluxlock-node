@@ -1,5 +1,6 @@
 use std::{thread, time::Duration};
 
+use colored::*;
 use ed25519_dalek::{SigningKey, Signer};
 
 use crate::genesis::builder::build_genesis_state;
@@ -15,11 +16,14 @@ use crate::tx::transaction::{Tx, RotationCommitTx, RotationRevealTx, TransferTx}
 use blake3;
 
 pub fn run_chain() {
-    println!("\n=======================================");
-    println!("🚀 Fluxlock Live Security Demo");
-    println!("=======================================\n");
+    println!(
+        "\n{}\n{}\n{}\n",
+        "=======================================".blue(),
+        "🚀 FLUXLOCK LIVE SECURITY DEMO".bold().bright_cyan(),
+        "=======================================".blue()
+    );
 
-    // --- Original keys ---
+    // --- Keys ---
     let signing_key = SigningKey::from_bytes(&[1u8; 32]);
     let verify_key = signing_key.verifying_key();
     let alice_key = verify_key.to_bytes().to_vec();
@@ -28,20 +32,17 @@ pub fn run_chain() {
 
     let (pq_public, pq_secret) = crate::pq::generate_keypair();
 
-    // --- New keys for rotation ---
     let new_signing_key = SigningKey::from_bytes(&[7u8; 32]);
     let new_verify_key = new_signing_key.verifying_key();
     let new_classical = new_verify_key.to_bytes().to_vec();
 
     let (new_pq_public, new_pq_secret) = crate::pq::generate_keypair();
 
-    // --- Commitment ---
     let mut hasher = blake3::Hasher::new();
     hasher.update(&new_classical);
     hasher.update(&new_pq_public);
     let commitment = hasher.finalize().as_bytes().to_vec();
 
-    // --- Validator ---
     let validator = Validator::new(
         1_000_000,
         vec![9; 32],
@@ -61,16 +62,20 @@ pub fn run_chain() {
     let mut state = build_genesis_state(config.clone());
     let mut block = build_genesis_block(&state);
 
-    println!("🧬 Genesis Initialized");
-    println!("   Tick: {}", block.tick);
-    println!("   Alice Balance: 1000\n");
+    println!("{}", "🧬 Genesis Initialized".green());
+    println!("   Tick: {}", block.tick.to_string().yellow());
+    println!("   Alice Balance: {}\n", "1000".green());
 
     for i in 1..=12 {
-        println!("---------------------------------------");
-        println!("⏱ Tick {}", i);
+        println!("{}", "---------------------------------------".dimmed());
+        println!(
+            "{} {}",
+            "⏱ Tick".bold(),
+            i.to_string().bright_yellow()
+        );
 
         let txs = if i == 3 {
-            println!("🔐 EVENT: Identity Commit Initiated");
+            println!("{}", "🔐 EVENT: Identity Commit Initiated".cyan());
 
             let mut msg = vec![];
             msg.extend(&alice_key);
@@ -85,7 +90,7 @@ pub fn run_chain() {
                 pq_signature: crate::pq::sign(&msg, &pq_secret),
             })]
         } else if i == 4 {
-            println!("🔁 EVENT: Identity Rotation Executed");
+            println!("{}", "🔁 EVENT: Identity Rotation Executed".bright_green());
 
             let mut msg = vec![];
             msg.extend(&alice_key);
@@ -102,7 +107,12 @@ pub fn run_chain() {
                 pq_signature: crate::pq::sign(&msg, &pq_secret),
             })]
         } else if i == 10 {
-            println!("⚠️ EVENT: Attempting transaction with outdated identity");
+            println!(
+                "{}",
+                "⚠️ EVENT: Attempting transaction with outdated identity"
+                    .yellow()
+                    .bold()
+            );
 
             let mut msg = vec![];
             msg.extend(&new_classical);
@@ -134,30 +144,33 @@ pub fn run_chain() {
             Ok((next_block, new_counter)) => {
                 state.counter = new_counter;
                 block = next_block;
-                println!("✅ Block accepted");
+                println!("{}", "✅ Block accepted".green());
             }
             Err(e) => {
-                println!("❌ Block rejected: {}", e);
+                println!("{}", format!("❌ Block rejected: {}", e).red().bold());
             }
         }
 
         let alice = &state.accounts[0];
 
         println!(
-            "📊 State → Balance: {} | Epoch: {}",
-            alice.balance,
-            alice.rotation_epoch
+            "{} {} | {} {}",
+            "📊 Balance:".bold(),
+            alice.balance.to_string().green(),
+            "Epoch:".bold(),
+            alice.rotation_epoch.to_string().blue()
         );
 
-        thread::sleep(Duration::from_millis(700));
+        thread::sleep(Duration::from_millis(600));
     }
 
-    println!("\n=======================================");
-    println!("🧠 DEMO SUMMARY");
-    println!("=======================================");
-    println!("✔ Identity rotated successfully");
-    println!("✔ System enforced epoch rules");
-    println!("✔ Outdated identity rejected");
-    println!("✔ Time-based security in action");
-    println!("=======================================\n");
+    println!(
+        "\n{}\n{}\n{}\n{}\n{}\n{}\n",
+        "=======================================".blue(),
+        "🧠 DEMO SUMMARY".bold().bright_cyan(),
+        "=======================================".blue(),
+        "✔ Identity rotated successfully".green(),
+        "✔ Epoch enforcement triggered rejection".yellow(),
+        "✔ Time-bound security enforced".cyan()
+    );
 }
