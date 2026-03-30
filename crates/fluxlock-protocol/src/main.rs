@@ -22,6 +22,10 @@ fn main() {
             fluxlock_protocol::cli::run::run_chain();
         }
 
+        "send" => {
+            fluxlock_protocol::cli::send::send_tx();
+        }
+
         "help" => {
             print_help();
         }
@@ -36,8 +40,9 @@ fn main() {
 fn print_help() {
     println!("Fluxlock CLI\n");
     println!("Usage:");
-    println!("  fluxlock-protocol demo          Run full protocol demo");
+    println!("  fluxlock-protocol demo          Run demo");
     println!("  fluxlock-protocol new-account   Create wallet");
     println!("  fluxlock-protocol run           Run live chain");
+    println!("  fluxlock-protocol send          Send transaction");
     println!("  fluxlock-protocol help          Show help\n");
 }
