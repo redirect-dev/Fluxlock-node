@@ -251,6 +251,7 @@ dependencies = [
  "ed25519-dalek",
  "pqcrypto-dilithium",
  "pqcrypto-traits",
+ "rand",
 ]
 
 [[package]]

@@ -14,6 +14,10 @@ fn main() {
             fluxlock_protocol::test_genesis::run_genesis_test();
         }
 
+        "new-account" => {
+            fluxlock_protocol::cli::account::create_account();
+        }
+
         "help" => {
             print_help();
         }
@@ -28,6 +32,7 @@ fn main() {
 fn print_help() {
     println!("Fluxlock CLI\n");
     println!("Usage:");
-    println!("  fluxlock-protocol demo     Run full protocol demo");
-    println!("  fluxlock-protocol help     Show this help message\n");
+    println!("  fluxlock-protocol demo          Run full protocol demo");
+    println!("  fluxlock-protocol new-account   Generate a new account");
+    println!("  fluxlock-protocol help          Show this help message\n");
 }
