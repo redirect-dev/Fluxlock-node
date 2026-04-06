@@ -36,4 +36,19 @@ impl Validator {
             status: ValidatorStatus::Active,
         }
     }
+
+    /// 🔥 NEW: Slash validator for protocol violation
+    pub fn slash(&mut self, amount: u128) {
+        if self.stake <= amount {
+            self.stake = 0;
+            self.status = ValidatorStatus::Slashed;
+        } else {
+            self.stake -= amount;
+        }
+
+        // 🎬 CINEMATIC OUTPUT (THIS IS THE DEMO MOMENT)
+        println!("\n🚨 PROTOCOL VIOLATION DETECTED");
+        println!("⚔ VALIDATOR SLASHED");
+        println!("🪓 New stake: {}\n", self.stake);
+    }
 }

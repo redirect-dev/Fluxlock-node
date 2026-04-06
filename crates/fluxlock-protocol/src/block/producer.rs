@@ -33,23 +33,23 @@ pub fn produce_block(
                     Some(acc) => acc,
                     None => {
                         slash(validators);
-                        return Err("Sender not found".into());
+                        return Err("Transaction rejected: identity no longer valid".into());
                     }
                 };
 
                 if !verify_transfer(t, &sender.current_pq_pubkey) {
                     slash(validators);
-                    return Err("Invalid transfer signature".into());
+                    return Err("Transaction rejected: invalid signature".into());
                 }
 
                 if t.nonce != sender.nonce {
                     slash(validators);
-                    return Err("Invalid nonce".into());
+                    return Err("Transaction rejected: invalid nonce".into());
                 }
 
                 if sender.balance < t.amount {
                     slash(validators);
-                    return Err("Insufficient balance".into());
+                    return Err("Transaction rejected: insufficient balance".into());
                 }
 
                 sender.balance -= t.amount;
@@ -72,18 +72,18 @@ pub fn produce_block(
                     Some(acc) => acc,
                     None => {
                         slash(validators);
-                        return Err("Sender not found".into());
+                        return Err("Transaction rejected: identity no longer valid".into());
                     }
                 };
 
                 if !verify_rotation_commit(r) {
                     slash(validators);
-                    return Err("Invalid rotation commit".into());
+                    return Err("Transaction rejected: invalid rotation commit".into());
                 }
 
                 if r.nonce != sender.nonce {
                     slash(validators);
-                    return Err("Invalid nonce".into());
+                    return Err("Transaction rejected: invalid nonce".into());
                 }
 
                 sender.nonce += 1;
@@ -99,18 +99,18 @@ pub fn produce_block(
                     Some(acc) => acc,
                     None => {
                         slash(validators);
-                        return Err("Sender not found".into());
+                        return Err("Transaction rejected: identity no longer valid".into());
                     }
                 };
 
                 if !verify_rotation_reveal(r) {
                     slash(validators);
-                    return Err("Invalid rotation reveal".into());
+                    return Err("Transaction rejected: invalid rotation reveal".into());
                 }
 
                 if r.nonce != sender.nonce {
                     slash(validators);
-                    return Err("Invalid nonce".into());
+                    return Err("Transaction rejected: invalid nonce".into());
                 }
 
                 sender.current_classical_pubkey = r.new_classical_key.clone();
@@ -122,7 +122,7 @@ pub fn produce_block(
     }
 
     // -----------------------------
-    // BUILD BLOCK (FULLY CORRECT)
+    // BUILD BLOCK
     // -----------------------------
     let next_block = Block {
         parent_hash: prev_block.parent_hash.clone(),
@@ -145,9 +145,10 @@ pub fn produce_block(
     Ok((next_block, new_counter))
 }
 
+// 🔥 FIXED SLASH FUNCTION (ROUTES TO VALIDATOR METHOD)
 fn slash(validators: &mut Vec<Validator>) {
     if let Some(v) = validators.first_mut() {
-        v.stake = (v.stake as f64 * 0.95) as u128;
-        println!("⚔️ Validator slashed! New stake: {}", v.stake);
+        let penalty = (v.stake as f64 * 0.05) as u128;
+        v.slash(penalty);
     }
 }

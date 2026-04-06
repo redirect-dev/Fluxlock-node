@@ -20,24 +20,23 @@ use blake3;
 pub fn run_genesis_test() {
     println!("--- Fluxlock FULL Rotation Test ---");
 
-    // 🔐 ORIGINAL classical key
+    // 🔐 ORIGINAL KEYS
     let signing_key = SigningKey::from_bytes(&[1u8; 32]);
     let verify_key = signing_key.verifying_key();
     let alice_key = verify_key.to_bytes().to_vec();
 
     let bob_key = vec![2; 32];
 
-    // 🔐 ORIGINAL PQ
     let (pq_public, pq_secret) = crate::pq::generate_keypair();
 
-    // 🔐 NEW KEYS FOR ROTATION
+    // 🔐 NEW ROTATED KEYS
     let new_signing_key = SigningKey::from_bytes(&[7u8; 32]);
     let new_verify_key = new_signing_key.verifying_key();
     let new_classical = new_verify_key.to_bytes().to_vec();
 
     let (new_pq_public, new_pq_secret) = crate::pq::generate_keypair();
 
-    // 🔐 COMMITMENT = hash(new_classical + new_pq)
+    // 🔐 COMMITMENT
     let mut hasher = blake3::Hasher::new();
     hasher.update(&new_classical);
     hasher.update(&new_pq_public);
@@ -65,10 +64,11 @@ pub fn run_genesis_test() {
     println!("Genesis tick: {}", genesis_block.tick);
 
     let mut current_block = genesis_block;
+    let mut expired_triggered = false;
 
     for i in 1..=12 {
         let txs = if i == 1 {
-            // 🔐 COMMIT
+            println!("\n🔐 ROTATION COMMIT INITIATED");
 
             let mut message = vec![];
             message.extend(&alice_key);
@@ -78,17 +78,15 @@ pub fn run_genesis_test() {
             let classical_sig = signing_key.sign(&message).to_bytes().to_vec();
             let pq_sig = crate::pq::sign(&message, &pq_secret);
 
-            vec![
-                Tx::RotationCommit(RotationCommitTx {
-                    from: alice_key.clone(),
-                    new_key_commitment: commitment.clone(),
-                    nonce: 0,
-                    classical_signature: classical_sig,
-                    pq_signature: pq_sig,
-                }),
-            ]
+            vec![Tx::RotationCommit(RotationCommitTx {
+                from: alice_key.clone(),
+                new_key_commitment: commitment.clone(),
+                nonce: 0,
+                classical_signature: classical_sig,
+                pq_signature: pq_sig,
+            })]
         } else if i == 3 {
-            // 🔐 REVEAL (THIS IS THE BIG MOMENT)
+            println!("\n🔐 ROTATION REVEAL — NEW IDENTITY ACTIVATED");
 
             let mut message = vec![];
             message.extend(&alice_key);
@@ -99,18 +97,36 @@ pub fn run_genesis_test() {
             let classical_sig = signing_key.sign(&message).to_bytes().to_vec();
             let pq_sig = crate::pq::sign(&message, &pq_secret);
 
-            vec![
-                Tx::RotationReveal(RotationRevealTx {
-                    from: alice_key.clone(),
-                    new_classical_key: new_classical.clone(),
-                    new_pq_key: new_pq_public.clone(),
-                    nonce: 1,
-                    classical_signature: classical_sig,
-                    pq_signature: pq_sig,
-                }),
-            ]
+            vec![Tx::RotationReveal(RotationRevealTx {
+                from: alice_key.clone(),
+                new_classical_key: new_classical.clone(),
+                new_pq_key: new_pq_public.clone(),
+                nonce: 1,
+                classical_signature: classical_sig,
+                pq_signature: pq_sig,
+            })]
+        } else if i == 9 {
+            println!("\n🚨 THREAT: Attempt to reuse expired credentials");
+
+            let mut message = vec![];
+            message.extend(&alice_key); // OLD KEY
+            message.extend(&bob_key);
+            message.extend(&50u128.to_le_bytes());
+            message.extend(&2u64.to_le_bytes());
+
+            let classical_sig = signing_key.sign(&message).to_bytes().to_vec();
+            let pq_sig = crate::pq::sign(&message, &pq_secret);
+
+            vec![Tx::Transfer(TransferTx {
+                from: alice_key.clone(), // ❌ OLD KEY
+                to: bob_key.clone(),
+                amount: 50,
+                nonce: 2,
+                classical_signature: classical_sig,
+                pq_signature: pq_sig,
+            })]
         } else if i == 11 {
-            // 🔐 TRANSFER USING NEW KEYS (SHOULD WORK IF ROTATION SUCCEEDED)
+            println!("\n✅ VALID TRANSACTION WITH ROTATED IDENTITY");
 
             let mut message = vec![];
             message.extend(&new_classical);
@@ -121,16 +137,14 @@ pub fn run_genesis_test() {
             let classical_sig = new_signing_key.sign(&message).to_bytes().to_vec();
             let pq_sig = crate::pq::sign(&message, &new_pq_secret);
 
-            vec![
-                Tx::Transfer(TransferTx {
-                    from: new_classical.clone(),
-                    to: bob_key.clone(),
-                    amount: 100,
-                    nonce: 2,
-                    classical_signature: classical_sig,
-                    pq_signature: pq_sig,
-                }),
-            ]
+            vec![Tx::Transfer(TransferTx {
+                from: new_classical.clone(),
+                to: bob_key.clone(),
+                amount: 100,
+                nonce: 2,
+                classical_signature: classical_sig,
+                pq_signature: pq_sig,
+            })]
         } else {
             vec![]
         };
@@ -148,21 +162,28 @@ pub fn run_genesis_test() {
                 genesis_state.counter = new_counter;
                 current_block = next_block;
             }
-            Err(e) => {
-                println!("Block {} rejected: {}", i, e);
+            Err(_e) => {
+                println!("❌ Transaction rejected: identity no longer valid");
+                println!("🛑 Network rejected expired identity");
             }
         }
 
         let alice = &genesis_state.accounts[0];
+        let expired = alice.has_flag(FLAG_IDENTITY_EXPIRED);
 
         println!(
             "Block {} | Balance: {} | Expired: {} | Epoch: {}",
             i,
             alice.balance,
-            alice.has_flag(FLAG_IDENTITY_EXPIRED),
+            expired,
             alice.rotation_epoch
         );
+
+        if expired && !expired_triggered {
+            println!("\n🚨 IDENTITY HAS EXPIRED AT BLOCK {}\n", i);
+            expired_triggered = true;
+        }
     }
 
-    println!("--- FULL rotation test complete ---");
+    println!("\n--- FULL rotation test complete ---");
 }
