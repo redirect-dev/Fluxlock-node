@@ -1,2 +1,21 @@
+# Rust build artifacts
 /target
-tick_log.json
+
+# Logs and runtime files
+*.log
+*.json
+
+# Data / test output
+*.csv
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / editor
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.swp
