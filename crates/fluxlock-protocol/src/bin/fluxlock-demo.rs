@@ -1,14 +1,44 @@
+use std::env;
 use std::thread::sleep;
 use std::time::Duration;
 
 fn pause() {
-    sleep(Duration::from_millis(700));
+    sleep(Duration::from_millis(600));
+}
+
+fn attack_mode() {
+    println!("\n==================== ATTACK SIMULATION ====================");
+    println!("Attempting repeated use of expired identity...\n");
+
+    let mut stake = 1_000_000;
+
+    for i in 1..=3 {
+        println!("🚨 Attack Attempt {}", i);
+        pause();
+
+        println!("❌ Transaction rejected: identity expired");
+        stake -= 25_000;
+
+        println!("⚔ Validator slashed → New stake: {}", stake);
+        pause();
+
+        println!("--------------------------------------------------\n");
+        pause();
+    }
+
+    println!("🛑 Attack unsuccessful");
+    println!("Expired identity cannot be reused\n");
+
+    println!("==========================================================\n");
 }
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+    let attack = args.iter().any(|arg| arg == "--attack");
+
     println!("\n==================== FLUXLOCK ====================");
     println!("Time-bound identity enforcement demo");
-    println!("Identity expires. Invalid identity is rejected.");
+    println!("Identity expires. Expired identity cannot act.");
     println!("=================================================\n");
 
     pause();
@@ -53,6 +83,10 @@ fn main() {
 
     println!("\nBlock 6 | State unchanged | Attack failed");
     pause();
+
+    if attack {
+        attack_mode();
+    }
 
     println!("\n--- VALID TRANSACTION ---");
     println!("✅ Using rotated identity...");

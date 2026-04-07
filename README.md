@@ -11,6 +11,18 @@ Identity rotates
 Identity expires
 Expired identity is rejected
 The network enforces validity over time
+### ⚔ Attack Mode
+
+Simulate repeated attempts to reuse expired identity:
+
+```bash
+cargo run -p fluxlock-protocol --bin fluxlock-demo -- --attack
+### ⚔ Attack Mode
+
+Simulate repeated attempts to reuse expired identity:
+
+```bash
+cargo run -p fluxlock-protocol --bin fluxlock-demo -- --attack
 
 **Time-bound cryptographic identity enforced at the protocol level**
 
