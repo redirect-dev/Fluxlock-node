@@ -12,7 +12,6 @@ Run the demo:
 
 ```bash
 cargo run -p fluxlock-protocol --bin fluxlock-demo
-
 # 🔐 Fluxlock
 
 A protocol for time-bound, self-healing identity.
