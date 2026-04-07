@@ -272,6 +272,7 @@ dependencies = [
  "blake3",
  "colored",
  "ed25519-dalek",
+ "hex",
  "pqcrypto-dilithium",
  "pqcrypto-traits",
  "rand",

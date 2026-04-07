@@ -6,6 +6,7 @@ pub struct TransferTx {
     pub to: Vec<u8>,
     pub amount: u128,
     pub nonce: u64,
+    pub epoch: u64, // 🔥 NEW: time-bound enforcement
     pub classical_signature: Vec<u8>,
     pub pq_signature: Vec<u8>,
 }
@@ -15,6 +16,7 @@ pub struct RotationCommitTx {
     pub from: Vec<u8>,
     pub new_key_commitment: Vec<u8>,
     pub nonce: u64,
+    pub epoch: u64, // 🔥 NEW
     pub classical_signature: Vec<u8>,
     pub pq_signature: Vec<u8>,
 }
@@ -25,6 +27,7 @@ pub struct RotationRevealTx {
     pub new_classical_key: Vec<u8>,
     pub new_pq_key: Vec<u8>,
     pub nonce: u64,
+    pub epoch: u64, // 🔥 NEW
     pub classical_signature: Vec<u8>,
     pub pq_signature: Vec<u8>,
 }

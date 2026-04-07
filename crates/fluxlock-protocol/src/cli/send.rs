@@ -25,6 +25,11 @@ pub fn send_tx() {
     // ✅ REAL NONCE
     let nonce = wallet.nonce;
 
+    // 🔥 NEW: EPOCH (for now derived from nonce or simple counter)
+    // later this will be network-driven
+    let epoch = wallet.nonce as u64;
+
+    // Build base message
     let msg = build_transfer_message(
         &from,
         &to,
@@ -32,14 +37,23 @@ pub fn send_tx() {
         nonce,
     );
 
-    let classical_sig = signing_key.sign(&msg).to_bytes().to_vec();
-    let pq_sig = crate::pq::sign(&msg, &wallet.pq_secret);
+    // 🔐 Bind epoch into signature payload
+    let mut data = Vec::new();
+    data.extend_from_slice(&epoch.to_be_bytes());
+    data.extend_from_slice(&msg);
+
+    // Classical signature (epoch-bound)
+    let classical_sig = signing_key.sign(&data).to_bytes().to_vec();
+
+    // PQ signature (also bound to epoch for consistency)
+    let pq_sig = crate::pq::sign(&data, &wallet.pq_secret);
 
     let tx = Tx::Transfer(TransferTx {
         from,
         to,
         amount,
         nonce,
+        epoch, // 🔥 NEW FIELD (you will need to add this to struct)
         classical_signature: classical_sig,
         pq_signature: pq_sig,
     });
@@ -50,5 +64,5 @@ pub fn send_tx() {
     wallet.nonce += 1;
     save_wallet(&wallet);
 
-    println!("✅ Transaction submitted\n");
+    println!("✅ Transaction submitted (epoch-bound)\n");
 }

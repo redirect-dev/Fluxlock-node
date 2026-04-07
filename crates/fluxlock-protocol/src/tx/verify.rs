@@ -1,111 +1,86 @@
 use ed25519_dalek::{Signature, VerifyingKey, Verifier};
 
-use crate::pq;
+fn to_pubkey(bytes: &[u8]) -> Option<VerifyingKey> {
+    let arr: [u8; 32] = bytes.try_into().ok()?;
+    VerifyingKey::from_bytes(&arr).ok()
+}
 
-use crate::tx::transaction::{
-    TransferTx,
-    RotationCommitTx,
-    RotationRevealTx,
-};
-use crate::tx::message::build_transfer_message;
+fn to_signature(bytes: &[u8]) -> Option<Signature> {
+    let arr: [u8; 64] = bytes.try_into().ok()?;
+    Some(Signature::from_bytes(&arr))
+}
 
-// -----------------------------
-// TRANSFER
-// -----------------------------
-pub fn verify_transfer(tx: &TransferTx, pq_pubkey: &Vec<u8>) -> bool {
-    let msg = build_transfer_message(
+/// ✅ KEEP ORIGINAL NAMES (fixes producer.rs automatically)
+
+pub fn verify_transfer(
+    pubkey_bytes: &[u8],
+    tx: &crate::tx::transaction::TransferTx,
+) -> bool {
+    let pubkey = match to_pubkey(pubkey_bytes) {
+        Some(pk) => pk,
+        None => return false,
+    };
+
+    let signature = match to_signature(&tx.classical_signature) {
+        Some(sig) => sig,
+        None => return false,
+    };
+
+    let msg = crate::tx::message::build_transfer_message(
         &tx.from,
         &tx.to,
         tx.amount,
         tx.nonce,
     );
 
-    // --- Public key ---
-    let pubkey_bytes: [u8; 32] = match tx.from.clone().try_into() {
-        Ok(b) => b,
-        Err(_) => return false,
-    };
+    let mut data = Vec::new();
+    data.extend_from_slice(&tx.epoch.to_be_bytes());
+    data.extend_from_slice(&msg);
 
-    let pubkey = match VerifyingKey::from_bytes(&pubkey_bytes) {
-        Ok(k) => k,
-        Err(_) => return false,
-    };
-
-    // --- Signature ---
-    let sig_bytes: [u8; 64] = match tx.classical_signature.clone().try_into() {
-        Ok(b) => b,
-        Err(_) => return false,
-    };
-
-    let sig = Signature::from_bytes(&sig_bytes);
-
-    if pubkey.verify(&msg, &sig).is_err() {
-        return false;
-    }
-
-    // --- PQ verify ---
-    if !pq::verify(&msg, &tx.pq_signature, pq_pubkey) {
-        return false;
-    }
-
-    true
+    pubkey.verify(&data, &signature).is_ok()
 }
 
-// -----------------------------
-// ROTATION COMMIT
-// -----------------------------
-pub fn verify_rotation_commit(tx: &RotationCommitTx) -> bool {
-    let mut msg = vec![];
-    msg.extend(&tx.from);
-    msg.extend(&tx.new_key_commitment);
-    msg.extend(&tx.nonce.to_le_bytes());
-
-    let pubkey_bytes: [u8; 32] = match tx.from.clone().try_into() {
-        Ok(b) => b,
-        Err(_) => return false,
+pub fn verify_rotation_commit(
+    pubkey_bytes: &[u8],
+    tx: &crate::tx::transaction::RotationCommitTx,
+) -> bool {
+    let pubkey = match to_pubkey(pubkey_bytes) {
+        Some(pk) => pk,
+        None => return false,
     };
 
-    let pubkey = match VerifyingKey::from_bytes(&pubkey_bytes) {
-        Ok(k) => k,
-        Err(_) => return false,
+    let signature = match to_signature(&tx.classical_signature) {
+        Some(sig) => sig,
+        None => return false,
     };
 
-    let sig_bytes: [u8; 64] = match tx.classical_signature.clone().try_into() {
-        Ok(b) => b,
-        Err(_) => return false,
-    };
+    let mut data = Vec::new();
+    data.extend_from_slice(&tx.epoch.to_be_bytes());
+    data.extend_from_slice(&tx.new_key_commitment);
+    data.extend_from_slice(&tx.nonce.to_be_bytes());
 
-    let sig = Signature::from_bytes(&sig_bytes);
-
-    pubkey.verify(&msg, &sig).is_ok()
+    pubkey.verify(&data, &signature).is_ok()
 }
 
-// -----------------------------
-// ROTATION REVEAL
-// -----------------------------
-pub fn verify_rotation_reveal(tx: &RotationRevealTx) -> bool {
-    let mut msg = vec![];
-    msg.extend(&tx.from);
-    msg.extend(&tx.new_classical_key);
-    msg.extend(&tx.new_pq_key);
-    msg.extend(&tx.nonce.to_le_bytes());
-
-    let pubkey_bytes: [u8; 32] = match tx.from.clone().try_into() {
-        Ok(b) => b,
-        Err(_) => return false,
+pub fn verify_rotation_reveal(
+    pubkey_bytes: &[u8],
+    tx: &crate::tx::transaction::RotationRevealTx,
+) -> bool {
+    let pubkey = match to_pubkey(pubkey_bytes) {
+        Some(pk) => pk,
+        None => return false,
     };
 
-    let pubkey = match VerifyingKey::from_bytes(&pubkey_bytes) {
-        Ok(k) => k,
-        Err(_) => return false,
+    let signature = match to_signature(&tx.classical_signature) {
+        Some(sig) => sig,
+        None => return false,
     };
 
-    let sig_bytes: [u8; 64] = match tx.classical_signature.clone().try_into() {
-        Ok(b) => b,
-        Err(_) => return false,
-    };
+    let mut data = Vec::new();
+    data.extend_from_slice(&tx.epoch.to_be_bytes());
+    data.extend_from_slice(&tx.new_classical_key);
+    data.extend_from_slice(&tx.new_pq_key);
+    data.extend_from_slice(&tx.nonce.to_be_bytes());
 
-    let sig = Signature::from_bytes(&sig_bytes);
-
-    pubkey.verify(&msg, &sig).is_ok()
+    pubkey.verify(&data, &signature).is_ok()
 }

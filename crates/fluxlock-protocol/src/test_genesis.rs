@@ -20,7 +20,6 @@ use blake3;
 pub fn run_genesis_test() {
     println!("--- Fluxlock FULL Rotation Test ---");
 
-    // 🔐 ORIGINAL KEYS
     let signing_key = SigningKey::from_bytes(&[1u8; 32]);
     let verify_key = signing_key.verifying_key();
     let alice_key = verify_key.to_bytes().to_vec();
@@ -29,14 +28,12 @@ pub fn run_genesis_test() {
 
     let (pq_public, pq_secret) = crate::pq::generate_keypair();
 
-    // 🔐 NEW ROTATED KEYS
     let new_signing_key = SigningKey::from_bytes(&[7u8; 32]);
     let new_verify_key = new_signing_key.verifying_key();
     let new_classical = new_verify_key.to_bytes().to_vec();
 
     let (new_pq_public, new_pq_secret) = crate::pq::generate_keypair();
 
-    // 🔐 COMMITMENT
     let mut hasher = blake3::Hasher::new();
     hasher.update(&new_classical);
     hasher.update(&new_pq_public);
@@ -67,10 +64,13 @@ pub fn run_genesis_test() {
     let mut expired_triggered = false;
 
     for i in 1..=12 {
+        let epoch = i as u64;
+
         let txs = if i == 1 {
             println!("\n🔐 ROTATION COMMIT INITIATED");
 
             let mut message = vec![];
+            message.extend(&epoch.to_be_bytes());
             message.extend(&alice_key);
             message.extend(&commitment);
             message.extend(&0u64.to_le_bytes());
@@ -82,6 +82,7 @@ pub fn run_genesis_test() {
                 from: alice_key.clone(),
                 new_key_commitment: commitment.clone(),
                 nonce: 0,
+                epoch,
                 classical_signature: classical_sig,
                 pq_signature: pq_sig,
             })]
@@ -89,6 +90,7 @@ pub fn run_genesis_test() {
             println!("\n🔐 ROTATION REVEAL — NEW IDENTITY ACTIVATED");
 
             let mut message = vec![];
+            message.extend(&epoch.to_be_bytes());
             message.extend(&alice_key);
             message.extend(&new_classical);
             message.extend(&new_pq_public);
@@ -102,6 +104,7 @@ pub fn run_genesis_test() {
                 new_classical_key: new_classical.clone(),
                 new_pq_key: new_pq_public.clone(),
                 nonce: 1,
+                epoch,
                 classical_signature: classical_sig,
                 pq_signature: pq_sig,
             })]
@@ -109,6 +112,7 @@ pub fn run_genesis_test() {
             println!("\n🚨 THREAT: Attempt to reuse expired credentials");
 
             let mut message = vec![];
+            message.extend(&epoch.to_be_bytes());
             message.extend(&alice_key); // OLD KEY
             message.extend(&bob_key);
             message.extend(&50u128.to_le_bytes());
@@ -118,10 +122,11 @@ pub fn run_genesis_test() {
             let pq_sig = crate::pq::sign(&message, &pq_secret);
 
             vec![Tx::Transfer(TransferTx {
-                from: alice_key.clone(), // ❌ OLD KEY
+                from: alice_key.clone(),
                 to: bob_key.clone(),
                 amount: 50,
                 nonce: 2,
+                epoch,
                 classical_signature: classical_sig,
                 pq_signature: pq_sig,
             })]
@@ -129,6 +134,7 @@ pub fn run_genesis_test() {
             println!("\n✅ VALID TRANSACTION WITH ROTATED IDENTITY");
 
             let mut message = vec![];
+            message.extend(&epoch.to_be_bytes());
             message.extend(&new_classical);
             message.extend(&bob_key);
             message.extend(&100u128.to_le_bytes());
@@ -142,6 +148,7 @@ pub fn run_genesis_test() {
                 to: bob_key.clone(),
                 amount: 100,
                 nonce: 2,
+                epoch,
                 classical_signature: classical_sig,
                 pq_signature: pq_sig,
             })]
@@ -162,7 +169,7 @@ pub fn run_genesis_test() {
                 genesis_state.counter = new_counter;
                 current_block = next_block;
             }
-            Err(_e) => {
+            Err(_) => {
                 println!("❌ Transaction rejected: identity no longer valid");
                 println!("🛑 Network rejected expired identity");
             }

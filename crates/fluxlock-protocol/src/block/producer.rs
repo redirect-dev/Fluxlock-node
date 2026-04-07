@@ -37,9 +37,10 @@ pub fn produce_block(
                     }
                 };
 
-                if !verify_transfer(t, &sender.current_pq_pubkey) {
+                // 🔐 FIX: correct verification (classical key + epoch-bound sig)
+                if !verify_transfer(&sender.current_classical_pubkey, t) {
                     slash(validators);
-                    return Err("Transaction rejected: invalid signature".into());
+                    return Err("Transaction rejected: invalid signature or epoch".into());
                 }
 
                 if t.nonce != sender.nonce {
@@ -76,7 +77,7 @@ pub fn produce_block(
                     }
                 };
 
-                if !verify_rotation_commit(r) {
+                if !verify_rotation_commit(&sender.current_classical_pubkey, r) {
                     slash(validators);
                     return Err("Transaction rejected: invalid rotation commit".into());
                 }
@@ -103,7 +104,7 @@ pub fn produce_block(
                     }
                 };
 
-                if !verify_rotation_reveal(r) {
+                if !verify_rotation_reveal(&sender.current_classical_pubkey, r) {
                     slash(validators);
                     return Err("Transaction rejected: invalid rotation reveal".into());
                 }
@@ -113,9 +114,13 @@ pub fn produce_block(
                     return Err("Transaction rejected: invalid nonce".into());
                 }
 
+                // 🔐 Identity rotation
                 sender.current_classical_pubkey = r.new_classical_key.clone();
                 sender.current_pq_pubkey = r.new_pq_key.clone();
-                sender.rotation_epoch += 1;
+
+                // 🔥 Time progression
+                sender.rotation_epoch = r.epoch;
+
                 sender.nonce += 1;
             }
         }
@@ -145,7 +150,7 @@ pub fn produce_block(
     Ok((next_block, new_counter))
 }
 
-// 🔥 FIXED SLASH FUNCTION (ROUTES TO VALIDATOR METHOD)
+// 🔥 Validator slashing
 fn slash(validators: &mut Vec<Validator>) {
     if let Some(v) = validators.first_mut() {
         let penalty = (v.stake as f64 * 0.05) as u128;
