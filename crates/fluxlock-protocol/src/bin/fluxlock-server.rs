@@ -1,18 +1,30 @@
-use tiny_http::{Server, Response};
+use tiny_http::{Server, Response, Header};
 use std::str;
 
-fn validate(identity: &str, epoch: i32) -> bool {
+fn validate(identity: &str, epoch: i32) -> (bool, &'static str) {
     match identity {
-        "ID-1000" => epoch == 0,
-        "ID-1001" => epoch == 1,
-        _ => false,
+        "ID-1000" => {
+            if epoch == 0 {
+                (true, "identity is current")
+            } else {
+                (false, "identity expired")
+            }
+        }
+        "ID-1001" => {
+            if epoch == 1 {
+                (true, "identity is current")
+            } else {
+                (false, "identity expired")
+            }
+        }
+        _ => (false, "unknown identity"),
     }
 }
 
 fn main() {
     let server = Server::http("0.0.0.0:8080").unwrap();
 
-    println!("🚀 Fluxlock UI running at http://localhost:8080");
+    println!("🚀 Fluxlock API + UI running at http://localhost:8080");
 
     for request in server.incoming_requests() {
         let url = request.url().to_string();
@@ -34,34 +46,37 @@ fn main() {
                 }
             }
 
-            let result = validate(identity, epoch);
+            let (valid, reason) = validate(identity, epoch);
 
-            let response = if result {
-                "VALID"
-            } else {
-                "INVALID"
-            };
+            let json = format!(
+                r#"{{
+    "valid": {},
+    "identity": "{}",
+    "epoch": {},
+    "reason": "{}"
+}}"#,
+                valid, identity, epoch, reason
+            );
 
-            let res = Response::from_string(response);
-            request.respond(res).unwrap();
+            let response = Response::from_string(json)
+                .with_header(Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap());
+
+            request.respond(response).unwrap();
         } else {
-            let html = r#"
+            let html = r###"
             <html>
             <head>
                 <title>Fluxlock UI</title>
             </head>
             <body>
-                <h1>🔐 Fluxlock Identity Validator</h1>
+                <h1>Fluxlock Identity Validator</h1>
 
-                <label>Identity:</label><br/>
-                <input id="identity" value="ID-1000"/><br/><br/>
-
-                <label>Epoch:</label><br/>
-                <input id="epoch" value="1"/><br/><br/>
+                <input id="identity" value="ID-1000"/>
+                <input id="epoch" value="1"/>
 
                 <button onclick="validate()">Validate</button>
 
-                <h2 id="result"></h2>
+                <pre id="result"></pre>
 
                 <script>
                     function validate() {
@@ -69,23 +84,18 @@ fn main() {
                         const epoch = document.getElementById('epoch').value;
 
                         fetch(`/validate?identity=${id}&epoch=${epoch}`)
-                            .then(res => res.text())
+                            .then(res => res.json())
                             .then(data => {
-                                const result = document.getElementById('result');
-                                if (data === "VALID") {
-                                    result.innerHTML = "✅ VALID";
-                                } else {
-                                    result.innerHTML = "❌ INVALID";
-                                }
+                                document.getElementById('result').innerText =
+                                    JSON.stringify(data, null, 2);
                             });
                     }
                 </script>
             </body>
             </html>
-            "#;
+            "###;
 
-            let res = Response::from_string(html);
-            request.respond(res).unwrap();
+            request.respond(Response::from_string(html)).unwrap();
         }
     }
 }
