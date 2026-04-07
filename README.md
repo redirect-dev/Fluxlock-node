@@ -191,6 +191,12 @@ This reduces the impact of:
 key theft
 long-term credential leaks
 delayed detection breaches
+## 🔎 Identity Validation
+
+Fluxlock can be used to validate identity state:
+
+```bash
+cargo run -p fluxlock-protocol --bin fluxlock validate --identity ID-1001 --epoch 1
 📬 Contact
 
 If you are working on identity, post-quantum systems, or distributed security and want to explore this model, feel free to connect or reach out.
