@@ -3,10 +3,12 @@ use blake3;
 use crate::state::account::{Account, FLAG_IDENTITY_EXPIRED};
 use crate::tx::transaction::RotationRevealTx;
 use crate::pq;
+use crate::state::validator::Validator;
 
-/// Apply rotation reveal (FULL HYBRID KEY REPLACEMENT + PHASE 3 RULES)
+/// Apply rotation reveal (NOW WITH SLASHING)
 pub fn apply_rotation_reveal(
     accounts: &mut Vec<Account>,
+    validator: &mut Validator,
     tx: &RotationRevealTx,
 ) -> Result<(), String> {
     let acc = accounts
@@ -18,15 +20,17 @@ pub fn apply_rotation_reveal(
     // 🔐 NONCE
     // -----------------------------
     if tx.nonce != acc.nonce {
+        validator.slash(5);
         return Err("Invalid nonce".into());
     }
 
     acc.nonce += 1;
 
     // -----------------------------
-    // 🔁 FORK PREVENTION (MOVE UP)
+    // 🔁 FORK PREVENTION
     // -----------------------------
     if tx.epoch <= acc.rotation_epoch {
+        validator.slash(20);
         return Err("FORK_DETECTED".into());
     }
 
@@ -34,6 +38,7 @@ pub fn apply_rotation_reveal(
     // ⏳ EXPIRATION
     // -----------------------------
     if acc.has_flag(FLAG_IDENTITY_EXPIRED) {
+        validator.slash(10);
         return Err("IDENTITY_EXPIRED".into());
     }
 
@@ -47,6 +52,7 @@ pub fn apply_rotation_reveal(
     );
 
     if !continuity_valid {
+        validator.slash(15);
         return Err("INVALID_LINK_SIGNATURE".into());
     }
 
@@ -65,11 +71,12 @@ pub fn apply_rotation_reveal(
     let calculated = hasher.finalize().as_bytes().to_vec();
 
     if calculated != commitment {
+        validator.slash(10);
         return Err("Commitment mismatch".into());
     }
 
     // -----------------------------
-    // 🔐 APPLY KEYS
+    // ✅ APPLY KEYS
     // -----------------------------
     acc.current_classical_pubkey = tx.new_classical_key.clone();
     acc.current_pq_pubkey = tx.new_pq_key.clone();

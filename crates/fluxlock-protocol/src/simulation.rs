@@ -1,5 +1,6 @@
 use fluxlock_protocol::state::account::Account;
 use fluxlock_protocol::state::reveal::apply_rotation_reveal;
+use fluxlock_protocol::state::validator::Validator;
 use fluxlock_protocol::tx::transaction::RotationRevealTx;
 use fluxlock_protocol::pq;
 
@@ -13,12 +14,23 @@ fn now() -> u64 {
 }
 
 pub fn run_simulation() {
-    println!("🧪 Fluxlock Phase 3 Simulation\n");
+    println!("🧪 Fluxlock Phase 3B Simulation (WITH SLASHING)\n");
 
     let mut accounts: Vec<Account> = vec![];
 
     // -----------------------------
-    // CREATE INITIAL ACCOUNT
+    // CREATE VALIDATOR
+    // -----------------------------
+    let mut validator = Validator::new(
+        1000,
+        b"validator_classical".to_vec(),
+        b"validator_pq".to_vec(),
+        0,
+        100,
+    );
+
+    // -----------------------------
+    // CREATE ACCOUNT
     // -----------------------------
     let (pq_pk, pq_sk) = pq::generate_keypair();
 
@@ -28,7 +40,6 @@ pub fn run_simulation() {
         pq_pk.clone(),
     );
 
-    // commitment for new keys
     let new_classical = b"new_classical".to_vec();
     let (new_pq, _) = pq::generate_keypair();
 
@@ -44,56 +55,44 @@ pub fn run_simulation() {
     let timestamp = now();
 
     // -----------------------------
-    // ✅ VALID ROTATION
+    // ❌ INVALID (continuity)
     // -----------------------------
-    let link_sig = pq::sign(&new_pq, &pq_sk);
-
-    let tx1 = RotationRevealTx {
+    let bad_tx = RotationRevealTx {
         from: b"initial_classical".to_vec(),
         new_classical_key: new_classical.clone(),
         new_pq_key: new_pq.clone(),
         nonce: 0,
         epoch: 1,
         timestamp,
-
-        link_signature: link_sig,
-        classical_signature: vec![],
-        pq_signature: vec![],
-    };
-
-    println!("➡️ Attempting VALID rotation...");
-
-    let result = apply_rotation_reveal(&mut accounts, &tx1);
-
-    match result {
-        Ok(_) => println!("✅ Rotation succeeded\n"),
-        Err(e) => println!("❌ Unexpected failure: {}\n", e),
-    }
-
-    // -----------------------------
-    // ❌ FORK ATTEMPT
-    // -----------------------------
-    let tx2 = RotationRevealTx {
-        from: b"new_classical".to_vec(), // identity updated
-        new_classical_key: b"fork_classical".to_vec(),
-        new_pq_key: b"fork_pq".to_vec(),
-        nonce: 1,
-        epoch: 1, // SAME epoch → fork
-        timestamp: timestamp + 1,
-
         link_signature: vec![0; 64],
         classical_signature: vec![],
         pq_signature: vec![],
     };
 
-    println!("➡️ Attempting fork (expected: FORK_DETECTED)");
+    println!("➡️ Invalid rotation (should SLASH)");
 
-    let result = apply_rotation_reveal(&mut accounts, &tx2);
+    let _ = apply_rotation_reveal(&mut accounts, &mut validator, &bad_tx);
 
-    match result {
-        Ok(_) => println!("⚠️ Fork succeeded (unexpected)\n"),
-        Err(e) => println!("✅ Fork blocked: {}\n", e),
-    }
+    // -----------------------------
+    // ✅ VALID ROTATION
+    // -----------------------------
+    let link_sig = pq::sign(&new_pq, &pq_sk);
 
-    println!("🏁 Simulation complete\n");
+    let good_tx = RotationRevealTx {
+        from: b"initial_classical".to_vec(),
+        new_classical_key: new_classical.clone(),
+        new_pq_key: new_pq.clone(),
+        nonce: 1,
+        epoch: 2,
+        timestamp: timestamp + 1,
+        link_signature: link_sig,
+        classical_signature: vec![],
+        pq_signature: vec![],
+    };
+
+    println!("➡️ Valid rotation");
+
+    let _ = apply_rotation_reveal(&mut accounts, &mut validator, &good_tx);
+
+    println!("\n🏁 Simulation complete\n");
 }
