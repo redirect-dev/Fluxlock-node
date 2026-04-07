@@ -1,68 +1,30 @@
-use ed25519_dalek::{SigningKey, Signer};
-
-use crate::cli::wallet::{load_wallet, save_wallet};
-use crate::cli::mempool::add_tx;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::tx::transaction::{Tx, TransferTx};
-use crate::tx::message::build_transfer_message;
+
+fn now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
 
 pub fn send_tx() {
-    println!("💸 Preparing transaction...\n");
+    println!("📤 Sending transaction...");
 
-    let mut wallet = match load_wallet() {
-        Some(w) => w,
-        None => return,
-    };
-
-    let signing_key = SigningKey::from_bytes(
-        &wallet.classical_secret.clone().try_into().expect("Invalid key"),
-    );
-
-    let from = wallet.classical_public.clone();
-    let to = vec![9; 32];
-    let amount = 100u128;
-
-    // ✅ REAL NONCE
-    let nonce = wallet.nonce;
-
-    // 🔥 NEW: EPOCH (for now derived from nonce or simple counter)
-    // later this will be network-driven
-    let epoch = wallet.nonce as u64;
-
-    // Build base message
-    let msg = build_transfer_message(
-        &from,
-        &to,
-        amount,
-        nonce,
-    );
-
-    // 🔐 Bind epoch into signature payload
-    let mut data = Vec::new();
-    data.extend_from_slice(&epoch.to_be_bytes());
-    data.extend_from_slice(&msg);
-
-    // Classical signature (epoch-bound)
-    let classical_sig = signing_key.sign(&data).to_bytes().to_vec();
-
-    // PQ signature (also bound to epoch for consistency)
-    let pq_sig = crate::pq::sign(&data, &wallet.pq_secret);
+    let timestamp = now();
 
     let tx = Tx::Transfer(TransferTx {
-        from,
-        to,
-        amount,
-        nonce,
-        epoch, // 🔥 NEW FIELD (you will need to add this to struct)
-        classical_signature: classical_sig,
-        pq_signature: pq_sig,
+        from: b"alice".to_vec(),
+        to: b"bob".to_vec(),
+        amount: 50,
+        nonce: 0,
+        epoch: 0,
+        timestamp,
+
+        classical_signature: vec![],
+        pq_signature: vec![],
     });
 
-    add_tx(tx);
-
-    // ✅ increment nonce locally
-    wallet.nonce += 1;
-    save_wallet(&wallet);
-
-    println!("✅ Transaction submitted (epoch-bound)\n");
+    println!("✅ Transaction created: {:?}", tx);
 }

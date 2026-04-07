@@ -7,6 +7,8 @@ pub struct TransferTx {
     pub amount: u128,
     pub nonce: u64,
     pub epoch: u64,
+    pub timestamp: u64, // 🔥 NEW
+
     pub classical_signature: Vec<u8>,
     pub pq_signature: Vec<u8>,
 }
@@ -17,6 +19,8 @@ pub struct RotationCommitTx {
     pub new_key_commitment: Vec<u8>,
     pub nonce: u64,
     pub epoch: u64,
+    pub timestamp: u64, // 🔥 NEW
+
     pub classical_signature: Vec<u8>,
     pub pq_signature: Vec<u8>,
 }
@@ -28,8 +32,9 @@ pub struct RotationRevealTx {
     pub new_pq_key: Vec<u8>,
     pub nonce: u64,
     pub epoch: u64,
+    pub timestamp: u64, // 🔥 NEW
 
-    // 🔥 NEW: continuity proof
+    // 🔗 continuity proof
     pub link_signature: Vec<u8>,
 
     pub classical_signature: Vec<u8>,

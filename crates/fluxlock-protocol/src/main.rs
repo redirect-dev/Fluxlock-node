@@ -1,5 +1,7 @@
 use std::env;
 
+mod simulation;
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -26,6 +28,11 @@ fn main() {
             fluxlock_protocol::cli::send::send_tx();
         }
 
+        "simulate" => {
+            println!("🧪 Running multi-validator simulation...\n");
+            simulation::run_simulation();
+        }
+
         "help" => {
             print_help();
         }
@@ -44,5 +51,6 @@ fn print_help() {
     println!("  fluxlock-protocol new-account   Create wallet");
     println!("  fluxlock-protocol run           Run live chain");
     println!("  fluxlock-protocol send          Send transaction");
+    println!("  fluxlock-protocol simulate      Run validator simulation"); // 🔥 NEW
     println!("  fluxlock-protocol help          Show help\n");
 }
