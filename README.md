@@ -1,4 +1,16 @@
 # 🔐 Fluxlock
+## ⚡ Try It
+
+Run the demo:
+
+```bash
+cargo run -p fluxlock-protocol --bin fluxlock-demo
+Watch what happens:
+
+Identity rotates
+Identity expires
+Expired identity is rejected
+The network enforces validity over time
 
 **Time-bound cryptographic identity enforced at the protocol level**
 
