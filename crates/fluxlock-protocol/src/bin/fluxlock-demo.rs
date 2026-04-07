@@ -6,9 +6,14 @@ fn pause() {
     sleep(Duration::from_millis(600));
 }
 
-fn attack_mode() {
+// simple identity generator (static for demo clarity)
+fn identity(epoch: u32) -> String {
+    format!("ID-{}", 1000 + epoch)
+}
+
+fn attack_mode(expired_id: &str) {
     println!("\n==================== ATTACK SIMULATION ====================");
-    println!("Attempting repeated use of expired identity...\n");
+    println!("Targeting expired identity: {}\n", expired_id);
 
     let mut stake = 1_000_000;
 
@@ -16,18 +21,18 @@ fn attack_mode() {
         println!("🚨 Attack Attempt {}", i);
         pause();
 
+        println!("Using expired identity: {}", expired_id);
         println!("❌ Transaction rejected: identity expired");
-        stake -= 25_000;
 
+        stake -= 25_000;
         println!("⚔ Validator slashed → New stake: {}", stake);
-        pause();
 
         println!("--------------------------------------------------\n");
         pause();
     }
 
     println!("🛑 Attack unsuccessful");
-    println!("Expired identity cannot be reused\n");
+    println!("System invariant preserved: expired identity remains invalid\n");
 
     println!("==========================================================\n");
 }
@@ -46,38 +51,44 @@ fn main() {
     println!("🌱 Bootstrapping chain...");
     pause();
 
+    // identity setup
+    let id_epoch_0 = identity(0);
+    let id_epoch_1 = identity(1);
+
     println!("\n--- ROTATION PHASE ---");
     println!("🔐 Identity commit initiated");
+    println!("Current identity: {}", id_epoch_0);
     pause();
 
-    println!("Block 1 | Identity valid | Epoch: 0");
+    println!("Block 1 | Identity {} | Epoch: 0", id_epoch_0);
     pause();
 
-    println!("Block 2 | Identity valid | Epoch: 0");
+    println!("Block 2 | Identity {} | Epoch: 0", id_epoch_0);
     pause();
 
     println!("\n🔁 Identity reveal → NEW identity activated");
+    println!("New identity: {}", id_epoch_1);
     pause();
 
-    println!("Block 3 | Identity valid | Epoch: 1");
+    println!("Block 3 | Identity {} | Epoch: 1", id_epoch_1);
     pause();
 
-    println!("Block 4 | Identity valid | Epoch: 1");
+    println!("Block 4 | Identity {} | Epoch: 1", id_epoch_1);
     pause();
 
     println!("\n--- EXPIRATION EVENT ---");
-    println!("⚠ Old identity is now INVALID");
+    println!("⚠ Identity {} is now INVALID", id_epoch_0);
     pause();
 
-    println!("Block 5 | Identity expired");
+    println!("Block 5 | {} expired", id_epoch_0);
     pause();
 
     println!("\n--- ATTACK ATTEMPT ---");
-    println!("🚨 Attempting transaction with expired identity...");
+    println!("🚨 Attempting to reuse expired identity: {}", id_epoch_0);
     pause();
 
     println!("\n🚨 PROTOCOL VIOLATION DETECTED");
-    println!("❌ Transaction rejected: identity expired");
+    println!("❌ Transaction rejected: {} is expired", id_epoch_0);
     println!("⚔ Validator slashed");
     pause();
 
@@ -85,26 +96,26 @@ fn main() {
     pause();
 
     if attack {
-        attack_mode();
+        attack_mode(&id_epoch_0);
     }
 
     println!("\n--- VALID TRANSACTION ---");
-    println!("✅ Using rotated identity...");
+    println!("✅ Using current identity: {}", id_epoch_1);
     pause();
 
     println!("Block 7 | Transaction accepted");
     pause();
 
     println!("\n--- WHAT YOU JUST SAW ---");
-    println!("• Identity rotated (commit → reveal)");
+    println!("• Identity {} rotated → {}", id_epoch_0, id_epoch_1);
     println!("• Epoch advanced");
-    println!("• Old identity expired");
+    println!("• {} expired", id_epoch_0);
     println!("• Expired identity was rejected");
     println!("• Invalid behavior triggered slashing");
 
     println!("\n==================== RESULT ====================");
     println!("Identity is NOT permanent");
-    println!("Expired credentials are unusable");
+    println!("Expired identities cannot act");
     println!("The network enforces validity over time");
     println!("===============================================\n");
 }
