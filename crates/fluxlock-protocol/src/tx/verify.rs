@@ -10,8 +10,6 @@ fn to_signature(bytes: &[u8]) -> Option<Signature> {
     Some(Signature::from_bytes(&arr))
 }
 
-/// ✅ KEEP ORIGINAL NAMES (fixes producer.rs automatically)
-
 pub fn verify_transfer(
     pubkey_bytes: &[u8],
     tx: &crate::tx::transaction::TransferTx,
@@ -71,6 +69,23 @@ pub fn verify_rotation_reveal(
         None => return false,
     };
 
+    // 🔥 LINK SIGNATURE (PHASE 2B CORE)
+    let link_sig = match to_signature(&tx.link_signature) {
+        Some(sig) => sig,
+        None => return false,
+    };
+
+    let mut link_data = Vec::new();
+    link_data.extend_from_slice(&tx.epoch.to_be_bytes());
+    link_data.extend_from_slice(&tx.new_classical_key);
+    link_data.extend_from_slice(&tx.new_pq_key);
+
+    if pubkey.verify(&link_data, &link_sig).is_err() {
+        println!("🚨 LINK SIGNATURE INVALID");
+        return false;
+    }
+
+    // 🔐 NORMAL SIGNATURE
     let signature = match to_signature(&tx.classical_signature) {
         Some(sig) => sig,
         None => return false,

@@ -18,7 +18,7 @@ use ed25519_dalek::{SigningKey, Signer};
 use blake3;
 
 pub fn run_genesis_test() {
-    println!("--- Fluxlock FULL Rotation Test ---");
+    println!("--- Fluxlock FULL Rotation Test (Phase 2B) ---");
 
     let signing_key = SigningKey::from_bytes(&[1u8; 32]);
     let verify_key = signing_key.verifying_key();
@@ -86,9 +86,20 @@ pub fn run_genesis_test() {
                 classical_signature: classical_sig,
                 pq_signature: pq_sig,
             })]
-        } else if i == 3 {
-            println!("\n🔐 ROTATION REVEAL — NEW IDENTITY ACTIVATED");
 
+        } else if i == 3 {
+            println!("\n🔐 ROTATION REVEAL — LINKED IDENTITY ACTIVATED");
+
+            // 🔐 LINK SIGNATURE (OLD → NEW)
+            let mut link_data = vec![];
+            link_data.extend(&epoch.to_be_bytes());
+            link_data.extend(&new_classical);
+            link_data.extend(&new_pq_public);
+
+            let fake_key = SigningKey::from_bytes(&[99u8; 32]);
+            let link_signature = fake_key.sign(&link_data).to_bytes().to_vec();
+
+            // Transaction message
             let mut message = vec![];
             message.extend(&epoch.to_be_bytes());
             message.extend(&alice_key);
@@ -105,9 +116,13 @@ pub fn run_genesis_test() {
                 new_pq_key: new_pq_public.clone(),
                 nonce: 1,
                 epoch,
+
+                link_signature, // 🔥 PHASE 2B CORE
+
                 classical_signature: classical_sig,
                 pq_signature: pq_sig,
             })]
+
         } else if i == 9 {
             println!("\n🚨 THREAT: Attempt to reuse expired credentials");
 
@@ -130,8 +145,9 @@ pub fn run_genesis_test() {
                 classical_signature: classical_sig,
                 pq_signature: pq_sig,
             })]
+
         } else if i == 11 {
-            println!("\n✅ VALID TRANSACTION WITH ROTATED IDENTITY");
+            println!("\n✅ VALID TRANSACTION WITH LINKED IDENTITY");
 
             let mut message = vec![];
             message.extend(&epoch.to_be_bytes());
@@ -152,6 +168,7 @@ pub fn run_genesis_test() {
                 classical_signature: classical_sig,
                 pq_signature: pq_sig,
             })]
+
         } else {
             vec![]
         };
@@ -171,7 +188,7 @@ pub fn run_genesis_test() {
             }
             Err(_) => {
                 println!("❌ Transaction rejected: identity no longer valid");
-                println!("🛑 Network rejected expired identity");
+                println!("🛑 Network rejected invalid or unlinked identity");
             }
         }
 
@@ -192,5 +209,5 @@ pub fn run_genesis_test() {
         }
     }
 
-    println!("\n--- FULL rotation test complete ---");
+    println!("\n--- FULL rotation test complete (Phase 2B) ---");
 }

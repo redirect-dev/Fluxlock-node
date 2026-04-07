@@ -23,9 +23,6 @@ pub fn produce_block(
     for tx in txs.iter() {
         match tx {
 
-            // -----------------------------
-            // TRANSFER
-            // -----------------------------
             Tx::Transfer(t) => {
                 let sender = match accounts.iter_mut()
                     .find(|a| a.current_classical_pubkey == t.from)
@@ -37,7 +34,6 @@ pub fn produce_block(
                     }
                 };
 
-                // 🔐 FIX: correct verification (classical key + epoch-bound sig)
                 if !verify_transfer(&sender.current_classical_pubkey, t) {
                     slash(validators);
                     return Err("Transaction rejected: invalid signature or epoch".into());
@@ -63,9 +59,6 @@ pub fn produce_block(
                 }
             }
 
-            // -----------------------------
-            // ROTATION COMMIT
-            // -----------------------------
             Tx::RotationCommit(r) => {
                 let sender = match accounts.iter_mut()
                     .find(|a| a.current_classical_pubkey == r.from)
@@ -90,9 +83,6 @@ pub fn produce_block(
                 sender.nonce += 1;
             }
 
-            // -----------------------------
-            // ROTATION REVEAL
-            // -----------------------------
             Tx::RotationReveal(r) => {
                 let sender = match accounts.iter_mut()
                     .find(|a| a.current_classical_pubkey == r.from)
@@ -104,9 +94,10 @@ pub fn produce_block(
                     }
                 };
 
+                // 🔥 HARD ENFORCEMENT
                 if !verify_rotation_reveal(&sender.current_classical_pubkey, r) {
                     slash(validators);
-                    return Err("Transaction rejected: invalid rotation reveal".into());
+                    return Err("Transaction rejected: invalid or unlinked identity".into());
                 }
 
                 if r.nonce != sender.nonce {
@@ -114,11 +105,8 @@ pub fn produce_block(
                     return Err("Transaction rejected: invalid nonce".into());
                 }
 
-                // 🔐 Identity rotation
                 sender.current_classical_pubkey = r.new_classical_key.clone();
                 sender.current_pq_pubkey = r.new_pq_key.clone();
-
-                // 🔥 Time progression
                 sender.rotation_epoch = r.epoch;
 
                 sender.nonce += 1;
@@ -126,19 +114,13 @@ pub fn produce_block(
         }
     }
 
-    // -----------------------------
-    // BUILD BLOCK
-    // -----------------------------
     let next_block = Block {
         parent_hash: prev_block.parent_hash.clone(),
         tick: prev_block.tick + 1,
-
         state_root: [0u8; 32],
         tx_root: [0u8; 32],
         txs: vec![],
-
         validator_classical_key: vec![0; 32],
-
         signature: HybridSignature {
             ed25519_sig: vec![0; 64],
             dilithium_sig: vec![],
@@ -150,7 +132,6 @@ pub fn produce_block(
     Ok((next_block, new_counter))
 }
 
-// 🔥 Validator slashing
 fn slash(validators: &mut Vec<Validator>) {
     if let Some(v) = validators.first_mut() {
         let penalty = (v.stake as f64 * 0.05) as u128;
