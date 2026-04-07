@@ -43,6 +43,15 @@ Watch how the protocol:
 rejects each attempt
 penalizes invalid behavior
 prevents identity reuse
+## 🖥 Fluxlock CLI
+
+Run Fluxlock as a simple tool:
+
+```bash
+cargo run -p fluxlock-protocol --bin fluxlock run
+cargo run -p fluxlock-protocol --bin fluxlock attack
+cargo run -p fluxlock-protocol --bin fluxlock explain
+
 🧭 What is Fluxlock?
 
 Fluxlock is a protocol-level identity system that enforces time-bound validity.
