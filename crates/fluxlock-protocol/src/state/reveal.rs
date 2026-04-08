@@ -4,47 +4,56 @@ use crate::state::account::{Account, FLAG_IDENTITY_EXPIRED};
 use crate::tx::transaction::RotationRevealTx;
 use crate::pq;
 use crate::state::validator::Validator;
+use crate::state::event::Event;
 
-/// Apply rotation reveal (NOW WITH SLASHING)
+/// Apply rotation reveal (EVENTS ALWAYS RETURNED)
 pub fn apply_rotation_reveal(
     accounts: &mut Vec<Account>,
     validator: &mut Validator,
     tx: &RotationRevealTx,
-) -> Result<(), String> {
-    let acc = accounts
+) -> (Vec<Event>, Result<(), String>) {
+    let mut events = Vec::new();
+
+    let acc = match accounts
         .iter_mut()
         .find(|a| a.current_classical_pubkey == tx.from)
-        .ok_or("Account not found")?;
+    {
+        Some(a) => a,
+        None => {
+            return (events, Err("Account not found".into()));
+        }
+    };
 
-    // -----------------------------
-    // 🔐 NONCE
-    // -----------------------------
+    // NONCE
     if tx.nonce != acc.nonce {
         validator.slash(5);
-        return Err("Invalid nonce".into());
+        events.push(Event::InvalidNonce { identity: tx.from.clone() });
+        events.push(Event::ValidatorSlashed { amount: 5 });
+        return (events, Err("Invalid nonce".into()));
     }
 
     acc.nonce += 1;
 
-    // -----------------------------
-    // 🔁 FORK PREVENTION
-    // -----------------------------
+    // FORK
     if tx.epoch <= acc.rotation_epoch {
         validator.slash(20);
-        return Err("FORK_DETECTED".into());
+        events.push(Event::ForkDetected {
+            identity: tx.from.clone(),
+            epoch: tx.epoch,
+        });
+        events.push(Event::ValidatorSlashed { amount: 20 });
+        return (events, Err("FORK_DETECTED".into()));
     }
 
-    // -----------------------------
-    // ⏳ EXPIRATION
-    // -----------------------------
+    // EXPIRATION
     if acc.has_flag(FLAG_IDENTITY_EXPIRED) {
         validator.slash(10);
-        return Err("IDENTITY_EXPIRED".into());
+        events.push(Event::IdentityExpired { identity: tx.from.clone() });
+        events.push(Event::ValidatorSlashed { amount: 10 });
+        return (events, Err("IDENTITY_EXPIRED".into()));
     }
 
-    // -----------------------------
-    // 🔁 CONTINUITY
-    // -----------------------------
+    // CONTINUITY
     let continuity_valid = pq::verify(
         &tx.new_pq_key,
         &tx.link_signature,
@@ -53,16 +62,16 @@ pub fn apply_rotation_reveal(
 
     if !continuity_valid {
         validator.slash(15);
-        return Err("INVALID_LINK_SIGNATURE".into());
+        events.push(Event::InvalidContinuity { identity: tx.from.clone() });
+        events.push(Event::ValidatorSlashed { amount: 15 });
+        return (events, Err("INVALID_LINK_SIGNATURE".into()));
     }
 
-    // -----------------------------
-    // 🔐 COMMIT CHECK
-    // -----------------------------
-    let commitment = acc
-        .rotation_commitment
-        .clone()
-        .ok_or("No commit found")?;
+    // COMMIT
+    let commitment = match acc.rotation_commitment.clone() {
+        Some(c) => c,
+        None => return (events, Err("No commit found".into())),
+    };
 
     let mut hasher = blake3::Hasher::new();
     hasher.update(&tx.new_classical_key);
@@ -72,15 +81,14 @@ pub fn apply_rotation_reveal(
 
     if calculated != commitment {
         validator.slash(10);
-        return Err("Commitment mismatch".into());
+        events.push(Event::CommitmentMismatch { identity: tx.from.clone() });
+        events.push(Event::ValidatorSlashed { amount: 10 });
+        return (events, Err("Commitment mismatch".into()));
     }
 
-    // -----------------------------
-    // ✅ APPLY KEYS
-    // -----------------------------
+    // SUCCESS
     acc.current_classical_pubkey = tx.new_classical_key.clone();
     acc.current_pq_pubkey = tx.new_pq_key.clone();
-
     acc.rotation_epoch = tx.epoch;
 
     acc.rotation_commitment = None;
@@ -88,5 +96,10 @@ pub fn apply_rotation_reveal(
 
     acc.clear_flag(FLAG_IDENTITY_EXPIRED);
 
-    Ok(())
+    events.push(Event::RotationSuccess {
+        identity: tx.from.clone(),
+        epoch: tx.epoch,
+    });
+
+    (events, Ok(()))
 }

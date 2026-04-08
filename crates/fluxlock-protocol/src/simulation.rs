@@ -1,6 +1,7 @@
 use fluxlock_protocol::state::account::Account;
 use fluxlock_protocol::state::reveal::apply_rotation_reveal;
 use fluxlock_protocol::state::validator::Validator;
+use fluxlock_protocol::state::event::Event;
 use fluxlock_protocol::tx::transaction::RotationRevealTx;
 use fluxlock_protocol::pq;
 
@@ -13,8 +14,14 @@ fn now() -> u64 {
         .as_secs()
 }
 
+fn print_events(events: Vec<Event>) {
+    for event in events {
+        println!("📡 EVENT: {:?}", event);
+    }
+}
+
 pub fn run_simulation() {
-    println!("🧪 Fluxlock Phase 3B Simulation (WITH SLASHING)\n");
+    println!("🧪 Fluxlock Phase 3C+ Simulation (FULL EVENT TRACE)\n");
 
     let mut accounts: Vec<Account> = vec![];
 
@@ -40,6 +47,9 @@ pub fn run_simulation() {
         pq_pk.clone(),
     );
 
+    // -----------------------------
+    // PREPARE ROTATION
+    // -----------------------------
     let new_classical = b"new_classical".to_vec();
     let (new_pq, _) = pq::generate_keypair();
 
@@ -55,7 +65,7 @@ pub fn run_simulation() {
     let timestamp = now();
 
     // -----------------------------
-    // ❌ INVALID (continuity)
+    // ❌ INVALID ROTATION (CONTINUITY FAIL)
     // -----------------------------
     let bad_tx = RotationRevealTx {
         from: b"initial_classical".to_vec(),
@@ -64,14 +74,20 @@ pub fn run_simulation() {
         nonce: 0,
         epoch: 1,
         timestamp,
-        link_signature: vec![0; 64],
+        link_signature: vec![0; 64], // invalid on purpose
         classical_signature: vec![],
         pq_signature: vec![],
     };
 
-    println!("➡️ Invalid rotation (should SLASH)");
+    println!("➡️ Invalid rotation (expect slashing + event)\n");
 
-    let _ = apply_rotation_reveal(&mut accounts, &mut validator, &bad_tx);
+    let (events, result) = apply_rotation_reveal(&mut accounts, &mut validator, &bad_tx);
+
+    print_events(events);
+
+    if let Err(e) = result {
+        println!("❌ Error: {}\n", e);
+    }
 
     // -----------------------------
     // ✅ VALID ROTATION
@@ -90,9 +106,15 @@ pub fn run_simulation() {
         pq_signature: vec![],
     };
 
-    println!("➡️ Valid rotation");
+    println!("➡️ Valid rotation (expect success event)\n");
 
-    let _ = apply_rotation_reveal(&mut accounts, &mut validator, &good_tx);
+    let (events, result) = apply_rotation_reveal(&mut accounts, &mut validator, &good_tx);
 
-    println!("\n🏁 Simulation complete\n");
+    print_events(events);
+
+    if let Err(e) = result {
+        println!("❌ Unexpected Error: {}\n", e);
+    }
+
+    println!("🏁 Simulation complete\n");
 }
