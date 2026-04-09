@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 
-// 🎨 Color styling based on event type
 function getColor(type) {
   switch (type) {
     case "RotationSuccess":
@@ -9,49 +8,59 @@ function getColor(type) {
       return "text-[#FF3B3B]";
     case "ValidatorSlashed":
       return "text-[#FF0000] animate-pulse";
-    case "InvalidNonce":
-    case "ForkDetected":
-    case "IdentityExpired":
-    case "CommitmentMismatch":
-      return "text-[#FFA500]";
     default:
       return "text-[#8B9BB4]";
   }
 }
 
-// 🔥 Convert byte array → readable string
-function formatPayload(payload) {
-  if (payload.identity) {
-    try {
-      const decoded = new TextDecoder().decode(
-        new Uint8Array(payload.identity)
-      );
-      return { ...payload, identity: decoded };
-    } catch {
-      return payload;
-    }
+// 🔥 Decode helper
+function decode(bytes) {
+  try {
+    return new TextDecoder().decode(new Uint8Array(bytes));
+  } catch {
+    return bytes;
   }
-  return payload;
+}
+
+// 🔥 Clean payload formatting
+function formatPayload(payload) {
+  const updated = { ...payload };
+
+  if (updated.identity) {
+    updated.identity = decode(updated.identity);
+  }
+
+  if (updated.new_identity) {
+    updated.new_identity = decode(updated.new_identity);
+  }
+
+  return updated;
 }
 
 export default function EventFeed() {
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
-    const loadEvents = () => {
-      fetch("/events.json?t=" + new Date().getTime()) // 🔥 prevents caching
-        .then((res) => res.json())
-        .then((data) => {
-          setEvents(data.reverse()); // newest first
-        })
-        .catch((err) => {
-          console.error("Failed to load events:", err);
-        });
+    let lastData = "";
+
+    const loadEvents = async () => {
+      try {
+        const res = await fetch("/events.json?t=" + Date.now());
+        const text = await res.text();
+
+        // 🔥 Only update if changed
+        if (text !== lastData) {
+          lastData = text;
+          const data = JSON.parse(text);
+          setEvents(data.reverse());
+        }
+      } catch (err) {
+        console.error("Failed to load events:", err);
+      }
     };
 
-    loadEvents(); // initial load
-
-    const interval = setInterval(loadEvents, 1000); // 🔄 refresh every second
+    loadEvents();
+    const interval = setInterval(loadEvents, 500);
 
     return () => clearInterval(interval);
   }, []);
@@ -59,7 +68,7 @@ export default function EventFeed() {
   return (
     <div className="bg-[#121821] border border-[#1F2A38] rounded-xl p-4 h-[80vh] overflow-y-auto">
       <h2 className="text-lg font-bold mb-4 text-[#8B9BB4]">
-        FLUXLOCK LIVE EVENT STREAM
+        ⚡ FLUXLOCK LIVE EVENT STREAM
       </h2>
 
       {events.length === 0 && (

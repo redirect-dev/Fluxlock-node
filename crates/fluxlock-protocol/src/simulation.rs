@@ -78,7 +78,7 @@ pub fn run_simulation() {
     // -----------------------------
     // PREPARE ROTATION
     // -----------------------------
-    let new_classical = b"new_classical".to_vec();
+    let new_classical = b"new_classical_v2".to_vec();
     let (new_pq, _) = pq::generate_keypair();
 
     acc.rotation_commitment = Some({

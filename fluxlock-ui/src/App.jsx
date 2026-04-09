@@ -1,3 +1,4 @@
+import IdentityGraph from "./components/IdentityGraph";
 import EventFeed from "./components/EventFeed";
 
 export default function App() {
@@ -8,6 +9,7 @@ export default function App() {
       </h1>
 
       <EventFeed />
+      <IdentityGraph />
     </div>
   );
 }
