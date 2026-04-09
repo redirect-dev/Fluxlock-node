@@ -6,6 +6,8 @@ use fluxlock_protocol::tx::transaction::RotationRevealTx;
 use fluxlock_protocol::pq;
 
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::fs::File;
+use std::io::Write;
 
 fn now() -> u64 {
     SystemTime::now()
@@ -14,14 +16,40 @@ fn now() -> u64 {
         .as_secs()
 }
 
-fn print_events(events: Vec<Event>) {
+// 🔥 NEW: Write events to JSON file
+fn write_events_to_file(events: &Vec<Event>) {
+    use std::fs;
+    use std::path::PathBuf;
+
+    // ✅ Get path to this crate (fluxlock-protocol)
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+    // ✅ Navigate to UI public folder
+    let path = base
+        .join("../../fluxlock-ui/public/events.json");
+
+    let dir = path.parent().unwrap();
+
+    // ✅ Ensure directory exists
+    fs::create_dir_all(dir).expect("Failed to create UI public directory");
+
+    let json = serde_json::to_string_pretty(events).unwrap();
+
+    fs::write(&path, json).expect("Unable to write events.json");
+
+    println!("📁 Writing events to: {:?}", path);
+}
+
+fn print_events(events: &Vec<Event>) {
     for event in events {
         println!("📡 EVENT: {:?}", event);
     }
 }
 
 pub fn run_simulation() {
-    println!("🧪 Fluxlock Phase 3C+ Simulation (FULL EVENT TRACE)\n");
+    println!("🧪 Fluxlock Phase 4 Simulation (RUST → UI BRIDGE)\n");
+
+    let mut all_events: Vec<Event> = vec![];
 
     let mut accounts: Vec<Account> = vec![];
 
@@ -65,7 +93,7 @@ pub fn run_simulation() {
     let timestamp = now();
 
     // -----------------------------
-    // ❌ INVALID ROTATION (CONTINUITY FAIL)
+    // ❌ INVALID ROTATION
     // -----------------------------
     let bad_tx = RotationRevealTx {
         from: b"initial_classical".to_vec(),
@@ -74,16 +102,17 @@ pub fn run_simulation() {
         nonce: 0,
         epoch: 1,
         timestamp,
-        link_signature: vec![0; 64], // invalid on purpose
+        link_signature: vec![0; 64],
         classical_signature: vec![],
         pq_signature: vec![],
     };
 
-    println!("➡️ Invalid rotation (expect slashing + event)\n");
+    println!("➡️ Invalid rotation\n");
 
     let (events, result) = apply_rotation_reveal(&mut accounts, &mut validator, &bad_tx);
 
-    print_events(events);
+    print_events(&events);
+    all_events.extend(events);
 
     if let Err(e) = result {
         println!("❌ Error: {}\n", e);
@@ -106,15 +135,22 @@ pub fn run_simulation() {
         pq_signature: vec![],
     };
 
-    println!("➡️ Valid rotation (expect success event)\n");
+    println!("➡️ Valid rotation\n");
 
     let (events, result) = apply_rotation_reveal(&mut accounts, &mut validator, &good_tx);
 
-    print_events(events);
+    print_events(&events);
+    all_events.extend(events);
 
     if let Err(e) = result {
         println!("❌ Unexpected Error: {}\n", e);
     }
 
+    // -----------------------------
+    // 🔥 WRITE TO UI
+    // -----------------------------
+    write_events_to_file(&all_events);
+
+    println!("📁 events.json written for UI\n");
     println!("🏁 Simulation complete\n");
 }

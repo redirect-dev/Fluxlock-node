@@ -1,8 +1,14 @@
-#[derive(Debug, Clone)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Event {
     RotationSuccess {
         identity: Vec<u8>,
         epoch: u64,
+    },
+
+    InvalidContinuity {
+        identity: Vec<u8>,
     },
 
     InvalidNonce {
@@ -15,10 +21,6 @@ pub enum Event {
     },
 
     IdentityExpired {
-        identity: Vec<u8>,
-    },
-
-    InvalidContinuity {
         identity: Vec<u8>,
     },
 
