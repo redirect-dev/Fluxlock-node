@@ -1,102 +1,103 @@
 import { useEffect, useState } from "react";
 
-function decode(bytes) {
-  try {
-    return new TextDecoder().decode(new Uint8Array(bytes));
-  } catch {
-    return null;
-  }
+function decodeIdentity(arr) {
+  if (typeof arr === "string") return arr;
+  if (!Array.isArray(arr)) return "";
+  return new TextDecoder().decode(new Uint8Array(arr));
 }
 
 export default function IdentityGraph() {
-  const [chain, setChain] = useState([]);
+  const [chains, setChains] = useState([]);
 
   useEffect(() => {
-    let lastData = "";
-
-    const loadEvents = async () => {
+    const interval = setInterval(async () => {
       try {
-        const res = await fetch("/events.json?t=" + Date.now());
-        const text = await res.text();
+        const res = await fetch("/events.json?ts=" + Date.now());
+        const data = await res.json();
 
-        // 🔥 Only update when file changes
-        if (text !== lastData) {
-          lastData = text;
-          const data = JSON.parse(text);
+        const newChains = [];
 
-          const parsed = [];
+        data.forEach((event) => {
+          if (event.RotationSuccess) {
+            newChains.push({
+              from: decodeIdentity(event.RotationSuccess.identity),
+              to: decodeIdentity(event.RotationSuccess.new_identity),
+              valid: true,
+            });
+          }
 
-          data.forEach((event) => {
-            const type = Object.keys(event)[0];
-            const payload = event[type];
+          if (event.InvalidContinuity) {
+            newChains.push({
+              from: decodeIdentity(event.InvalidContinuity.identity),
+              to: "❌",
+              valid: false,
+            });
+          }
+        });
 
-            if (type === "RotationSuccess") {
-              parsed.push({
-                type,
-                from: decode(payload.identity),
-                to: decode(payload.new_identity),
-              });
-            }
-
-            if (type === "InvalidContinuity") {
-              parsed.push({
-                type,
-                from: decode(payload.identity),
-                to: "❌",
-              });
-            }
-          });
-
-          setChain(parsed);
-        }
+        setChains(newChains);
       } catch (err) {
-        console.error("Failed to load chain:", err);
+        console.error(err);
       }
-    };
-
-    loadEvents();
-    const interval = setInterval(loadEvents, 500);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="mt-6 p-4 border border-[#1F2A38] rounded-xl bg-[#0F141B]">
-      <h2 className="text-[#8B9BB4] mb-4 font-bold">
-        IDENTITY CHAIN
-      </h2>
+    <div style={{ marginTop: "40px", textAlign: "center" }}>
+      <h2>🔗 Identity Chain</h2>
 
-      <div className="flex items-center flex-wrap gap-4">
-        {chain.map((link, index) => {
-          const isError = link.type === "InvalidContinuity";
+      {chains.map((chain, index) => (
+        <div
+          key={index}
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            marginBottom: "15px",
+            gap: "10px",
+            animation: "fadeIn 0.5s ease",
+          }}
+        >
+          <div
+            style={{
+              padding: "10px 15px",
+              borderRadius: "8px",
+              border: "1px solid #4dff88",
+              transition: "all 0.3s ease",
+            }}
+          >
+            {chain.from}
+          </div>
 
-          return (
-            <div key={index} className="flex items-center">
-              <div className="px-3 py-2 rounded-lg border border-[#1F2A38] text-white">
-                {link.from}
-              </div>
+          <div style={{ fontSize: "20px" }}>→</div>
 
-              <div
-                className={`mx-2 ${
-                  isError ? "text-red-500" : "text-green-500"
-                }`}
-              >
-                →
-              </div>
+          <div
+            style={{
+              padding: "10px 15px",
+              borderRadius: "8px",
+              border: `1px solid ${
+                chain.valid ? "#4dff88" : "#ff4d4d"
+              }`,
+              color: chain.valid ? "#4dff88" : "#ff4d4d",
+              transform: chain.valid ? "scale(1)" : "scale(1.1)",
+              transition: "all 0.3s ease",
+            }}
+          >
+            {chain.to}
+          </div>
+        </div>
+      ))}
 
-              <div
-                className={`px-3 py-2 rounded-lg border ${
-                  isError
-                    ? "border-red-500 text-red-400"
-                    : "border-green-500 text-green-400"
-                }`}
-              >
-                {link.to}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <style>
+        {`
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}
+      </style>
     </div>
   );
 }

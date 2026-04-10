@@ -8,13 +8,22 @@ function decodeIdentity(arr) {
 
 export default function EventFeed() {
   const [events, setEvents] = useState([]);
+  const [latestIndex, setLatestIndex] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
         const res = await fetch("/events.json?ts=" + Date.now());
         const data = await res.json();
-        setEvents(data.reverse());
+
+        const reversed = data.reverse();
+
+        setEvents((prev) => {
+          if (prev.length !== reversed.length) {
+            setLatestIndex(0); // newest event is index 0
+          }
+          return reversed;
+        });
       } catch (err) {
         console.error("Error fetching events:", err);
       }
@@ -50,6 +59,8 @@ export default function EventFeed() {
           formattedData.new_identity = decodeIdentity(data.new_identity);
         }
 
+        const isNew = index === latestIndex;
+
         return (
           <div
             key={index}
@@ -59,6 +70,12 @@ export default function EventFeed() {
               border: `1px solid ${color}`,
               borderRadius: "10px",
               backgroundColor: "#111",
+              transform: isNew ? "scale(1.02)" : "scale(1)",
+              boxShadow: isNew
+                ? `0 0 15px ${color}`
+                : "0 0 5px rgba(0,0,0,0.3)",
+              transition: "all 0.4s ease",
+              opacity: isNew ? 1 : 0.85,
             }}
           >
             <h3 style={{ color }}>{type}</h3>
