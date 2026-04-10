@@ -9,24 +9,29 @@ export default function ValidatorNetwork() {
         const res = await fetch("/events.json?ts=" + Date.now());
         const data = await res.json();
 
-        // Simulated 3 validators
-        let state = [
-          { name: "Validator A", stake: 1000, status: "Healthy" },
-          { name: "Validator B", stake: 1000, status: "Healthy" },
-          { name: "Validator C", stake: 1000, status: "Healthy" },
-        ];
-
-        let slashIndex = 0;
+        let state = {
+          "Validator A": { stake: 1000, status: "Healthy" },
+          "Validator B": { stake: 1000, status: "Healthy" },
+          "Validator C": { stake: 1000, status: "Healthy" },
+        };
 
         data.forEach((event) => {
           if (event.ValidatorSlashed) {
-            state[slashIndex % 3].stake -= event.ValidatorSlashed.amount;
-            state[slashIndex % 3].status = "Slashed";
-            slashIndex++;
+            const { validator, amount } = event.ValidatorSlashed;
+
+            if (state[validator]) {
+              state[validator].stake -= amount;
+              state[validator].status = "Slashed";
+            }
           }
         });
 
-        setValidators(state);
+        setValidators(
+          Object.entries(state).map(([name, val]) => ({
+            name,
+            ...val,
+          }))
+        );
       } catch (err) {
         console.error(err);
       }

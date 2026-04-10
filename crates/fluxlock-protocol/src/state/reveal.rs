@@ -6,11 +6,11 @@ use crate::pq;
 use crate::state::validator::Validator;
 use crate::state::event::Event;
 
-/// Apply rotation reveal (EVENTS ALWAYS RETURNED)
 pub fn apply_rotation_reveal(
     accounts: &mut Vec<Account>,
     validator: &mut Validator,
     tx: &RotationRevealTx,
+    validator_name: &str,
 ) -> (Vec<Event>, Result<(), String>) {
     let mut events = Vec::new();
 
@@ -19,53 +19,55 @@ pub fn apply_rotation_reveal(
         .find(|a| a.current_classical_pubkey == tx.from)
     {
         Some(a) => a,
-        None => {
-            return (events, Err("Account not found".into()));
-        }
+        None => return (events, Err("Account not found".into())),
     };
 
-    // -----------------------------
-    // NONCE CHECK
-    // -----------------------------
+    // NONCE
     if tx.nonce != acc.nonce {
         validator.slash(5);
         events.push(Event::InvalidNonce {
             identity: tx.from.clone(),
+            validator: validator_name.to_string(),
         });
-        events.push(Event::ValidatorSlashed { amount: 5 });
+        events.push(Event::ValidatorSlashed {
+            amount: 5,
+            validator: validator_name.to_string(),
+        });
         return (events, Err("Invalid nonce".into()));
     }
 
     acc.nonce += 1;
 
-    // -----------------------------
-    // FORK DETECTION
-    // -----------------------------
+    // FORK
     if tx.epoch <= acc.rotation_epoch {
         validator.slash(20);
         events.push(Event::ForkDetected {
             identity: tx.from.clone(),
             epoch: tx.epoch,
+            validator: validator_name.to_string(),
         });
-        events.push(Event::ValidatorSlashed { amount: 20 });
+        events.push(Event::ValidatorSlashed {
+            amount: 20,
+            validator: validator_name.to_string(),
+        });
         return (events, Err("FORK_DETECTED".into()));
     }
 
-    // -----------------------------
-    // EXPIRATION CHECK
-    // -----------------------------
+    // EXPIRATION
     if acc.has_flag(FLAG_IDENTITY_EXPIRED) {
         validator.slash(10);
         events.push(Event::IdentityExpired {
             identity: tx.from.clone(),
+            validator: validator_name.to_string(),
         });
-        events.push(Event::ValidatorSlashed { amount: 10 });
+        events.push(Event::ValidatorSlashed {
+            amount: 10,
+            validator: validator_name.to_string(),
+        });
         return (events, Err("IDENTITY_EXPIRED".into()));
     }
 
-    // -----------------------------
-    // CONTINUITY CHECK (CRITICAL)
-    // -----------------------------
+    // CONTINUITY
     let continuity_valid = pq::verify(
         &tx.new_pq_key,
         &tx.link_signature,
@@ -76,14 +78,16 @@ pub fn apply_rotation_reveal(
         validator.slash(15);
         events.push(Event::InvalidContinuity {
             identity: tx.from.clone(),
+            validator: validator_name.to_string(),
         });
-        events.push(Event::ValidatorSlashed { amount: 15 });
+        events.push(Event::ValidatorSlashed {
+            amount: 15,
+            validator: validator_name.to_string(),
+        });
         return (events, Err("INVALID_LINK_SIGNATURE".into()));
     }
 
-    // -----------------------------
-    // COMMITMENT CHECK
-    // -----------------------------
+    // COMMITMENT
     let commitment = match acc.rotation_commitment.clone() {
         Some(c) => c,
         None => return (events, Err("No commit found".into())),
@@ -99,18 +103,17 @@ pub fn apply_rotation_reveal(
         validator.slash(10);
         events.push(Event::CommitmentMismatch {
             identity: tx.from.clone(),
+            validator: validator_name.to_string(),
         });
-        events.push(Event::ValidatorSlashed { amount: 10 });
+        events.push(Event::ValidatorSlashed {
+            amount: 10,
+            validator: validator_name.to_string(),
+        });
         return (events, Err("Commitment mismatch".into()));
     }
 
-    // -----------------------------
-    // SUCCESS (STATE TRANSITION)
-    // -----------------------------
-    let old_identity = acc.current_classical_pubkey.clone();
-    let new_identity = tx.new_classical_key.clone();
-
-    acc.current_classical_pubkey = new_identity.clone();
+    // SUCCESS
+    acc.current_classical_pubkey = tx.new_classical_key.clone();
     acc.current_pq_pubkey = tx.new_pq_key.clone();
     acc.rotation_epoch = tx.epoch;
 
@@ -119,11 +122,11 @@ pub fn apply_rotation_reveal(
 
     acc.clear_flag(FLAG_IDENTITY_EXPIRED);
 
-    // 🔥 UPDATED EVENT (CHAIN SUPPORT)
     events.push(Event::RotationSuccess {
-        identity: old_identity,
-        new_identity: new_identity,
+        identity: tx.from.clone(),
+        new_identity: tx.new_classical_key.clone(),
         epoch: tx.epoch,
+        validator: validator_name.to_string(),
     });
 
     (events, Ok(()))

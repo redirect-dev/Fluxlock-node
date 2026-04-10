@@ -2,55 +2,41 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Event {
-    // -----------------------------
-    // ✅ SUCCESSFUL ROTATION
-    // -----------------------------
     RotationSuccess {
-        identity: Vec<u8>,        // previous identity
-        new_identity: Vec<u8>,    // new identity after rotation
+        identity: Vec<u8>,
+        new_identity: Vec<u8>,
         epoch: u64,
+        validator: String,
     },
 
-    // -----------------------------
-    // ❌ CONTINUITY FAILURE
-    // -----------------------------
     InvalidContinuity {
         identity: Vec<u8>,
+        validator: String,
     },
 
-    // -----------------------------
-    // ❌ NONCE FAILURE
-    // -----------------------------
     InvalidNonce {
         identity: Vec<u8>,
+        validator: String,
     },
 
-    // -----------------------------
-    // ❌ FORK DETECTED
-    // -----------------------------
     ForkDetected {
         identity: Vec<u8>,
         epoch: u64,
+        validator: String,
     },
 
-    // -----------------------------
-    // ❌ IDENTITY EXPIRED
-    // -----------------------------
     IdentityExpired {
         identity: Vec<u8>,
+        validator: String,
     },
 
-    // -----------------------------
-    // ❌ COMMITMENT FAILURE
-    // -----------------------------
     CommitmentMismatch {
         identity: Vec<u8>,
+        validator: String,
     },
 
-    // -----------------------------
-    // ⚔ VALIDATOR PENALTY
-    // -----------------------------
     ValidatorSlashed {
         amount: u128,
+        validator: String,
     },
 }
