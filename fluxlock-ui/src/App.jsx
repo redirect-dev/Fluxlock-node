@@ -2,6 +2,7 @@ import EventFeed from "./components/EventFeed";
 import ValidatorPanel from "./components/ValidatorPanel";
 import IdentityGraph from "./components/IdentityGraph";
 import ValidatorNetwork from "./components/ValidatorNetwork";
+import ConsensusPanel from "./components/ConsensusPanel";
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
       <ValidatorPanel />
       <IdentityGraph />
       <ValidatorNetwork />
+      <ConsensusPanel />
     </div>
   );
 }
