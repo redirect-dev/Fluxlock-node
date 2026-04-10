@@ -1,94 +1,70 @@
 import { useEffect, useState } from "react";
 
-function getColor(type) {
-  switch (type) {
-    case "RotationSuccess":
-      return "text-[#00FF9C]";
-    case "InvalidContinuity":
-      return "text-[#FF3B3B]";
-    case "ValidatorSlashed":
-      return "text-[#FF0000] animate-pulse";
-    default:
-      return "text-[#8B9BB4]";
-  }
-}
-
-// 🔥 Decode helper
-function decode(bytes) {
-  try {
-    return new TextDecoder().decode(new Uint8Array(bytes));
-  } catch {
-    return bytes;
-  }
-}
-
-// 🔥 Clean payload formatting
-function formatPayload(payload) {
-  const updated = { ...payload };
-
-  if (updated.identity) {
-    updated.identity = decode(updated.identity);
-  }
-
-  if (updated.new_identity) {
-    updated.new_identity = decode(updated.new_identity);
-  }
-
-  return updated;
+function decodeIdentity(arr) {
+  if (typeof arr === "string") return arr;
+  if (!Array.isArray(arr)) return "";
+  return new TextDecoder().decode(new Uint8Array(arr));
 }
 
 export default function EventFeed() {
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
-    let lastData = "";
-
-    const loadEvents = async () => {
+    const interval = setInterval(async () => {
       try {
-        const res = await fetch("/events.json?t=" + Date.now());
-        const text = await res.text();
-
-        // 🔥 Only update if changed
-        if (text !== lastData) {
-          lastData = text;
-          const data = JSON.parse(text);
-          setEvents(data.reverse());
-        }
+        const res = await fetch("/events.json?ts=" + Date.now());
+        const data = await res.json();
+        setEvents(data.reverse());
       } catch (err) {
-        console.error("Failed to load events:", err);
+        console.error("Error fetching events:", err);
       }
-    };
-
-    loadEvents();
-    const interval = setInterval(loadEvents, 500);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, []);
 
+  const getColor = (event) => {
+    if (event.InvalidContinuity || event.ValidatorSlashed) return "#ff4d4d";
+    if (event.RotationSuccess) return "#4dff88";
+    return "#ccc";
+  };
+
   return (
-    <div className="bg-[#121821] border border-[#1F2A38] rounded-xl p-4 h-[80vh] overflow-y-auto">
-      <h2 className="text-lg font-bold mb-4 text-[#8B9BB4]">
+    <div>
+      <h2 style={{ textAlign: "center" }}>
         ⚡ FLUXLOCK LIVE EVENT STREAM
       </h2>
 
-      {events.length === 0 && (
-        <p className="text-[#8B9BB4]">Waiting for events...</p>
-      )}
-
-      {events.map((event, i) => {
+      {events.map((event, index) => {
         const type = Object.keys(event)[0];
-        const payload = formatPayload(event[type]);
+        const data = event[type];
+        const color = getColor(event);
+
+        const formattedData = { ...data };
+
+        if (data.identity) {
+          formattedData.identity = decodeIdentity(data.identity);
+        }
+
+        if (data.new_identity) {
+          formattedData.new_identity = decodeIdentity(data.new_identity);
+        }
 
         return (
           <div
-            key={i}
-            className={`mb-3 p-3 rounded-lg border border-[#1F2A38] bg-[#0F141B] ${getColor(
-              type
-            )}`}
+            key={index}
+            style={{
+              marginBottom: "30px",
+              padding: "15px",
+              border: `1px solid ${color}`,
+              borderRadius: "10px",
+              backgroundColor: "#111",
+            }}
           >
-            <p className="text-xs uppercase opacity-70 mb-1">{type}</p>
-            <pre className="text-sm">
-              {JSON.stringify(payload, null, 2)}
+            <h3 style={{ color }}>{type}</h3>
+
+            <pre style={{ whiteSpace: "pre-wrap", color: "#ccc" }}>
+              {JSON.stringify(formattedData, null, 2)}
             </pre>
           </div>
         );

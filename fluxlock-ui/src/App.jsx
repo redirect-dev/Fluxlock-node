@@ -1,15 +1,32 @@
-import IdentityGraph from "./components/IdentityGraph";
 import EventFeed from "./components/EventFeed";
+import ValidatorPanel from "./components/ValidatorPanel";
 
-export default function App() {
+function App() {
   return (
-    <div className="h-screen w-full p-6 bg-[#0B0F14]">
-      <h1 className="text-2xl mb-4 text-[#3B82F6]">
+    <div
+      style={{
+        backgroundColor: "#0b0f14",
+        minHeight: "100vh",
+        padding: "20px",
+        fontFamily: "Arial, sans-serif",
+        color: "#fff",
+      }}
+    >
+      <h1
+        style={{
+          textAlign: "center",
+          color: "#4da3ff",
+          marginBottom: "30px",
+        }}
+      >
         ⚡ FLUXLOCK LIVE EVENT STREAM
       </h1>
 
       <EventFeed />
-      <IdentityGraph />
+
+      <ValidatorPanel />
     </div>
   );
 }
+
+export default App;
