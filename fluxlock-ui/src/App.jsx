@@ -1,6 +1,7 @@
 import EventFeed from "./components/EventFeed";
 import ValidatorPanel from "./components/ValidatorPanel";
 import IdentityGraph from "./components/IdentityGraph";
+import ValidatorNetwork from "./components/ValidatorNetwork";
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
       <EventFeed />
       <ValidatorPanel />
       <IdentityGraph />
+      <ValidatorNetwork />
     </div>
   );
 }

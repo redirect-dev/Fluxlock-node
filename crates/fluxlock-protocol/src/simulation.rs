@@ -6,8 +6,8 @@ use fluxlock_protocol::tx::transaction::RotationRevealTx;
 use fluxlock_protocol::pq;
 
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::fs::File;
-use std::io::Write;
+use std::fs;
+use std::path::PathBuf;
 
 fn now() -> u64 {
     SystemTime::now()
@@ -16,84 +16,41 @@ fn now() -> u64 {
         .as_secs()
 }
 
-// 🔥 NEW: Write events to JSON file
-fn write_events_to_file(events: &Vec<Event>) {
-    use std::fs;
-    use std::path::PathBuf;
-
-    // ✅ Get path to this crate (fluxlock-protocol)
-    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-
-    // ✅ Navigate to UI public folder
-    let path = base
-        .join("../../fluxlock-ui/public/events.json");
-
-    let dir = path.parent().unwrap();
-
-    // ✅ Ensure directory exists
-    fs::create_dir_all(dir).expect("Failed to create UI public directory");
-
-    let json = serde_json::to_string_pretty(events).unwrap();
-
-    fs::write(&path, json).expect("Unable to write events.json");
-
-    println!("📁 Writing events to: {:?}", path);
-}
-
-fn print_events(events: &Vec<Event>) {
-    for event in events {
-        println!("📡 EVENT: {:?}", event);
-    }
-}
-
 pub fn run_simulation() {
-    println!("🧪 Fluxlock Phase 4 Simulation (RUST → UI BRIDGE)\n");
+    println!("🧪 Fluxlock Phase 5 — STATEFUL MULTI VALIDATOR\n");
 
     let mut all_events: Vec<Event> = vec![];
 
-    let mut accounts: Vec<Account> = vec![];
-
     // -----------------------------
-    // CREATE VALIDATOR
-    // -----------------------------
-    let mut validator = Validator::new(
-        1000,
-        b"validator_classical".to_vec(),
-        b"validator_pq".to_vec(),
-        0,
-        100,
-    );
-
-    // -----------------------------
-    // CREATE ACCOUNT
+    // BASE ACCOUNT
     // -----------------------------
     let (pq_pk, pq_sk) = pq::generate_keypair();
 
-    let mut acc = Account::new(
+    let base_account = Account::new(
         1000,
         b"initial_classical".to_vec(),
         pq_pk.clone(),
     );
 
     // -----------------------------
-    // PREPARE ROTATION
+    // ROTATION SETUP
     // -----------------------------
-    let new_classical = b"new_classical_v2".to_vec();
+    let new_classical = b"new_classical_v4".to_vec();
     let (new_pq, _) = pq::generate_keypair();
 
-    acc.rotation_commitment = Some({
+    let mut acc_template = base_account.clone();
+
+    acc_template.rotation_commitment = Some({
         let mut hasher = blake3::Hasher::new();
         hasher.update(&new_classical);
         hasher.update(&new_pq);
         hasher.finalize().as_bytes().to_vec()
     });
 
-    accounts.push(acc);
-
     let timestamp = now();
 
     // -----------------------------
-    // ❌ INVALID ROTATION
+    // TRANSACTIONS
     // -----------------------------
     let bad_tx = RotationRevealTx {
         from: b"initial_classical".to_vec(),
@@ -102,26 +59,10 @@ pub fn run_simulation() {
         nonce: 0,
         epoch: 1,
         timestamp,
-        link_signature: vec![0; 64],
+        link_signature: vec![0; 64], // invalid
         classical_signature: vec![],
         pq_signature: vec![],
     };
-
-    println!("➡️ Invalid rotation\n");
-
-    let (events, result) = apply_rotation_reveal(&mut accounts, &mut validator, &bad_tx);
-
-    print_events(&events);
-    all_events.extend(events);
-
-    if let Err(e) = result {
-        println!("❌ Error: {}\n", e);
-    }
-
-    // -----------------------------
-    // ✅ VALID ROTATION
-    // -----------------------------
-    let link_sig = pq::sign(&new_pq, &pq_sk);
 
     let good_tx = RotationRevealTx {
         from: b"initial_classical".to_vec(),
@@ -130,27 +71,55 @@ pub fn run_simulation() {
         nonce: 1,
         epoch: 2,
         timestamp: timestamp + 1,
-        link_signature: link_sig,
+        link_signature: pq::sign(&new_pq, &pq_sk),
         classical_signature: vec![],
         pq_signature: vec![],
     };
 
-    println!("➡️ Valid rotation\n");
+    // -----------------------------
+    // VALIDATORS WITH STATE
+    // -----------------------------
+    let mut validators = vec![
+        (Validator::new(1000, b"A".to_vec(), b"A_pq".to_vec(), 0, 100), vec![acc_template.clone()]),
+        (Validator::new(1000, b"B".to_vec(), b"B_pq".to_vec(), 0, 100), vec![acc_template.clone()]),
+        (Validator::new(1000, b"C".to_vec(), b"C_pq".to_vec(), 0, 100), vec![acc_template.clone()]),
+    ];
 
-    let (events, result) = apply_rotation_reveal(&mut accounts, &mut validator, &good_tx);
+    println!("➡️ INVALID rotation phase\n");
 
-    print_events(&events);
-    all_events.extend(events);
+    for (i, (validator, accounts)) in validators.iter_mut().enumerate() {
+        let (events, result) = apply_rotation_reveal(accounts, validator, &bad_tx);
 
-    if let Err(e) = result {
-        println!("❌ Unexpected Error: {}\n", e);
+        println!("Validator {}: {:?}", i, result);
+
+        for e in events {
+            println!("📡 {:?}", e);
+            all_events.push(e);
+        }
+    }
+
+    println!("\n➡️ VALID rotation phase\n");
+
+    for (i, (validator, accounts)) in validators.iter_mut().enumerate() {
+        let (events, result) = apply_rotation_reveal(accounts, validator, &good_tx);
+
+        println!("Validator {}: {:?}", i, result);
+
+        for e in events {
+            println!("📡 {:?}", e);
+            all_events.push(e);
+        }
     }
 
     // -----------------------------
-    // 🔥 WRITE TO UI
+    // WRITE EVENTS
     // -----------------------------
-    write_events_to_file(&all_events);
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("../../fluxlock-ui/public/events.json");
 
-    println!("📁 events.json written for UI\n");
-    println!("🏁 Simulation complete\n");
+    let json = serde_json::to_string_pretty(&all_events).unwrap();
+
+    fs::write(&path, json).expect("Unable to write events.json");
+
+    println!("\n📁 events.json updated");
 }
