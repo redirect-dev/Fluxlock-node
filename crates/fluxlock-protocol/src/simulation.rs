@@ -9,6 +9,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::fs;
 use std::path::PathBuf;
 
+use serde::{Serialize, Deserialize};
+
 fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -16,11 +18,63 @@ fn now() -> u64 {
         .as_secs()
 }
 
+#[derive(Serialize, Deserialize)]
+struct ValidatorState {
+    name: String,
+    stake: u128,
+    reputation: i32,
+}
+
 pub fn run_simulation() {
-    println!("🧪 Fluxlock Phase 8 — REPUTATION SYSTEM\n");
+    println!("🧪 Fluxlock Phase 8B — PERSISTENCE\n");
 
     let mut all_events: Vec<Event> = vec![];
 
+    // -----------------------------
+    // LOAD EXISTING STATE (IF EXISTS)
+    // -----------------------------
+    let mut state_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    state_path.push("validator_state.json");
+
+    let saved_states: Vec<ValidatorState> = if state_path.exists() {
+        let data = fs::read_to_string(&state_path).unwrap();
+        serde_json::from_str(&data).unwrap_or_default()
+    } else {
+        vec![]
+    };
+
+    // -----------------------------
+    // INITIALIZE VALIDATORS
+    // -----------------------------
+    let mut validators = vec![];
+
+    let names = vec!["Validator A", "Validator B", "Validator C"];
+
+    for name in names {
+        let saved = saved_states.iter().find(|s| s.name == name);
+
+        let (stake, reputation) = if let Some(s) = saved {
+            (s.stake, s.reputation)
+        } else {
+            (1000, 100)
+        };
+
+        validators.push((
+            name,
+            Validator::new(
+                stake,
+                name.as_bytes().to_vec(),
+                name.as_bytes().to_vec(),
+                0,
+                reputation,
+            ),
+            vec![],
+        ));
+    }
+
+    // -----------------------------
+    // ACCOUNT SETUP (FRESH EACH RUN)
+    // -----------------------------
     let (pq_pk, pq_sk) = pq::generate_keypair();
 
     let base_account = Account::new(
@@ -29,7 +83,7 @@ pub fn run_simulation() {
         pq_pk.clone(),
     );
 
-    let new_classical = b"new_classical_v7".to_vec();
+    let new_classical = b"new_classical_persist".to_vec();
     let (new_pq, _) = pq::generate_keypair();
 
     let mut acc_template = base_account.clone();
@@ -67,15 +121,12 @@ pub fn run_simulation() {
         pq_signature: vec![],
     };
 
-    let mut validators = vec![
-        ("Validator A", Validator::new(1000, b"A".to_vec(), b"A_pq".to_vec(), 0, 100), vec![acc_template.clone()]),
-        ("Validator B", Validator::new(1000, b"B".to_vec(), b"B_pq".to_vec(), 0, 100), vec![acc_template.clone()]),
-        ("Validator C", Validator::new(1000, b"C".to_vec(), b"C_pq".to_vec(), 0, 100), vec![acc_template.clone()]),
-    ];
-
-    let mut validator_states = Vec::new();
-
+    // -----------------------------
+    // RUN SIMULATION
+    // -----------------------------
     for (name, validator, accounts) in validators.iter_mut() {
+        accounts.push(acc_template.clone());
+
         let (events, _) = match *name {
             "Validator A" => apply_rotation_reveal(accounts, validator, &good_tx, name),
             "Validator B" => apply_rotation_reveal(accounts, validator, &bad_tx, name),
@@ -90,24 +141,50 @@ pub fn run_simulation() {
         for e in events {
             all_events.push(e);
         }
-
-        validator_states.push(serde_json::json!({
-            "name": name,
-            "stake": validator.stake,
-            "reputation": validator.reputation,
-        }));
     }
 
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push("../../fluxlock-ui/public/events.json");
+    // -----------------------------
+    // SAVE STATE
+    // -----------------------------
+    let new_states: Vec<ValidatorState> = validators
+        .iter()
+        .map(|(name, v, _)| ValidatorState {
+            name: name.to_string(),
+            stake: v.stake,
+            reputation: v.reputation,
+        })
+        .collect();
+
+    fs::write(
+        &state_path,
+        serde_json::to_string_pretty(&new_states).unwrap(),
+    )
+    .expect("Failed to save validator state");
+
+    // -----------------------------
+    // EXPORT UI DATA
+    // -----------------------------
+    let mut ui_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    ui_path.push("../../fluxlock-ui/public/events.json");
+
+    let validator_states: Vec<_> = validators
+        .iter()
+        .map(|(name, v, _)| {
+            serde_json::json!({
+                "name": name,
+                "stake": v.stake,
+                "reputation": v.reputation
+            })
+        })
+        .collect();
 
     let json = serde_json::json!({
         "events": all_events,
         "validators": validator_states
     });
 
-    fs::write(&path, serde_json::to_string_pretty(&json).unwrap())
-        .expect("Unable to write events.json");
+    fs::write(&ui_path, serde_json::to_string_pretty(&json).unwrap())
+        .expect("Unable to write UI file");
 
-    println!("📁 events + validator state written");
+    println!("📁 State persisted + UI updated");
 }
