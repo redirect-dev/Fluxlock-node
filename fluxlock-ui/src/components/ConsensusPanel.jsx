@@ -13,10 +13,12 @@ export default function ConsensusPanel() {
         const res = await fetch("/events.json?ts=" + Date.now());
         const data = await res.json();
 
+        const events = data.events || [];
+
         let valid = [];
         let allValidators = new Set();
 
-        data.forEach((event) => {
+        events.forEach((event) => {
           if (event.RotationSuccess) {
             const v = event.RotationSuccess.validator;
             valid.push(v);
@@ -28,12 +30,11 @@ export default function ConsensusPanel() {
           }
         });
 
-        // Everyone not in valid list is wrong
         let invalid = [...allValidators].filter(
           (v) => !valid.includes(v)
         );
 
-        let decision = "No Consensus";
+        let decision = "Unknown";
         let majority = [];
         let minority = [];
 

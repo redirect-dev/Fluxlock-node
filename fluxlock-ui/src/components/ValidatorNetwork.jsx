@@ -9,29 +9,7 @@ export default function ValidatorNetwork() {
         const res = await fetch("/events.json?ts=" + Date.now());
         const data = await res.json();
 
-        let state = {
-          "Validator A": { stake: 1000, status: "Healthy" },
-          "Validator B": { stake: 1000, status: "Healthy" },
-          "Validator C": { stake: 1000, status: "Healthy" },
-        };
-
-        data.forEach((event) => {
-          if (event.ValidatorSlashed) {
-            const { validator, amount } = event.ValidatorSlashed;
-
-            if (state[validator]) {
-              state[validator].stake -= amount;
-              state[validator].status = "Slashed";
-            }
-          }
-        });
-
-        setValidators(
-          Object.entries(state).map(([name, val]) => ({
-            name,
-            ...val,
-          }))
-        );
+        setValidators(data.validators || []);
       } catch (err) {
         console.error(err);
       }
@@ -57,33 +35,29 @@ export default function ValidatorNetwork() {
             key={i}
             style={{
               padding: "20px",
-              width: "200px",
+              width: "220px",
               borderRadius: "10px",
               background: "#111",
               border: `1px solid ${
-                v.status === "Slashed" ? "#ff4d4d" : "#4dff88"
+                v.reputation < 80 ? "#ff4d4d" : "#4dff88"
               }`,
               textAlign: "center",
-              transition: "all 0.3s ease",
-              boxShadow:
-                v.status === "Slashed"
-                  ? "0 0 15px rgba(255,0,0,0.5)"
-                  : "0 0 10px rgba(0,255,100,0.3)",
             }}
           >
             <h3>{v.name}</h3>
 
-            <p>
-              <strong>Stake:</strong> {v.stake}
-            </p>
+            <p>Stake: {v.stake}</p>
 
-            <p
-              style={{
-                color: v.status === "Slashed" ? "#ff4d4d" : "#4dff88",
-                fontWeight: "bold",
-              }}
-            >
-              {v.status}
+            <p>
+              Reputation:{" "}
+              <span
+                style={{
+                  color: v.reputation < 80 ? "#ff4d4d" : "#4dff88",
+                  fontWeight: "bold",
+                }}
+              >
+                {v.reputation}
+              </span>
             </p>
           </div>
         ))}

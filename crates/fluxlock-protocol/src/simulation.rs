@@ -17,7 +17,7 @@ fn now() -> u64 {
 }
 
 pub fn run_simulation() {
-    println!("🧪 Fluxlock Phase 6 — VALIDATOR DISAGREEMENT\n");
+    println!("🧪 Fluxlock Phase 8 — REPUTATION SYSTEM\n");
 
     let mut all_events: Vec<Event> = vec![];
 
@@ -29,7 +29,7 @@ pub fn run_simulation() {
         pq_pk.clone(),
     );
 
-    let new_classical = b"new_classical_v6".to_vec();
+    let new_classical = b"new_classical_v7".to_vec();
     let (new_pq, _) = pq::generate_keypair();
 
     let mut acc_template = base_account.clone();
@@ -73,6 +73,8 @@ pub fn run_simulation() {
         ("Validator C", Validator::new(1000, b"C".to_vec(), b"C_pq".to_vec(), 0, 100), vec![acc_template.clone()]),
     ];
 
+    let mut validator_states = Vec::new();
+
     for (name, validator, accounts) in validators.iter_mut() {
         let (events, _) = match *name {
             "Validator A" => apply_rotation_reveal(accounts, validator, &good_tx, name),
@@ -88,13 +90,24 @@ pub fn run_simulation() {
         for e in events {
             all_events.push(e);
         }
+
+        validator_states.push(serde_json::json!({
+            "name": name,
+            "stake": validator.stake,
+            "reputation": validator.reputation,
+        }));
     }
 
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("../../fluxlock-ui/public/events.json");
 
-    let json = serde_json::to_string_pretty(&all_events).unwrap();
-    fs::write(&path, json).expect("Unable to write events.json");
+    let json = serde_json::json!({
+        "events": all_events,
+        "validators": validator_states
+    });
 
-    println!("📁 events.json updated");
+    fs::write(&path, serde_json::to_string_pretty(&json).unwrap())
+        .expect("Unable to write events.json");
+
+    println!("📁 events + validator state written");
 }

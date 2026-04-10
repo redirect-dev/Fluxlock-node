@@ -122,6 +122,8 @@ pub fn apply_rotation_reveal(
 
     acc.clear_flag(FLAG_IDENTITY_EXPIRED);
 
+    validator.reward();
+    
     events.push(Event::RotationSuccess {
         identity: tx.from.clone(),
         new_identity: tx.new_classical_key.clone(),
