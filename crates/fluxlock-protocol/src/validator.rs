@@ -1,141 +1,59 @@
-use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
 
-use crate::tx::transaction::RotationRevealTx;
-use crate::pq;
-use crate::epoch::EpochProvider;
-
-#[derive(Clone, Debug)]
-pub struct IdentityState {
-    pub current_classical_key: Vec<u8>,
-    pub current_pq_key: Vec<u8>,
-    pub epoch: u64,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Validator {
+    pub name: String,
+    pub stake: u128,
+    pub reputation: i32,
+    pub violations: u32,
 }
 
-#[derive(Default)]
-pub struct NetworkState {
-    pub identities: HashMap<Vec<u8>, IdentityState>,
-}
-
-/// Tracks rotations per epoch to prevent forks
-#[derive(Default)]
-pub struct RotationTracker {
-    pub seen: HashMap<(Vec<u8>, u64), bool>, // (identity, epoch)
-}
-
-pub struct Validator<E: EpochProvider> {
-    pub state: NetworkState,
-    pub epoch_provider: E,
-    pub rotation_tracker: RotationTracker,
-}
-
-impl<E: EpochProvider> Validator<E> {
-    pub fn new(epoch_provider: E) -> Self {
+impl Validator {
+    pub fn new(name: &str) -> Self {
         Self {
-            state: NetworkState::default(),
-            epoch_provider,
-            rotation_tracker: RotationTracker::default(),
+            name: name.to_string(),
+            stake: 1000,
+            reputation: 100,
+            violations: 0,
         }
     }
 
-    /// Apply a single transaction
-    pub fn apply_tx(&mut self, tx: RotationRevealTx) -> Result<(), String> {
-        let current_epoch = self.epoch_provider.current_epoch().number;
+    pub fn slash(&mut self, amount: u128) {
+        self.stake = self.stake.saturating_sub(amount);
 
-        let node_id = tx.from.clone();
+        self.violations += 1;
 
-        // -----------------------------
-        // RULE 1 — TIME VALIDITY
-        // -----------------------------
-        if tx.epoch != current_epoch {
-            return Err("INVALID_EPOCH".into());
-        }
-
-        // -----------------------------
-        // RULE 4 — FORK PREVENTION
-        // -----------------------------
-        let key = (node_id.clone(), tx.epoch);
-        if self.rotation_tracker.seen.contains_key(&key) {
-            return Err("FORK_DETECTED_SLASH".into());
-        }
-
-        // -----------------------------
-        // LOAD EXISTING STATE
-        // -----------------------------
-        let prev_state = self.state.identities.get(&node_id);
-
-        // -----------------------------
-        // RULE 3 — CONTINUITY
-        // -----------------------------
-        if let Some(prev) = prev_state {
-            // message = new PQ key (can be extended later)
-            let message = &tx.new_pq_key;
-
-            let valid_link = pq::verify(
-                message,
-                &tx.link_signature,
-                &prev.current_pq_key,
-            );
-
-            if !valid_link {
-                return Err("INVALID_LINK_SIGNATURE".into());
-            }
-
-            // -----------------------------
-            // RULE 2 — EXPIRATION
-            // -----------------------------
-            if prev.epoch < current_epoch {
-                return Err("IDENTITY_EXPIRED".into());
-            }
-        }
-
-        // -----------------------------
-        // VERIFY NEW KEY OWNERSHIP (PQ)
-        // -----------------------------
-        let valid_new_key = pq::verify(
-            &tx.new_pq_key,
-            &tx.pq_signature,
-            &tx.new_pq_key,
-        );
-
-        if !valid_new_key {
-            return Err("INVALID_NEW_KEY_SIGNATURE".into());
-        }
-
-        // -----------------------------
-        // APPLY STATE UPDATE
-        // -----------------------------
-        let new_state = IdentityState {
-            current_classical_key: tx.new_classical_key.clone(),
-            current_pq_key: tx.new_pq_key.clone(),
-            epoch: tx.epoch,
+        // 🔥 TRUE ESCALATION (no reset)
+        let penalty = match self.violations {
+            1 => 8,
+            2 => 15,
+            3 => 25,
+            _ => 40,
         };
 
-        self.state.identities.insert(node_id.clone(), new_state);
-
-        // mark rotation as seen
-        self.rotation_tracker.seen.insert(key, true);
-
-        Ok(())
+        self.reputation = (self.reputation - penalty).max(0);
     }
 
-    /// Apply transactions deterministically
-    pub fn apply_block(&mut self, mut txs: Vec<RotationRevealTx>) -> Result<(), String> {
-        // -----------------------------
-        // SORT (DETERMINISTIC ORDER)
-        // -----------------------------
-        txs.sort_by(|a, b| {
-            a.epoch
-                .cmp(&b.epoch)
-                .then(a.timestamp.cmp(&b.timestamp))
-        });
-
-        // -----------------------------
-        // APPLY IN ORDER
-        // -----------------------------
-        for tx in txs {
-            self.apply_tx(tx)?;
+    pub fn reward(&mut self) {
+        // 🔥 VERY SLOW RECOVERY
+        if self.reputation < 100 {
+            self.reputation += 1;
         }
 
-        Ok(())
+        // 🔥 NO VIOLATION RESET (this is the key change)
+    }
+
+    pub fn is_exiled(&self) -> bool {
+        self.reputation < 20
+    }
+
+    pub fn status(&self) -> String {
+        if self.is_exiled() {
+            "Exiled".to_string()
+        } else if self.reputation < 60 {
+            "Degraded".to_string()
+        } else {
+            "Healthy".to_string()
+        }
     }
 }

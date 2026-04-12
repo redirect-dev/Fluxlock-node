@@ -5,63 +5,39 @@ export default function ValidatorNetwork() {
 
   useEffect(() => {
     const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/events.json?ts=" + Date.now());
-        const data = await res.json();
-
-        setValidators(data.validators || []);
-      } catch (err) {
-        console.error(err);
-      }
+      const res = await fetch("/events.json?ts=" + Date.now());
+      const data = await res.json();
+      setValidators(data.validators || []);
     }, 2000);
 
     return () => clearInterval(interval);
   }, []);
 
+  const getStatus = (rep) => {
+    if (rep < 20) return { label: "EXILED", color: "#666" };
+    if (rep < 60) return { label: "DEGRADED", color: "#ff4d4d" };
+    return { label: "HEALTHY", color: "#4dff88" };
+  };
+
   return (
-    <div style={{ marginTop: "40px" }}>
-      <h2 style={{ textAlign: "center" }}>🌐 Validator Network</h2>
+    <div style={{ marginTop: "40px", textAlign: "center" }}>
+      <h2>🌐 Validator Network</h2>
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: "20px",
-          marginTop: "20px",
-        }}
-      >
-        {validators.map((v, i) => (
-          <div
-            key={i}
-            style={{
-              padding: "20px",
-              width: "220px",
-              borderRadius: "10px",
-              background: "#111",
-              border: `1px solid ${
-                v.reputation < 80 ? "#ff4d4d" : "#4dff88"
-              }`,
-              textAlign: "center",
-            }}
-          >
+      {validators.map((v, i) => {
+        const status = getStatus(v.reputation);
+
+        return (
+          <div key={i} style={{ marginBottom: "15px" }}>
             <h3>{v.name}</h3>
-
             <p>Stake: {v.stake}</p>
+            <p>Reputation: {v.reputation}</p>
 
-            <p>
-              Reputation:{" "}
-              <span
-                style={{
-                  color: v.reputation < 80 ? "#ff4d4d" : "#4dff88",
-                  fontWeight: "bold",
-                }}
-              >
-                {v.reputation}
-              </span>
+            <p style={{ color: status.color, fontWeight: "bold" }}>
+              {status.label}
             </p>
           </div>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }

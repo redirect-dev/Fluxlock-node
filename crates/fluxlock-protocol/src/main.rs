@@ -20,8 +20,9 @@ fn main() {
             fluxlock_protocol::cli::wallet::create_wallet();
         }
 
+        // 🔥 REMOVED broken run_chain
         "run" => {
-            fluxlock_protocol::cli::run::run_chain();
+            println!("⚠️ Run command not implemented in Phase 9 yet\n");
         }
 
         "send" => {
@@ -49,8 +50,8 @@ fn print_help() {
     println!("Usage:");
     println!("  fluxlock-protocol demo          Run demo");
     println!("  fluxlock-protocol new-account   Create wallet");
-    println!("  fluxlock-protocol run           Run live chain");
+    println!("  fluxlock-protocol run           (disabled in Phase 9)");
     println!("  fluxlock-protocol send          Send transaction");
-    println!("  fluxlock-protocol simulate      Run validator simulation"); // 🔥 NEW
+    println!("  fluxlock-protocol simulate      Run validator simulation");
     println!("  fluxlock-protocol help          Show help\n");
 }
