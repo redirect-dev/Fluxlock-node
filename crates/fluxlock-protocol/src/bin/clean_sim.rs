@@ -1,14 +1,17 @@
-use serde::{Serialize, Deserialize};
+fn main() {
+    println!("🧪 CLEAN SIMULATION ENTRY\n");
+    run_simulation();
+}
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Validator {
-    pub name: String,
-    pub stake: u128,
-    pub reputation: i32,
+#[derive(Clone, Debug)]
+struct Validator {
+    name: String,
+    stake: u128,
+    reputation: i32,
 }
 
 impl Validator {
-    pub fn new(name: &str) -> Self {
+    fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
             stake: 1000,
@@ -16,8 +19,8 @@ impl Validator {
         }
     }
 
-    // 🔥 HEAVIER SLASH — REAL CONSEQUENCES
-    pub fn slash(&mut self, amount: u128) {
+    // 🔥 HARD FAILURE
+    fn slash(&mut self, amount: u128) {
         self.stake = self.stake.saturating_sub(amount);
         self.reputation = (self.reputation - 30).max(0);
 
@@ -27,20 +30,20 @@ impl Validator {
         );
     }
 
-    // 🔄 SLOW RECOVERY
-    pub fn reward(&mut self) {
+    // 🔄 SLOW TRUST RECOVERY
+    fn reward(&mut self) {
         if self.reputation < 100 {
             self.reputation += 5;
         }
     }
 
     // 💰 ECONOMIC RE-ENTRY
-    pub fn restake(&mut self, amount: u128) {
+    fn restake(&mut self, amount: u128) {
         println!("💰 {} RESTAKES {}", self.name, amount);
         self.stake += amount;
     }
 
-    pub fn status(&self) -> &'static str {
+    fn status(&self) -> &'static str {
         if self.reputation < 20 {
             "EXILED"
         } else if self.stake == 0 {
@@ -53,7 +56,7 @@ impl Validator {
     }
 }
 
-pub fn run_simulation() {
+fn run_simulation() {
     println!("🧪 Fluxlock Phase 15 — Economic Reality Simulation\n");
 
     let mut validators = vec![
@@ -62,7 +65,7 @@ pub fn run_simulation() {
         Validator::new("Validator C"),
     ];
 
-    // 🔥 CHAOS PHASE — FORCE FAILURE
+    // ⚡ CHAOS — FORCE BANKRUPTCY
     println!("⚡ Chaos Phase\n");
 
     for v in validators.iter_mut() {
@@ -78,18 +81,19 @@ pub fn run_simulation() {
         );
     }
 
-    // 🌱 RECOVERY PHASE
+    // 🌱 RECOVERY — CONTROLLED + VERIFIED
     println!("\n🌱 Recovery Phase\n");
 
     for round in 0..10 {
         println!("--- Round {} ---", round + 1);
 
         for v in validators.iter_mut() {
-            // 🔄 reputation recovers slowly
+            // Step 1: recover trust slowly
             v.reward();
 
-            // 💰 ONLY RESTAKE IF BANKRUPT
-            if v.stake == 0 {
+            // Step 2: FORCE ECONOMIC REBUILD
+            if v.stake < 200 {
+                println!("🔁 RESTAKE TRIGGER → {}", v.name);
                 v.restake(50);
             }
 
@@ -103,5 +107,5 @@ pub fn run_simulation() {
         }
     }
 
-    println!("\n✅ Phase 15 Simulation Complete");
+    println!("\n✅ Phase 15 Complete");
 }
