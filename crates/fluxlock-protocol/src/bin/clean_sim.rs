@@ -37,32 +37,49 @@ impl Validator {
 }
 
 fn run_simulation() {
-    println!("🧪 Fluxlock Phase 21 — Collusion Attack\n");
+    println!("🧪 Fluxlock Phase 23 — Slow Corruption Attack\n");
 
     let mut validators = vec![
         Validator::new("Validator A (Honest)"),
-        Validator::new("Validator B (Colluder 1)"),
-        Validator::new("Validator C (Colluder 2)"),
+        Validator::new("Validator C (Slow Corruptor)"),
     ];
 
     println!("⚡ Identity Validation\n");
-    for v in validators.iter_mut() {
+    for v in validators.iter() {
         println!("✅ {} VALID", v.name);
     }
 
-    println!("\n🌱 Behavior Phase\n");
+    println!("\n🌱 Trust Building Phase\n");
 
+    // Build trust equally first
     for round in 0..3 {
-        println!("--- Round {} ---", round + 1);
+        println!("--- Build Round {} ---", round + 1);
 
         for v in validators.iter_mut() {
-            if v.name.contains("Honest") {
-                v.reputation += 5;
-            }
+            v.reputation += 5;
 
-            if v.name.contains("Colluder") {
-                v.trust_penalty += 15;
-                v.reputation -= 5;
+            println!(
+                "{} → eff_rep: {} | influence: {:.2}",
+                v.name,
+                v.effective_reputation(),
+                v.influence()
+            );
+        }
+    }
+
+    println!("\n🐍 Slow Corruption Phase\n");
+
+    // Subtle degradation (no big penalties)
+    for round in 0..5 {
+        println!("--- Corruption Round {} ---", round + 1);
+
+        for v in validators.iter_mut() {
+            if v.name.contains("Slow Corruptor") {
+                // small degradation each round
+                v.trust_penalty += 3;
+                v.reputation -= 2;
+            } else {
+                v.reputation += 3;
             }
 
             println!(
@@ -74,29 +91,29 @@ fn run_simulation() {
         }
     }
 
-    println!("\n⚔️ Collusion Attempt\n");
+    println!("\n⚔️ Conflict After Slow Corruption\n");
 
     let mut honest_weight = 0.0;
-    let mut collusion_weight = 0.0;
+    let mut corruptor_weight = 0.0;
 
     for v in validators.iter() {
         if v.name.contains("Honest") {
             honest_weight += v.influence();
         } else {
-            collusion_weight += v.influence();
+            corruptor_weight += v.influence();
         }
     }
 
     println!("Honest weight: {:.2}", honest_weight);
-    println!("Colluding weight: {:.2}", collusion_weight);
+    println!("Corruptor weight: {:.2}", corruptor_weight);
 
     println!("\n🏆 FINAL RESULT:");
 
-    if honest_weight > collusion_weight {
-        println!("✔ Honest validator resists collusion");
+    if honest_weight > corruptor_weight {
+        println!("✔ Honest validator resists slow corruption");
     } else {
-        println!("❌ Collusion attack succeeds");
+        println!("❌ Slow corruption attack succeeds");
     }
 
-    println!("\n✅ Phase 21 Complete");
+    println!("\n✅ Phase 23 Complete");
 }
