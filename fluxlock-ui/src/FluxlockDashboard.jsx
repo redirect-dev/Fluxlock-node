@@ -1,184 +1,260 @@
 import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+
+const GRID_SIZE = 5;
+const NODE_COUNT = 20;
+
+function getNeighbors(id) {
+  const row = Math.floor(id / GRID_SIZE);
+  const col = id % GRID_SIZE;
+
+  const neighbors = [];
+
+  for (let r = row - 1; r <= row + 1; r++) {
+    for (let c = col - 1; c <= col + 1; c++) {
+      if (
+        r >= 0 &&
+        r < GRID_SIZE &&
+        c >= 0 &&
+        c < GRID_SIZE &&
+        !(r === row && c === col)
+      ) {
+        neighbors.push(r * GRID_SIZE + c);
+      }
+    }
+  }
+
+  return neighbors;
+}
+
+function createNode(id) {
+  return {
+    id,
+    trust: 100,
+    drift: 0,
+    behavior: 100,
+    influence: 100,
+    status: "normal",
+  };
+}
 
 export default function FluxlockDashboard() {
-  const [nodes, setNodes] = useState([]);
-  const [log, setLog] = useState("");
+  const [nodes, setNodes] = useState(
+    Array.from({ length: NODE_COUNT }, (_, i) => createNode(i))
+  );
 
-  // 🔄 Fetch simulation data
-  const fetchData = async () => {
-    try {
-      const res = await fetch("http://localhost:8080/simulation");
-      const data = await res.json();
-
-      setNodes(data);
-
-      const attacker = data.find((n) => n.id === 19);
-
-      if (attacker?.status === "attacked") {
-        setLog("🚨 Attacker isolated — network rejecting node");
-      } else if (attacker?.drift_score > 40) {
-        setLog("⚠️ Suspicious validator behavior rising");
-      } else {
-        setLog("System stable — trust network intact");
-      }
-    } catch {
-      setLog("⚠️ Unable to connect to engine");
-    }
-  };
+  const [selectedNode, setSelectedNode] = useState(null);
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 1000);
+    const interval = setInterval(() => {
+      setNodes((prev) => {
+        if (!prev || prev.length !== NODE_COUNT) return prev;
+
+        const updated = prev.map((n) => ({ ...n }));
+
+        const attacker = updated[19];
+        if (!attacker) return prev;
+
+        // =========================
+        // ⚠️ ATTACK PROGRESSION
+        // =========================
+        attacker.trust = Math.max(attacker.trust - 2, 0);
+        attacker.drift += 5;
+        attacker.behavior = Math.max(attacker.behavior - 2, 0);
+        attacker.influence = Math.max(attacker.influence - 3, 0);
+
+        if (attacker.trust < 40) attacker.status = "drifting";
+        if (attacker.trust < 20) attacker.status = "attacked";
+
+        // =========================
+        // 🌊 PROPAGATION (TUNED)
+        // =========================
+        const neighbors = getNeighbors(19);
+
+        neighbors.forEach((id) => {
+          const n = updated[id];
+          if (!n) return;
+
+          const resistance =
+            attacker.status === "attacked"
+              ? 0.3
+              : attacker.status === "drifting"
+              ? 0.6
+              : 1;
+
+          // 🔧 Slightly stronger propagation
+          n.trust = Math.max(n.trust - 1 * resistance, 0);
+          n.drift += 1 * resistance;
+          n.behavior = Math.max(n.behavior - 0.4 * resistance, 0);
+
+          // 🔧 Early awareness trigger (NEW)
+          if ((n.trust < 75 || n.drift > 5) && n.status === "normal") {
+            n.status = "suspicious";
+          }
+
+          // escalate if worsening
+          if (n.trust < 50 && n.status === "suspicious") {
+            n.status = "drifting";
+          }
+        });
+
+        // =========================
+        // 🔒 CONTAINMENT
+        // =========================
+        if (attacker.status === "attacked") {
+          attacker.influence = Math.max(attacker.influence - 10, 0);
+        }
+
+        // =========================
+        // 🌱 PASSIVE RECOVERY
+        // =========================
+        updated.forEach((n) => {
+          if (n.status === "normal") {
+            n.trust = Math.min(n.trust + 0.2, 100);
+            n.behavior = Math.min(n.behavior + 0.1, 100);
+          }
+        });
+
+        return updated;
+      });
+    }, 1000);
+
     return () => clearInterval(interval);
   }, []);
 
-  // 📍 Grid positioning
-  const getPosition = (id) => {
-    const col = id % 5;
-    const row = Math.floor(id / 5);
-    return {
-      x: col * 120,
-      y: row * 120,
-    };
-  };
-
-  // 🎨 Color logic
-  const getColor = (n) => {
-    if (n.status === "attacked") return "#ff3b3b";
-    if (n.drift_score > 70) return "#ff6b00";
-    if (n.drift_score > 30) return "#f9c74f";
+  function getNodeColor(node) {
+    if (node.status === "attacked") return "#ff3b3b";
+    if (node.status === "drifting") return "#f59e0b";
+    if (node.status === "suspicious") return "#facc15";
     return "#4cc9f0";
-  };
+  }
 
-  // ✨ Glow logic
-  const getGlow = (n) => {
-    if (n.status === "attacked") return "0 0 25px rgba(255,0,0,0.9)";
-    if (n.drift_score > 30) return "0 0 18px rgba(249,199,79,0.7)";
-    return "0 0 15px rgba(76,201,240,0.6)";
-  };
+  function getGlow(node) {
+    if (node.status === "attacked")
+      return "0 0 35px rgba(255, 0, 0, 0.9)";
+    if (node.status === "drifting")
+      return "0 0 25px rgba(245, 158, 11, 0.8)";
+    if (node.status === "suspicious")
+      return "0 0 18px rgba(250, 204, 21, 0.7)";
+    return "0 0 18px rgba(76, 201, 240, 0.7)";
+  }
 
-  // 🔥 CRITICAL FIX — CONNECTION FILTER
-  const shouldConnect = (a, b) => {
-    // No self / duplicate
-    if (a.id === b.id) return false;
+  const attackedNode = nodes.find((n) => n.status === "attacked");
 
-    // NEVER connect attacked nodes
-    if (a.status === "attacked" || b.status === "attacked") return false;
-
-    // GRID LOCALITY (prevents spiderweb)
-    const dx = Math.abs((a.id % 5) - (b.id % 5));
-    const dy = Math.abs(Math.floor(a.id / 5) - Math.floor(b.id / 5));
-
-    if (dx > 1 || dy > 1) return false;
-
-    // TRUST SIMILARITY
-    if (Math.abs(a.trust - b.trust) > 15) return false;
-
-    return true;
-  };
+  // 🔧 UPDATED COUNT (accurate adaptation)
+  const adaptingCount = nodes.filter(
+    (n) => n.status === "suspicious" || n.status === "drifting"
+  ).length;
 
   return (
     <div
       style={{
-        background: "#05070d",
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
+        background: "radial-gradient(circle at center, #020617, #01030a)",
+        minHeight: "100vh",
         color: "white",
+        padding: "20px",
+        fontFamily: "sans-serif",
       }}
     >
-      <h1 style={{ marginBottom: "20px", fontWeight: "300" }}>
+      <h1
+        style={{
+          textAlign: "center",
+          fontSize: "48px",
+          letterSpacing: "4px",
+          marginBottom: "20px",
+          opacity: 0.9,
+        }}
+      >
         FLUXLOCK NETWORK GRAPH
       </h1>
 
-      <div style={{ position: "relative", width: 600, height: 600 }}>
-        {/* 🔗 CONNECTION LINES */}
-        <svg
-          width="600"
-          height="600"
-          style={{ position: "absolute", top: 0, left: 0 }}
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        {/* GRID */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${GRID_SIZE}, 110px)`,
+            gap: "30px",
+          }}
         >
-          {nodes.map((a) =>
-            nodes.map((b) => {
-              if (a.id >= b.id) return null;
-              if (!shouldConnect(a, b)) return null;
-
-              const posA = getPosition(a.id);
-              const posB = getPosition(b.id);
-
-              return (
-                <line
-                  key={`${a.id}-${b.id}`}
-                  x1={posA.x + 35}
-                  y1={posA.y + 35}
-                  x2={posB.x + 35}
-                  y2={posB.y + 35}
-                  stroke="rgba(100,200,255,0.6)"
-                  strokeWidth="1.5"
-                />
-              );
-            })
-          )}
-        </svg>
-
-        {/* 🔵 NODES */}
-        {nodes.map((n) => {
-          const pos = getPosition(n.id);
-
-          return (
-            <motion.div
-              key={n.id}
-              animate={{
-                scale:
-                  n.status === "attacked"
-                    ? 0.6
-                    : n.drift_score > 30
-                    ? [1, 1.15, 1]
-                    : [1, 1.05, 1],
-                opacity: n.status === "attacked" ? 0.5 : 1,
-              }}
-              transition={{
-                duration: 0.8,
-                repeat: n.status === "attacked" ? 0 : Infinity,
-              }}
+          {nodes.map((node) => (
+            <div
+              key={node.id}
+              onClick={() => setSelectedNode(node)}
               style={{
-                position: "absolute",
-                left: pos.x,
-                top: pos.y,
-                width: 70,
-                height: 70,
+                width: 90,
+                height: 90,
                 borderRadius: "50%",
-                background: getColor(n),
-                boxShadow: getGlow(n),
+                background: getNodeColor(node),
+                boxShadow: getGlow(node),
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: "12px",
+                cursor: "pointer",
                 fontWeight: "bold",
+                transition: "all 0.3s ease",
               }}
             >
-              {n.id}
-            </motion.div>
-          );
-        })}
+              {node.id}
+            </div>
+          ))}
+        </div>
+
+        {/* SIDE PANEL */}
+        {selectedNode && (
+          <div
+            style={{
+              marginLeft: "50px",
+              minWidth: "260px",
+              padding: "25px",
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "rgba(255,255,255,0.03)",
+              backdropFilter: "blur(6px)",
+            }}
+          >
+            <h2>Validator {selectedNode.id}</h2>
+            <p>Trust: {selectedNode.trust.toFixed(2)}</p>
+            <p>Drift: {selectedNode.drift.toFixed(2)}</p>
+            <p>Behavior: {selectedNode.behavior.toFixed(2)}</p>
+            <p>Influence: {selectedNode.influence.toFixed(2)}</p>
+            <p>Status: {selectedNode.status}</p>
+
+            <button
+              onClick={() => setSelectedNode(null)}
+              style={{
+                marginTop: "20px",
+                padding: "10px",
+                width: "100%",
+                background: "transparent",
+                border: "1px solid rgba(255,255,255,0.2)",
+                color: "white",
+                cursor: "pointer",
+              }}
+            >
+              Close
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* 📊 STATUS PANEL */}
+      {/* STATUS BAR */}
       <div
         style={{
-          marginTop: "20px",
-          padding: "12px 24px",
-          border: "1px solid #222",
-          background: "#0d1117",
-          minWidth: "360px",
-          textAlign: "center",
+          position: "fixed",
+          bottom: "20px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          padding: "14px 35px",
+          borderRadius: "8px",
+          border: "1px solid rgba(255,255,255,0.1)",
+          background: "rgba(0,0,0,0.65)",
+          backdropFilter: "blur(10px)",
+          fontSize: "16px",
           letterSpacing: "1px",
         }}
       >
-        {log}
+        {attackedNode
+          ? `🚨 Instability detected — ${adaptingCount} nodes adapting`
+          : "System stable — trust network intact"}
       </div>
     </div>
   );
