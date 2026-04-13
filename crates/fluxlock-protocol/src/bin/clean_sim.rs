@@ -1,3 +1,6 @@
+use fluxlock_protocol::state::account::Account;
+use fluxlock_protocol::pq;
+
 fn main() {
     println!("🧪 CLEAN SIMULATION ENTRY\n");
     run_simulation();
@@ -8,6 +11,9 @@ struct Validator {
     name: String,
     stake: u128,
     reputation: i32,
+    suspicion_timer: i32,
+    trust_penalty: i32,
+    valid_identity: bool,
 }
 
 impl Validator {
@@ -16,96 +22,127 @@ impl Validator {
             name: name.to_string(),
             stake: 1000,
             reputation: 100,
+            suspicion_timer: 0,
+            trust_penalty: 0,
+            valid_identity: true,
         }
     }
 
-    // 🔥 HARD FAILURE
-    fn slash(&mut self, amount: u128) {
-        self.stake = self.stake.saturating_sub(amount);
-        self.reputation = (self.reputation - 30).max(0);
-
-        println!(
-            "⚠️ {} SLASHED → stake: {} | rep: {}",
-            self.name, self.stake, self.reputation
-        );
-    }
-
-    // 🔄 SLOW TRUST RECOVERY
-    fn reward(&mut self) {
-        if self.reputation < 100 {
-            self.reputation += 5;
-        }
-    }
-
-    // 💰 ECONOMIC RE-ENTRY
-    fn restake(&mut self, amount: u128) {
-        println!("💰 {} RESTAKES {}", self.name, amount);
-        self.stake += amount;
+    fn effective_reputation(&self) -> i32 {
+        self.reputation - self.trust_penalty
     }
 
     fn status(&self) -> &'static str {
-        if self.reputation < 20 {
-            "EXILED"
-        } else if self.stake == 0 {
-            "BANKRUPT"
-        } else if self.stake < 200 {
-            "RECOVERING"
-        } else {
-            "HEALTHY"
+        if !self.valid_identity {
+            return "INVALID_IDENTITY";
         }
+
+        if self.reputation < 20 {
+            return "EXILED";
+        }
+
+        if self.stake == 0 {
+            return "BANKRUPT";
+        }
+
+        if self.suspicion_timer > 0 {
+            return "UNDER_REVIEW";
+        }
+
+        if self.stake >= 200 && self.effective_reputation() >= 60 {
+            return "HEALTHY";
+        }
+
+        if self.stake >= 200 {
+            return "UNTRUSTED";
+        }
+
+        "RECOVERING"
     }
 }
 
 fn run_simulation() {
-    println!("🧪 Fluxlock Phase 15 — Economic Reality Simulation\n");
+    println!("🧪 Fluxlock Phase 17 — Identity + Behavior Fusion (Fixed)\n");
 
     let mut validators = vec![
-        Validator::new("Validator A"),
-        Validator::new("Validator B"),
-        Validator::new("Validator C"),
+        Validator::new("Validator A (Valid Chain)"),
+        Validator::new("Validator B (Broken Chain)"),
+        Validator::new("Validator C (Valid but Aggressive)"),
     ];
 
-    // ⚡ CHAOS — FORCE BANKRUPTCY
-    println!("⚡ Chaos Phase\n");
+    // 🔥 Simulated identity creation
+    let mut accounts: Vec<Account> = vec![];
 
-    for v in validators.iter_mut() {
-        v.slash(500);
-        v.slash(500);
+    for i in 0..3 {
+        let (pq_pk, _) = pq::generate_keypair();
 
-        println!(
-            "{} post-chaos → stake: {} | rep: {} | status: {}",
-            v.name,
-            v.stake,
-            v.reputation,
-            v.status()
+        let acc = Account::new(
+            1000,
+            format!("identity_{}", i).as_bytes().to_vec(),
+            pq_pk,
         );
+
+        accounts.push(acc);
     }
 
-    // 🌱 RECOVERY — CONTROLLED + VERIFIED
-    println!("\n🌱 Recovery Phase\n");
+    println!("⚡ Identity Validation Phase\n");
 
-    for round in 0..10 {
+    for v in validators.iter_mut() {
+        if v.name.contains("Broken") {
+            v.valid_identity = false;
+            println!("❌ {} FAILED identity chain", v.name);
+        } else {
+            println!("✅ {} PASSED identity chain", v.name);
+        }
+    }
+
+    println!("\n🌱 Behavior + Identity Combined\n");
+
+    for round in 0..6 {
         println!("--- Round {} ---", round + 1);
 
         for v in validators.iter_mut() {
-            // Step 1: recover trust slowly
-            v.reward();
+            if v.suspicion_timer > 0 {
+                v.suspicion_timer -= 1;
+            }
 
-            // Step 2: FORCE ECONOMIC REBUILD
-            if v.stake < 200 {
-                println!("🔁 RESTAKE TRIGGER → {}", v.name);
-                v.restake(50);
+            if !v.valid_identity {
+                println!("{} → BLOCKED (invalid identity)", v.name);
+                continue;
+            }
+
+            // Honest
+            if v.name.contains("Valid Chain") {
+                if v.stake < 200 {
+                    v.stake += 50;
+                }
+                v.reputation += 5;
+            }
+
+            // Aggressive
+            if v.name.contains("Aggressive") {
+                if v.stake < 200 {
+                    v.stake += 100;
+                }
+
+                if round < 2 {
+                    v.suspicion_timer = 3;
+                    v.trust_penalty += 10;
+                    v.reputation -= 5;
+                }
             }
 
             println!(
-                "{} → stake: {} | rep: {} | status: {}",
+                "{} → stake: {} | rep: {} | eff_rep: {} | penalty: {} | status: {}",
                 v.name,
                 v.stake,
                 v.reputation,
+                v.effective_reputation(),
+                v.trust_penalty,
                 v.status()
             );
         }
     }
 
-    println!("\n✅ Phase 15 Complete");
+    println!("\n✅ Phase 17 Complete");
 }
