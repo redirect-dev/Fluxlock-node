@@ -37,42 +37,31 @@ impl Validator {
 }
 
 fn run_simulation() {
-    println!("🧪 Fluxlock Phase 20 — Fork Resolution\n");
+    println!("🧪 Fluxlock Phase 21 — Collusion Attack\n");
 
     let mut validators = vec![
         Validator::new("Validator A (Honest)"),
-        Validator::new("Validator B (Broken)"),
-        Validator::new("Validator C (Aggressive)"),
+        Validator::new("Validator B (Colluder 1)"),
+        Validator::new("Validator C (Colluder 2)"),
     ];
 
-    // Identity validation
     println!("⚡ Identity Validation\n");
     for v in validators.iter_mut() {
-        if v.name.contains("Broken") {
-            v.valid_identity = false;
-            println!("❌ {} INVALID", v.name);
-        } else {
-            println!("✅ {} VALID", v.name);
-        }
+        println!("✅ {} VALID", v.name);
     }
 
-    // Behavior shaping
     println!("\n🌱 Behavior Phase\n");
 
     for round in 0..3 {
         println!("--- Round {} ---", round + 1);
 
         for v in validators.iter_mut() {
-            if !v.valid_identity {
-                continue;
-            }
-
             if v.name.contains("Honest") {
                 v.reputation += 5;
             }
 
-            if v.name.contains("Aggressive") && round < 2 {
-                v.trust_penalty += 10;
+            if v.name.contains("Colluder") {
+                v.trust_penalty += 15;
                 v.reputation -= 5;
             }
 
@@ -85,37 +74,29 @@ fn run_simulation() {
         }
     }
 
-    // Fork simulation
-    println!("\n🌐 Fork Simulation\n");
+    println!("\n⚔️ Collusion Attempt\n");
 
-    let mut chain_valid_weight = 0.0;
-    let mut chain_invalid_weight = 0.0;
+    let mut honest_weight = 0.0;
+    let mut collusion_weight = 0.0;
 
     for v in validators.iter() {
-        if !v.valid_identity {
-            continue;
-        }
-
         if v.name.contains("Honest") {
-            println!("{} builds VALID chain", v.name);
-            chain_valid_weight += v.influence();
-        } else if v.name.contains("Aggressive") {
-            println!("{} builds INVALID chain", v.name);
-            chain_invalid_weight += v.influence();
+            honest_weight += v.influence();
+        } else {
+            collusion_weight += v.influence();
         }
     }
 
-    println!("\n⚖️ Chain Weights:");
-    println!("VALID chain weight: {:.2}", chain_valid_weight);
-    println!("INVALID chain weight: {:.2}", chain_invalid_weight);
+    println!("Honest weight: {:.2}", honest_weight);
+    println!("Colluding weight: {:.2}", collusion_weight);
 
-    println!("\n🏆 FINAL CHAIN:");
+    println!("\n🏆 FINAL RESULT:");
 
-    if chain_valid_weight > chain_invalid_weight {
-        println!("✔ VALID chain survives");
+    if honest_weight > collusion_weight {
+        println!("✔ Honest validator resists collusion");
     } else {
-        println!("❌ INVALID chain survives");
+        println!("❌ Collusion attack succeeds");
     }
 
-    println!("\n✅ Phase 20 Complete");
+    println!("\n✅ Phase 21 Complete");
 }
