@@ -1,141 +1,138 @@
-fn main() {
-    println!("🧪 CLEAN SIMULATION ENTRY\n");
-    run_simulation();
-}
+use rand::Rng;
 
 #[derive(Clone, Debug)]
-struct Validator {
-    name: String,
-    stake: u128,
-    reputation: i32,
-    trust_penalty: i32,
-    valid_identity: bool,
+pub struct Validator {
+    pub id: usize,
+    pub stake: f64,
+    pub reputation: f64,
+    pub effective_reputation: f64,
+    pub penalty: f64,
+
+    pub behavior_score: f64,
 }
 
 impl Validator {
-    fn new(name: &str, stake: u128) -> Self {
-        Self {
-            name: name.to_string(),
-            stake,
-            reputation: 100,
-            trust_penalty: 0,
-            valid_identity: true,
+    pub fn new(id: usize, is_attacker: bool) -> Self {
+        if is_attacker {
+            Self {
+                id,
+                stake: 10.0,
+                reputation: 10.0,
+                effective_reputation: 10.0,
+                penalty: 20.0,
+                behavior_score: 30.0,
+            }
+        } else {
+            Self {
+                id,
+                stake: 100.0,
+                reputation: 70.0,
+                effective_reputation: 70.0,
+                penalty: 0.0,
+                behavior_score: 90.0,
+            }
         }
     }
 
-    fn effective_reputation(&self) -> i32 {
-        self.reputation - self.trust_penalty
-    }
-
-    fn influence(&self) -> f64 {
-        if !self.valid_identity {
-            return 0.0;
+    pub fn influence(&self) -> f64 {
+        // 🔥 TRUST GATING
+        if self.effective_reputation < 30.0 {
+            return self.stake * 0.01;
         }
 
-        let stake_weight = (self.stake as f64 / 1000.0).sqrt();
-        let trust_factor = (self.effective_reputation() as f64) / 100.0;
+        let trust_factor = (100.0 - self.penalty).max(0.0) / 100.0;
 
-        (self.effective_reputation() as f64) * stake_weight * trust_factor
+        self.stake * trust_factor * (self.effective_reputation / 100.0)
     }
 }
 
-fn run_simulation() {
-    println!("🧪 Fluxlock Phase 28 — Sybil Dampening\n");
+pub fn simulate_saturation_attack() {
+    let mut rng = rand::thread_rng();
 
-    let mut validators = vec![
-        Validator::new("Validator A (Honest)", 1000),
+    println!("\n=== PHASE 30: NETWORK SATURATION ATTACK ===\n");
 
-        // Sybil group
-        Validator::new("Validator C1 (Sybil)", 1000),
-        Validator::new("Validator C2 (Sybil)", 1000),
-        Validator::new("Validator C3 (Sybil)", 1000),
-    ];
+    let mut validators: Vec<Validator> = Vec::new();
 
-    println!("⚡ Identity Validation\n");
-    for v in validators.iter() {
-        println!("✅ {} VALID", v.name);
+    // ✅ Honest validators
+    for i in 0..20 {
+        validators.push(Validator::new(i, false));
     }
 
-    println!("\n🌱 Trust Building Phase\n");
-
-    for round in 0..3 {
-        println!("--- Build Round {} ---", round + 1);
-
-        for v in validators.iter_mut() {
-            v.reputation += 5;
-
-            println!(
-                "{} → eff_rep: {} | influence: {:.2}",
-                v.name,
-                v.effective_reputation(),
-                v.influence()
-            );
-        }
+    // 🚨 Attacker swarm
+    for i in 20..120 {
+        validators.push(Validator::new(i, true));
     }
 
-    println!("\n⚠️ ATTACK PHASE (Sybil Coordination)\n");
-
-    for round in 0..3 {
-        println!("--- Attack Round {} ---", round + 1);
-
+    // 🔥 Simulate a few rounds
+    for _ in 0..10 {
         for v in validators.iter_mut() {
-            if v.name.contains("Sybil") {
-                v.trust_penalty += 3;
-                v.reputation -= 2;
+            let action = if v.reputation < 30.0 {
+                rng.gen_range(20.0..50.0) // noisy/bad actors
             } else {
-                v.reputation += 5;
+                rng.gen_range(80.0..100.0) // honest
+            };
+
+            v.behavior_score =
+                (v.behavior_score * 0.9) + (action * 0.1);
+
+            // Slight rep adjustments
+            if action > 70.0 {
+                v.effective_reputation += 0.5;
+            } else {
+                v.effective_reputation -= 0.5;
             }
 
-            println!(
-                "{} → eff_rep: {} | influence: {:.2}",
-                v.name,
-                v.effective_reputation(),
-                v.influence()
-            );
+            // Clamp
+            if v.effective_reputation > 100.0 {
+                v.effective_reputation = 100.0;
+            }
+            if v.effective_reputation < 0.0 {
+                v.effective_reputation = 0.0;
+            }
         }
     }
 
-    println!("\n🧠 Detecting Coordinated Group Behavior...\n");
-
-    // 🔥 GROUP PENALTY
-    let sybil_count = validators.iter().filter(|v| v.name.contains("Sybil")).count();
-
-    let mut sybil_penalty_factor = 1.0;
-
-    if sybil_count > 1 {
-        println!("🚨 Sybil cluster detected ({} validators)", sybil_count);
-
-        // Dampen combined influence
-        sybil_penalty_factor = 0.5;
-    }
-
-    println!("\n⚔️ Conflict: Honest vs Sybil Group\n");
-
-    let mut honest_weight = 0.0;
-    let mut sybil_weight = 0.0;
+    // 📊 Calculate influence totals
+    let mut honest_total = 0.0;
+    let mut attacker_total = 0.0;
 
     for v in validators.iter() {
-        if v.name.contains("Honest") {
-            honest_weight += v.influence();
+        if v.reputation >= 30.0 {
+            honest_total += v.influence();
         } else {
-            sybil_weight += v.influence();
+            attacker_total += v.influence();
         }
     }
 
-    // 🔥 APPLY GROUP DAMPENING
-    let adjusted_sybil_weight = sybil_weight * sybil_penalty_factor;
+    println!("Honest Validators Total Influence: {:.2}", honest_total);
+    println!("Attacker Swarm Total Influence: {:.2}", attacker_total);
 
-    println!("Honest weight: {:.2}", honest_weight);
-    println!("Sybil raw weight: {:.2}", sybil_weight);
-    println!("Sybil adjusted weight: {:.2}", adjusted_sybil_weight);
+    println!(
+        "\nInfluence Ratio (Honest / Attacker): {:.2}",
+        honest_total / attacker_total.max(1.0)
+    );
 
-    println!("\n🏆 FINAL RESULT:");
+    println!("\n=== SAMPLE VALIDATORS ===\n");
 
-    if honest_weight > adjusted_sybil_weight {
-        println!("✔ Honest validator resists Sybil attack (dampened)");
-    } else {
-        println!("❌ Sybil attack still overwhelms system");
+    for v in validators.iter().take(5) {
+        println!(
+            "HONEST ID {} | Inf: {:.2} | Rep: {:.2}",
+            v.id,
+            v.influence(),
+            v.effective_reputation
+        );
     }
 
-    println!("\n✅ Phase 28 Complete");
+    for v in validators.iter().skip(20).take(5) {
+        println!(
+            "ATTACKER ID {} | Inf: {:.2} | Rep: {:.2}",
+            v.id,
+            v.influence(),
+            v.effective_reputation
+        );
+    }
+}
+
+fn main() {
+    simulate_saturation_attack();
 }
