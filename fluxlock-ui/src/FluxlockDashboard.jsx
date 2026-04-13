@@ -15,7 +15,7 @@ export default function FluxlockDashboard() {
       const attacker = data.find((n) => n.id === 19);
 
       if (attacker?.status === "attacked") {
-        setLog("🚨 Attacker neutralized");
+        setLog("🚨 Attacker neutralized — localized containment complete");
       } else if (attacker?.drift_score > 40) {
         setLog("⚠️ Suspicious validator behavior rising");
       } else {
@@ -23,7 +23,7 @@ export default function FluxlockDashboard() {
       }
     } catch (err) {
       console.error(err);
-      setLog("⚠️ Engine connection failed");
+      setLog("⚠️ Unable to connect to engine");
     }
   };
 
@@ -33,99 +33,104 @@ export default function FluxlockDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const getState = (node) => {
-    if (node.status === "attacked") return "attacked";
-    if (node.id === 19 && node.drift_score > 70) return "critical";
-    if (node.drift_score > 30) return "drifting";
-    return "normal";
-  };
-
-  const getColor = (node) => {
-    const s = getState(node);
-    if (s === "attacked") return "#ff3b3b";
-    if (s === "critical") return "#ff6b00";
-    if (s === "drifting") return "#f9c74f";
+  // 🧠 COLOR SYSTEM (tight + readable)
+  const getColor = (n) => {
+    if (n.status === "attacked") return "#ff3b3b";
+    if (n.drift_score > 70) return "#ff6b00";
+    if (n.drift_score > 30) return "#f9c74f";
     return "#4cc9f0";
   };
 
-  const getGlow = (node) => {
-    const s = getState(node);
-    if (s === "attacked") return "0 0 40px #ff3b3b";
-    if (s === "critical") return "0 0 35px #ff6b00";
-    if (s === "drifting") return "0 0 20px #f9c74f";
-    return "0 0 20px #4cc9f0";
+  // ✨ GLOW SYSTEM (less fog, more signal)
+  const getGlow = (n) => {
+    if (n.status === "attacked") return "0 0 30px rgba(255, 59, 59, 0.8)";
+    if (n.shock > 1)
+      return `0 0 ${12 + n.shock}px rgba(255,255,255,0.6)`;
+    if (n.drift_score > 70)
+      return "0 0 25px rgba(255,107,0,0.7)";
+    if (n.drift_score > 30)
+      return "0 0 18px rgba(249,199,79,0.7)";
+    return "0 0 18px rgba(76,201,240,0.6)";
   };
 
-  const getSize = (node) => 60 + node.influence * 0.3;
+  // 📏 FIXED SIZE (NO JITTER)
+  const BASE_SIZE = 70;
 
   return (
     <div
       style={{
         background: "#05070d",
         height: "100vh",
-        color: "white",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
+        color: "white",
       }}
     >
-      <h1 style={{ marginBottom: "20px", letterSpacing: "2px" }}>
+      <h1
+        style={{
+          marginBottom: "30px",
+          letterSpacing: "3px",
+          fontWeight: "300",
+        }}
+      >
         FLUXLOCK LIVE NETWORK
       </h1>
 
+      {/* GRID */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(5, 120px)",
-          gap: "30px",
+          gridTemplateColumns: "repeat(5, 110px)",
+          gap: "28px",
         }}
       >
-        {nodes.map((node) => {
-          const state = getState(node);
+        {nodes.map((n) => (
+          <motion.div
+            key={n.id}
+            animate={{
+              scale:
+                n.status === "attacked"
+                  ? 0.5
+                  : n.shock > 1
+                  ? [1, 1.25, 1] // localized pulse
+                  : [1, 1.05, 1],
 
-          return (
-            <motion.div
-              key={node.id}
-              animate={{
-                width: getSize(node),
-                height: getSize(node),
-                opacity: state === "attacked" ? 0.4 : 1,
-                scale:
-                  state === "attacked"
-                    ? 0.5
-                    : state === "critical"
-                    ? [1, 1.2, 1]
-                    : [1, 1.05, 1],
-              }}
-              transition={{
-                duration: 1,
-                repeat: state === "attacked" ? 0 : Infinity,
-              }}
-              style={{
-                borderRadius: "50%",
-                background: getColor(node),
-                boxShadow: getGlow(node),
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "12px",
-              }}
-            >
-              {node.id}
-            </motion.div>
-          );
-        })}
+              opacity: n.status === "attacked" ? 0.35 : 1,
+            }}
+            transition={{
+              duration: 0.8,
+              repeat: n.status === "attacked" ? 0 : Infinity,
+            }}
+            style={{
+              width: BASE_SIZE,
+              height: BASE_SIZE,
+              borderRadius: "50%",
+              background: getColor(n),
+              boxShadow: getGlow(n),
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "12px",
+              fontWeight: "bold",
+            }}
+          >
+            {n.id}
+          </motion.div>
+        ))}
       </div>
 
+      {/* STATUS PANEL */}
       <div
         style={{
-          marginTop: "30px",
-          padding: "10px 20px",
-          background: "#0d1117",
+          marginTop: "35px",
+          padding: "12px 24px",
           border: "1px solid #222",
+          background: "#0d1117",
+          letterSpacing: "1px",
           fontSize: "14px",
-          minWidth: "320px",
+          minWidth: "360px",
           textAlign: "center",
         }}
       >
