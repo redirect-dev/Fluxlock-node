@@ -11,8 +11,14 @@ hex = "0.4"
 # 🔐 Post-quantum crypto (Dilithium)
 pqcrypto-dilithium = "0.5"
 pqcrypto-traits = "0.3"
+
+# 🎲 Random + utilities
 rand = "0.8"
 colored = "2"
+
+# 🧠 Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
+
+# 🌐 Lightweight HTTP server (KEEP THIS)
 tiny_http = "0.12"
