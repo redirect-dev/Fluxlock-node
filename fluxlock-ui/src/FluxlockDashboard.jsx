@@ -1,260 +1,336 @@
 import React, { useEffect, useState } from "react";
 
-const GRID_SIZE = 5;
 const NODE_COUNT = 20;
 
-function getNeighbors(id) {
-  const row = Math.floor(id / GRID_SIZE);
-  const col = id % GRID_SIZE;
+// -----------------------------
+// CREATE NODES (SPREAD START)
+// -----------------------------
+const createNodes = () => {
+  const centerX = window.innerWidth / 2;
+  const centerY = window.innerHeight / 2;
 
-  const neighbors = [];
+  return Array.from({ length: NODE_COUNT }, (_, i) => {
+    const angle = (i / NODE_COUNT) * Math.PI * 2;
+    const radius = 300 + Math.random() * 100;
 
-  for (let r = row - 1; r <= row + 1; r++) {
-    for (let c = col - 1; c <= col + 1; c++) {
+    return {
+      id: i,
+      x: centerX + Math.cos(angle) * radius,
+      y: centerY + Math.sin(angle) * radius,
+      vx: 0,
+      vy: 0,
+      trust: 85 + Math.random() * 15,
+      drift: 0,
+      attacked: false,
+      connections: [],
+    };
+  });
+};
+
+// -----------------------------
+// CONNECT NODES (REAL NETWORK)
+// -----------------------------
+const connectNodes = (nodes) => {
+  let updated = nodes.map(n => ({ ...n, connections: [] }));
+
+  // STEP 1: LOCAL NEIGHBORS
+  updated.forEach((node) => {
+    const neighbors = updated
+      .filter(n => n.id !== node.id)
+      .map(n => ({
+        id: n.id,
+        dist: Math.hypot(n.x - node.x, n.y - node.y)
+      }))
+      .sort((a, b) => a.dist - b.dist);
+
+    const connectionCount = 2 + Math.floor(Math.random() * 2);
+
+    neighbors.slice(0, connectionCount).forEach(({ id }) => {
+      if (!node.connections.includes(id)) {
+        node.connections.push(id);
+      }
+    });
+  });
+
+  // STEP 2: BIDIRECTIONAL FIX
+  updated.forEach((node) => {
+    node.connections.forEach((cid) => {
+      if (!updated[cid].connections.includes(node.id)) {
+        updated[cid].connections.push(node.id);
+      }
+    });
+  });
+
+  // STEP 3: NO ISOLATED NODES
+  updated.forEach((node) => {
+    if (node.connections.length === 0) {
+      const closest = updated
+        .filter(n => n.id !== node.id)
+        .map(n => ({
+          id: n.id,
+          dist: Math.hypot(n.x - node.x, n.y - node.y)
+        }))
+        .sort((a, b) => a.dist - b.dist)[0];
+
+      node.connections.push(closest.id);
+      updated[closest.id].connections.push(node.id);
+    }
+  });
+
+  // STEP 4: LIGHT RANDOM LINKS
+  updated.forEach((node) => {
+    if (Math.random() < 0.2) {
+      const target = Math.floor(Math.random() * updated.length);
       if (
-        r >= 0 &&
-        r < GRID_SIZE &&
-        c >= 0 &&
-        c < GRID_SIZE &&
-        !(r === row && c === col)
+        target !== node.id &&
+        !node.connections.includes(target)
       ) {
-        neighbors.push(r * GRID_SIZE + c);
+        node.connections.push(target);
+        updated[target].connections.push(node.id);
       }
     }
+  });
+
+  return updated;
+};
+
+// -----------------------------
+// PHYSICS (BALANCED)
+// -----------------------------
+const physicsStep = (nodes) => {
+  const updated = nodes.map(n => ({ ...n }));
+
+  const centerX = window.innerWidth / 2;
+  const centerY = window.innerHeight / 2;
+
+  updated.forEach((node) => {
+    let fx = 0;
+    let fy = 0;
+
+    // REPULSION
+    updated.forEach((other) => {
+      if (node.id === other.id) return;
+
+      const dx = node.x - other.x;
+      const dy = node.y - other.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) + 0.01;
+
+      const repulsion = 20000 / (dist * dist);
+      fx += (dx / dist) * repulsion;
+      fy += (dy / dist) * repulsion;
+    });
+
+    // SPRINGS
+    node.connections.forEach((cid) => {
+      const other = updated[cid];
+      if (!other) return;
+
+      const dx = other.x - node.x;
+      const dy = other.y - node.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) + 0.01;
+
+      const ideal = 180; // 🔥 tighter network
+      const spring = (dist - ideal) * 0.08;
+
+      fx += (dx / dist) * spring;
+      fy += (dy / dist) * spring;
+    });
+
+    // CENTERING
+    fx += (centerX - node.x) * 0.01;
+    fy += (centerY - node.y) * 0.01;
+
+    node.vx = (node.vx + fx) * 0.90;
+    node.vy = (node.vy + fy) * 0.90;
+
+// soft clamp instead of full stop
+if (Math.abs(node.vx) < 0.01) node.vx = 0;
+if (Math.abs(node.vy) < 0.01) node.vy = 0;
+
+    node.x += node.vx;
+    node.y += node.vy;
+  });
+
+  return updated;
+};
+
+// -----------------------------
+// TRUST PROPAGATION
+// -----------------------------
+const propagateTrust = (nodes) => {
+  return nodes.map((node) => {
+    let influence = 0;
+    let drift = node.drift * 0.9;
+
+    node.connections.forEach((cid) => {
+      const other = nodes[cid];
+      if (!other) return;
+
+      influence += (other.trust - 50) * 0.01;
+
+      if (other.attacked) drift += 2;
+    });
+
+    let trust = node.trust + influence - drift * 0.08;
+
+    if (node.attacked) trust -= 4;
+
+    trust = Math.max(0, Math.min(100, trust));
+
+    return { ...node, trust, drift };
+  });
+};
+
+// -----------------------------
+// EDGE STYLE
+// -----------------------------
+const getEdgeStyle = (a, b) => {
+  if (a.attacked || b.attacked) {
+    return { color: "rgba(255,80,80,0.9)", width: 2 };
   }
 
-  return neighbors;
-}
+  const avgTrust = (a.trust + b.trust) / 2;
 
-function createNode(id) {
   return {
-    id,
-    trust: 100,
-    drift: 0,
-    behavior: 100,
-    influence: 100,
-    status: "normal",
+    color: `rgba(80,200,255,${0.3 + avgTrust / 140})`,
+    width: 1 + avgTrust / 50,
   };
-}
+};
 
+// -----------------------------
+// COMPONENT
+// -----------------------------
 export default function FluxlockDashboard() {
-  const [nodes, setNodes] = useState(
-    Array.from({ length: NODE_COUNT }, (_, i) => createNode(i))
-  );
-
-  const [selectedNode, setSelectedNode] = useState(null);
+  const [nodes, setNodes] = useState([]);
+  const [selected, setSelected] = useState(null);
 
   useEffect(() => {
+    let base = createNodes();
+    base = connectNodes(base);
+
+    base[19].attacked = true;
+
+    setNodes(base);
+
     const interval = setInterval(() => {
-      setNodes((prev) => {
-        if (!prev || prev.length !== NODE_COUNT) return prev;
-
-        const updated = prev.map((n) => ({ ...n }));
-
-        const attacker = updated[19];
-        if (!attacker) return prev;
-
-        // =========================
-        // ⚠️ ATTACK PROGRESSION
-        // =========================
-        attacker.trust = Math.max(attacker.trust - 2, 0);
-        attacker.drift += 5;
-        attacker.behavior = Math.max(attacker.behavior - 2, 0);
-        attacker.influence = Math.max(attacker.influence - 3, 0);
-
-        if (attacker.trust < 40) attacker.status = "drifting";
-        if (attacker.trust < 20) attacker.status = "attacked";
-
-        // =========================
-        // 🌊 PROPAGATION (TUNED)
-        // =========================
-        const neighbors = getNeighbors(19);
-
-        neighbors.forEach((id) => {
-          const n = updated[id];
-          if (!n) return;
-
-          const resistance =
-            attacker.status === "attacked"
-              ? 0.3
-              : attacker.status === "drifting"
-              ? 0.6
-              : 1;
-
-          // 🔧 Slightly stronger propagation
-          n.trust = Math.max(n.trust - 1 * resistance, 0);
-          n.drift += 1 * resistance;
-          n.behavior = Math.max(n.behavior - 0.4 * resistance, 0);
-
-          // 🔧 Early awareness trigger (NEW)
-          if ((n.trust < 75 || n.drift > 5) && n.status === "normal") {
-            n.status = "suspicious";
-          }
-
-          // escalate if worsening
-          if (n.trust < 50 && n.status === "suspicious") {
-            n.status = "drifting";
-          }
-        });
-
-        // =========================
-        // 🔒 CONTAINMENT
-        // =========================
-        if (attacker.status === "attacked") {
-          attacker.influence = Math.max(attacker.influence - 10, 0);
-        }
-
-        // =========================
-        // 🌱 PASSIVE RECOVERY
-        // =========================
-        updated.forEach((n) => {
-          if (n.status === "normal") {
-            n.trust = Math.min(n.trust + 0.2, 100);
-            n.behavior = Math.min(n.behavior + 0.1, 100);
-          }
-        });
-
-        return updated;
+      setNodes(prev => {
+        let next = physicsStep(prev);
+        next = propagateTrust(next);
+        return [...next];
       });
-    }, 1000);
+    }, 80);
 
     return () => clearInterval(interval);
   }, []);
 
-  function getNodeColor(node) {
-    if (node.status === "attacked") return "#ff3b3b";
-    if (node.status === "drifting") return "#f59e0b";
-    if (node.status === "suspicious") return "#facc15";
+  const getNodeColor = (node) => {
+    if (node.attacked) return "#ff3b3b";
+    if (node.drift > 30) return "#ffcc00";
+    if (node.drift > 15) return "#ffaa00";
     return "#4cc9f0";
-  }
-
-  function getGlow(node) {
-    if (node.status === "attacked")
-      return "0 0 35px rgba(255, 0, 0, 0.9)";
-    if (node.status === "drifting")
-      return "0 0 25px rgba(245, 158, 11, 0.8)";
-    if (node.status === "suspicious")
-      return "0 0 18px rgba(250, 204, 21, 0.7)";
-    return "0 0 18px rgba(76, 201, 240, 0.7)";
-  }
-
-  const attackedNode = nodes.find((n) => n.status === "attacked");
-
-  // 🔧 UPDATED COUNT (accurate adaptation)
-  const adaptingCount = nodes.filter(
-    (n) => n.status === "suspicious" || n.status === "drifting"
-  ).length;
+  };
 
   return (
-    <div
-      style={{
-        background: "radial-gradient(circle at center, #020617, #01030a)",
-        minHeight: "100vh",
-        color: "white",
-        padding: "20px",
-        fontFamily: "sans-serif",
-      }}
-    >
-      <h1
-        style={{
-          textAlign: "center",
-          fontSize: "48px",
-          letterSpacing: "4px",
-          marginBottom: "20px",
-          opacity: 0.9,
-        }}
-      >
+    <div style={{
+      width: "100vw",
+      height: "100vh",
+      background: "radial-gradient(circle at center, #020617, #000)",
+      overflow: "hidden",
+      position: "relative"
+    }}>
+      <h1 style={{
+        textAlign: "center",
+        color: "#e2e8f0",
+        fontWeight: 200,
+        letterSpacing: 4,
+        marginTop: 20
+      }}>
         FLUXLOCK NETWORK GRAPH
       </h1>
 
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        {/* GRID */}
+      <svg style={{ position: "absolute", width: "100%", height: "100%" }}>
+        {nodes.map(node =>
+          node.connections.map(cid => {
+            if (node.id > cid) return null;
+            const target = nodes[cid];
+            if (!target) return null;
+
+            const style = getEdgeStyle(node, target);
+
+            return (
+              <line
+                key={`${node.id}-${cid}`}
+                x1={node.x}
+                y1={node.y}
+                x2={target.x}
+                y2={target.y}
+                stroke={style.color}
+                strokeWidth={style.width}
+              />
+            );
+          })
+        )}
+      </svg>
+
+      {nodes.map(node => (
         <div
+          key={node.id}
+          onClick={() => setSelected(node)}
           style={{
-            display: "grid",
-            gridTemplateColumns: `repeat(${GRID_SIZE}, 110px)`,
-            gap: "30px",
+            position: "absolute",
+            left: node.x,
+            top: node.y,
+            transform: "translate(-50%, -50%)",
+            width: 42,
+            height: 42,
+            borderRadius: "50%",
+            background: getNodeColor(node),
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#fff",
+            fontSize: 12,
+            boxShadow:
+              node.attacked
+                ? "0 0 30px red"
+                : "0 0 18px rgba(0,200,255,0.7)",
           }}
         >
-          {nodes.map((node) => (
-            <div
-              key={node.id}
-              onClick={() => setSelectedNode(node)}
-              style={{
-                width: 90,
-                height: 90,
-                borderRadius: "50%",
-                background: getNodeColor(node),
-                boxShadow: getGlow(node),
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                fontWeight: "bold",
-                transition: "all 0.3s ease",
-              }}
-            >
-              {node.id}
-            </div>
-          ))}
+          {node.id}
         </div>
+      ))}
 
-        {/* SIDE PANEL */}
-        {selectedNode && (
-          <div
-            style={{
-              marginLeft: "50px",
-              minWidth: "260px",
-              padding: "25px",
-              border: "1px solid rgba(255,255,255,0.08)",
-              background: "rgba(255,255,255,0.03)",
-              backdropFilter: "blur(6px)",
-            }}
-          >
-            <h2>Validator {selectedNode.id}</h2>
-            <p>Trust: {selectedNode.trust.toFixed(2)}</p>
-            <p>Drift: {selectedNode.drift.toFixed(2)}</p>
-            <p>Behavior: {selectedNode.behavior.toFixed(2)}</p>
-            <p>Influence: {selectedNode.influence.toFixed(2)}</p>
-            <p>Status: {selectedNode.status}</p>
-
-            <button
-              onClick={() => setSelectedNode(null)}
-              style={{
-                marginTop: "20px",
-                padding: "10px",
-                width: "100%",
-                background: "transparent",
-                border: "1px solid rgba(255,255,255,0.2)",
-                color: "white",
-                cursor: "pointer",
-              }}
-            >
-              Close
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* STATUS BAR */}
-      <div
-        style={{
-          position: "fixed",
-          bottom: "20px",
-          left: "50%",
-          transform: "translateX(-50%)",
-          padding: "14px 35px",
-          borderRadius: "8px",
+      {selected && (
+        <div style={{
+          position: "absolute",
+          right: 40,
+          top: 120,
+          width: 260,
+          padding: 20,
           border: "1px solid rgba(255,255,255,0.1)",
-          background: "rgba(0,0,0,0.65)",
-          backdropFilter: "blur(10px)",
-          fontSize: "16px",
-          letterSpacing: "1px",
-        }}
-      >
-        {attackedNode
-          ? `🚨 Instability detected — ${adaptingCount} nodes adapting`
-          : "System stable — trust network intact"}
+          borderRadius: 8,
+          color: "#e2e8f0",
+          background: "rgba(0,0,0,0.4)"
+        }}>
+          <h3>Validator {selected.id}</h3>
+          <p>Trust: {selected.trust.toFixed(2)}</p>
+          <p>Drift: {selected.drift.toFixed(2)}</p>
+          <p>Status: {selected.attacked ? "attacked" : "normal"}</p>
+          <button onClick={() => setSelected(null)}>Close</button>
+        </div>
+      )}
+
+      <div style={{
+        position: "absolute",
+        bottom: 40,
+        left: "50%",
+        transform: "translateX(-50%)",
+        padding: "10px 20px",
+        borderRadius: 8,
+        background: "rgba(0,0,0,0.5)",
+        color: "#e2e8f0"
+      }}>
+        Adaptive trust network — stabilized topology
       </div>
     </div>
   );
