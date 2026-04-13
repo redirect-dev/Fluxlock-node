@@ -1,6 +1,3 @@
-use fluxlock_protocol::state::account::Account;
-use fluxlock_protocol::pq;
-
 fn main() {
     println!("🧪 CLEAN SIMULATION ENTRY\n");
     run_simulation();
@@ -11,7 +8,6 @@ struct Validator {
     name: String,
     stake: u128,
     reputation: i32,
-    suspicion_timer: i32,
     trust_penalty: i32,
     valid_identity: bool,
 }
@@ -22,7 +18,6 @@ impl Validator {
             name: name.to_string(),
             stake: 1000,
             reputation: 100,
-            suspicion_timer: 0,
             trust_penalty: 0,
             valid_identity: true,
         }
@@ -36,165 +31,91 @@ impl Validator {
         if !self.valid_identity {
             return 0.0;
         }
-
         let stake_weight = self.stake as f64 / 1000.0;
         (self.effective_reputation() as f64) * stake_weight
-    }
-
-    fn status(&self) -> &'static str {
-        if !self.valid_identity {
-            return "INVALID_IDENTITY";
-        }
-
-        if self.reputation < 20 {
-            return "EXILED";
-        }
-
-        if self.stake == 0 {
-            return "BANKRUPT";
-        }
-
-        if self.suspicion_timer > 0 {
-            return "UNDER_REVIEW";
-        }
-
-        if self.stake >= 200 && self.effective_reputation() >= 60 {
-            return "HEALTHY";
-        }
-
-        if self.stake >= 200 {
-            return "UNTRUSTED";
-        }
-
-        "RECOVERING"
     }
 }
 
 fn run_simulation() {
-    println!("🧪 Fluxlock Phase 19 — Conflict Resolution\n");
+    println!("🧪 Fluxlock Phase 20 — Fork Resolution\n");
 
     let mut validators = vec![
         Validator::new("Validator A (Honest)"),
-        Validator::new("Validator B (Broken Identity)"),
+        Validator::new("Validator B (Broken)"),
         Validator::new("Validator C (Aggressive)"),
     ];
 
-    // Identity setup
-    let mut accounts: Vec<Account> = vec![];
-
-    for i in 0..3 {
-        let (pq_pk, _) = pq::generate_keypair();
-
-        let acc = Account::new(
-            1000,
-            format!("identity_{}", i).as_bytes().to_vec(),
-            pq_pk,
-        );
-
-        accounts.push(acc);
-    }
-
-    println!("⚡ Identity Validation Phase\n");
-
+    // Identity validation
+    println!("⚡ Identity Validation\n");
     for v in validators.iter_mut() {
         if v.name.contains("Broken") {
             v.valid_identity = false;
-            println!("❌ {} FAILED identity chain", v.name);
+            println!("❌ {} INVALID", v.name);
         } else {
-            println!("✅ {} PASSED identity chain", v.name);
+            println!("✅ {} VALID", v.name);
         }
     }
 
+    // Behavior shaping
     println!("\n🌱 Behavior Phase\n");
 
-    for round in 0..4 {
+    for round in 0..3 {
         println!("--- Round {} ---", round + 1);
 
         for v in validators.iter_mut() {
-            if v.suspicion_timer > 0 {
-                v.suspicion_timer -= 1;
-            }
-
             if !v.valid_identity {
-                println!("{} → BLOCKED", v.name);
                 continue;
             }
 
-            // Honest
             if v.name.contains("Honest") {
                 v.reputation += 5;
             }
 
-            // Aggressive
-            if v.name.contains("Aggressive") {
-                if round < 2 {
-                    v.suspicion_timer = 3;
-                    v.trust_penalty += 10;
-                    v.reputation -= 5;
-                }
+            if v.name.contains("Aggressive") && round < 2 {
+                v.trust_penalty += 10;
+                v.reputation -= 5;
             }
 
             println!(
-                "{} → rep: {} | eff_rep: {} | influence: {:.2} | status: {}",
+                "{} → eff_rep: {} | influence: {:.2}",
                 v.name,
-                v.reputation,
                 v.effective_reputation(),
-                v.influence(),
-                v.status()
+                v.influence()
             );
         }
     }
 
-    // 🔥 CONFLICT SIMULATION
-    println!("\n⚔️ Conflict Simulation\n");
+    // Fork simulation
+    println!("\n🌐 Fork Simulation\n");
 
-    let mut decisions = vec![];
+    let mut chain_valid_weight = 0.0;
+    let mut chain_invalid_weight = 0.0;
 
     for v in validators.iter() {
         if !v.valid_identity {
             continue;
         }
 
-        let vote = if v.name.contains("Honest") {
-            "VALID"
+        if v.name.contains("Honest") {
+            println!("{} builds VALID chain", v.name);
+            chain_valid_weight += v.influence();
         } else if v.name.contains("Aggressive") {
-            "INVALID"
-        } else {
-            "ABSTAIN"
-        };
-
-        decisions.push((v.name.clone(), vote, v.influence()));
-    }
-
-    println!("Votes:");
-
-    let mut valid_weight = 0.0;
-    let mut invalid_weight = 0.0;
-
-    for (name, vote, influence) in &decisions {
-        println!("{} → {} (weight {:.2})", name, vote, influence);
-
-        match *vote {
-            "VALID" => valid_weight += influence,
-            "INVALID" => invalid_weight += influence,
-            _ => {}
+            println!("{} builds INVALID chain", v.name);
+            chain_invalid_weight += v.influence();
         }
     }
 
-    println!("\n⚖️ Weighted Result:");
+    println!("\n⚖️ Chain Weights:");
+    println!("VALID chain weight: {:.2}", chain_valid_weight);
+    println!("INVALID chain weight: {:.2}", chain_invalid_weight);
 
-    println!("VALID weight: {:.2}", valid_weight);
-    println!("INVALID weight: {:.2}", invalid_weight);
+    println!("\n🏆 FINAL CHAIN:");
 
-    println!("\n🏆 FINAL DECISION:");
-
-    if valid_weight > invalid_weight {
-        println!("✔ TRANSACTION ACCEPTED");
-    } else if invalid_weight > valid_weight {
-        println!("❌ TRANSACTION REJECTED");
+    if chain_valid_weight > chain_invalid_weight {
+        println!("✔ VALID chain survives");
     } else {
-        println!("⚠️ TIE — NO CONSENSUS");
+        println!("❌ INVALID chain survives");
     }
 
-    println!("\n✅ Phase 19 Complete");
+    println!("\n✅ Phase 20 Complete");
 }
