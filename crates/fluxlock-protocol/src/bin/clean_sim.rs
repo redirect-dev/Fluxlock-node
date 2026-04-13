@@ -13,10 +13,10 @@ struct Validator {
 }
 
 impl Validator {
-    fn new(name: &str) -> Self {
+    fn new(name: &str, stake: u128) -> Self {
         Self {
             name: name.to_string(),
-            stake: 1000,
+            stake,
             reputation: 100,
             trust_penalty: 0,
             valid_identity: true,
@@ -31,17 +31,23 @@ impl Validator {
         if !self.valid_identity {
             return 0.0;
         }
-        let stake_weight = self.stake as f64 / 1000.0;
-        (self.effective_reputation() as f64) * stake_weight
+
+        // 🔥 Dampened stake (non-linear)
+        let stake_weight = (self.stake as f64 / 1000.0).sqrt();
+
+        // 🔥 Trust gating (THIS is the key upgrade)
+        let trust_factor = (self.effective_reputation() as f64) / 100.0;
+
+        (self.effective_reputation() as f64) * stake_weight * trust_factor
     }
 }
 
 fn run_simulation() {
-    println!("🧪 Fluxlock Phase 23 — Slow Corruption Attack\n");
+    println!("🧪 Fluxlock Phase 26 — Trust-Gated Stake\n");
 
     let mut validators = vec![
-        Validator::new("Validator A (Honest)"),
-        Validator::new("Validator C (Slow Corruptor)"),
+        Validator::new("Validator A (Honest)", 1000),
+        Validator::new("Validator C (Wealthy Attacker)", 3000),
     ];
 
     println!("⚡ Identity Validation\n");
@@ -51,7 +57,6 @@ fn run_simulation() {
 
     println!("\n🌱 Trust Building Phase\n");
 
-    // Build trust equally first
     for round in 0..3 {
         println!("--- Build Round {} ---", round + 1);
 
@@ -59,61 +64,63 @@ fn run_simulation() {
             v.reputation += 5;
 
             println!(
-                "{} → eff_rep: {} | influence: {:.2}",
+                "{} → stake: {} | eff_rep: {} | trust_factor: {:.2} | influence: {:.2}",
                 v.name,
+                v.stake,
                 v.effective_reputation(),
+                v.effective_reputation() as f64 / 100.0,
                 v.influence()
             );
         }
     }
 
-    println!("\n🐍 Slow Corruption Phase\n");
+    println!("\n⚠️ ATTACK PHASE\n");
 
-    // Subtle degradation (no big penalties)
-    for round in 0..5 {
-        println!("--- Corruption Round {} ---", round + 1);
+    for round in 0..3 {
+        println!("--- Attack Round {} ---", round + 1);
 
         for v in validators.iter_mut() {
-            if v.name.contains("Slow Corruptor") {
-                // small degradation each round
-                v.trust_penalty += 3;
-                v.reputation -= 2;
+            if v.name.contains("Attacker") {
+                v.trust_penalty += 5;
+                v.reputation -= 3;
             } else {
-                v.reputation += 3;
+                v.reputation += 5;
             }
 
             println!(
-                "{} → eff_rep: {} | influence: {:.2}",
+                "{} → stake: {} | eff_rep: {} | trust_factor: {:.2} | influence: {:.2}",
                 v.name,
+                v.stake,
                 v.effective_reputation(),
+                v.effective_reputation() as f64 / 100.0,
                 v.influence()
             );
         }
     }
 
-    println!("\n⚔️ Conflict After Slow Corruption\n");
+    println!("\n⚔️ Conflict: Trust-Gated Wealth vs Honest Behavior\n");
 
     let mut honest_weight = 0.0;
-    let mut corruptor_weight = 0.0;
+    let mut attacker_weight = 0.0;
 
     for v in validators.iter() {
         if v.name.contains("Honest") {
             honest_weight += v.influence();
         } else {
-            corruptor_weight += v.influence();
+            attacker_weight += v.influence();
         }
     }
 
     println!("Honest weight: {:.2}", honest_weight);
-    println!("Corruptor weight: {:.2}", corruptor_weight);
+    println!("Attacker weight: {:.2}", attacker_weight);
 
     println!("\n🏆 FINAL RESULT:");
 
-    if honest_weight > corruptor_weight {
-        println!("✔ Honest validator resists slow corruption");
+    if honest_weight > attacker_weight {
+        println!("✔ Trust outweighs wealth (gated)");
     } else {
-        println!("❌ Slow corruption attack succeeds");
+        println!("❌ Wealth still dominates (needs stronger gating)");
     }
 
-    println!("\n✅ Phase 23 Complete");
+    println!("\n✅ Phase 26 Complete");
 }
