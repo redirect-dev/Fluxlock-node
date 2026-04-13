@@ -71,7 +71,7 @@ impl Validator {
 }
 
 fn run_simulation() {
-    println!("🧪 Fluxlock Phase 18 — Influence & Consensus\n");
+    println!("🧪 Fluxlock Phase 19 — Conflict Resolution\n");
 
     let mut validators = vec![
         Validator::new("Validator A (Honest)"),
@@ -107,7 +107,7 @@ fn run_simulation() {
 
     println!("\n🌱 Behavior Phase\n");
 
-    for round in 0..6 {
+    for round in 0..4 {
         println!("--- Round {} ---", round + 1);
 
         for v in validators.iter_mut() {
@@ -122,18 +122,11 @@ fn run_simulation() {
 
             // Honest
             if v.name.contains("Honest") {
-                if v.stake < 200 {
-                    v.stake += 50;
-                }
                 v.reputation += 5;
             }
 
             // Aggressive
             if v.name.contains("Aggressive") {
-                if v.stake < 200 {
-                    v.stake += 100;
-                }
-
                 if round < 2 {
                     v.suspicion_timer = 3;
                     v.trust_penalty += 10;
@@ -152,31 +145,56 @@ fn run_simulation() {
         }
     }
 
-    // 🔥 CONSENSUS CALCULATION
-    println!("\n⚖️ Network Influence\n");
+    // 🔥 CONFLICT SIMULATION
+    println!("\n⚔️ Conflict Simulation\n");
 
-    let mut ranked = validators.clone();
+    let mut decisions = vec![];
 
-    ranked.sort_by(|a, b| b.influence().partial_cmp(&a.influence()).unwrap());
+    for v in validators.iter() {
+        if !v.valid_identity {
+            continue;
+        }
 
-    for v in ranked.iter() {
-        println!(
-            "{} → Influence: {:.2} | Status: {}",
-            v.name,
-            v.influence(),
-            v.status()
-        );
+        let vote = if v.name.contains("Honest") {
+            "VALID"
+        } else if v.name.contains("Aggressive") {
+            "INVALID"
+        } else {
+            "ABSTAIN"
+        };
+
+        decisions.push((v.name.clone(), vote, v.influence()));
     }
 
-    println!("\n🏆 Consensus Leader:");
+    println!("Votes:");
 
-    if let Some(top) = ranked.first() {
-        if top.influence() > 0.0 {
-            println!("✔ {}", top.name);
-        } else {
-            println!("❌ No valid leader");
+    let mut valid_weight = 0.0;
+    let mut invalid_weight = 0.0;
+
+    for (name, vote, influence) in &decisions {
+        println!("{} → {} (weight {:.2})", name, vote, influence);
+
+        match *vote {
+            "VALID" => valid_weight += influence,
+            "INVALID" => invalid_weight += influence,
+            _ => {}
         }
     }
 
-    println!("\n✅ Phase 18 Complete");
+    println!("\n⚖️ Weighted Result:");
+
+    println!("VALID weight: {:.2}", valid_weight);
+    println!("INVALID weight: {:.2}", invalid_weight);
+
+    println!("\n🏆 FINAL DECISION:");
+
+    if valid_weight > invalid_weight {
+        println!("✔ TRANSACTION ACCEPTED");
+    } else if invalid_weight > valid_weight {
+        println!("❌ TRANSACTION REJECTED");
+    } else {
+        println!("⚠️ TIE — NO CONSENSUS");
+    }
+
+    println!("\n✅ Phase 19 Complete");
 }
