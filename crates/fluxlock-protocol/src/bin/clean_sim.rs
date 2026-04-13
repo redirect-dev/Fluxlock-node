@@ -32,6 +32,15 @@ impl Validator {
         self.reputation - self.trust_penalty
     }
 
+    fn influence(&self) -> f64 {
+        if !self.valid_identity {
+            return 0.0;
+        }
+
+        let stake_weight = self.stake as f64 / 1000.0;
+        (self.effective_reputation() as f64) * stake_weight
+    }
+
     fn status(&self) -> &'static str {
         if !self.valid_identity {
             return "INVALID_IDENTITY";
@@ -62,15 +71,15 @@ impl Validator {
 }
 
 fn run_simulation() {
-    println!("🧪 Fluxlock Phase 17 — Identity + Behavior Fusion (Fixed)\n");
+    println!("🧪 Fluxlock Phase 18 — Influence & Consensus\n");
 
     let mut validators = vec![
-        Validator::new("Validator A (Valid Chain)"),
-        Validator::new("Validator B (Broken Chain)"),
-        Validator::new("Validator C (Valid but Aggressive)"),
+        Validator::new("Validator A (Honest)"),
+        Validator::new("Validator B (Broken Identity)"),
+        Validator::new("Validator C (Aggressive)"),
     ];
 
-    // 🔥 Simulated identity creation
+    // Identity setup
     let mut accounts: Vec<Account> = vec![];
 
     for i in 0..3 {
@@ -96,7 +105,7 @@ fn run_simulation() {
         }
     }
 
-    println!("\n🌱 Behavior + Identity Combined\n");
+    println!("\n🌱 Behavior Phase\n");
 
     for round in 0..6 {
         println!("--- Round {} ---", round + 1);
@@ -107,12 +116,12 @@ fn run_simulation() {
             }
 
             if !v.valid_identity {
-                println!("{} → BLOCKED (invalid identity)", v.name);
+                println!("{} → BLOCKED", v.name);
                 continue;
             }
 
             // Honest
-            if v.name.contains("Valid Chain") {
+            if v.name.contains("Honest") {
                 if v.stake < 200 {
                     v.stake += 50;
                 }
@@ -133,16 +142,41 @@ fn run_simulation() {
             }
 
             println!(
-                "{} → stake: {} | rep: {} | eff_rep: {} | penalty: {} | status: {}",
+                "{} → rep: {} | eff_rep: {} | influence: {:.2} | status: {}",
                 v.name,
-                v.stake,
                 v.reputation,
                 v.effective_reputation(),
-                v.trust_penalty,
+                v.influence(),
                 v.status()
             );
         }
     }
 
-    println!("\n✅ Phase 17 Complete");
+    // 🔥 CONSENSUS CALCULATION
+    println!("\n⚖️ Network Influence\n");
+
+    let mut ranked = validators.clone();
+
+    ranked.sort_by(|a, b| b.influence().partial_cmp(&a.influence()).unwrap());
+
+    for v in ranked.iter() {
+        println!(
+            "{} → Influence: {:.2} | Status: {}",
+            v.name,
+            v.influence(),
+            v.status()
+        );
+    }
+
+    println!("\n🏆 Consensus Leader:");
+
+    if let Some(top) = ranked.first() {
+        if top.influence() > 0.0 {
+            println!("✔ {}", top.name);
+        } else {
+            println!("❌ No valid leader");
+        }
+    }
+
+    println!("\n✅ Phase 18 Complete");
 }
