@@ -1,229 +1,210 @@
 // epochs.js
-// PHASE 44 — TRUST DIFFUSION ENABLED
+// PHASE 5 SAFE — NO GRAPH BREAK VERSION
 
-function hashString(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const chr = str.charCodeAt(i);
-    hash = (hash << 5) - hash + chr;
-    hash |= 0;
-  }
-  return Math.abs(hash).toString(16);
+function randomKey() {
+  return Math.random().toString(16).slice(2, 10);
 }
 
-function createEpoch(node) {
-  return {
-    epochId: node.id,
-    epochAge: 0,
-    epochWeight: 1,
-    epochKey: "",
-    epochValid: true,
-    recovering: false,
-  };
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
 }
 
-export function ensureNodeEpoch(node) {
-  if (
-    node.epochId !== undefined &&
-    node.epochAge !== undefined &&
-    node.epochWeight !== undefined &&
-    node.epochKey !== undefined &&
-    node.epochValid !== undefined
-  ) {
-    return node;
-  }
-
-  return {
-    ...node,
-    ...createEpoch(node),
-  };
-}
-
+// ------------------------------
+// Ensure schema (CRITICAL)
+// ------------------------------
 export function ensureAllEpochs(nodes) {
-  return nodes.map(ensureNodeEpoch);
+  return nodes.map(node => ({
+    ...node,
+    connections: Array.isArray(node.connections) ? node.connections : [],
+    trust: node.trust ?? 0,
+    drift: node.drift ?? 0,
+    influence: node.influence ?? 0,
+
+    epochId: node.epochId ?? node.id,
+    epochKey: node.epochKey ?? randomKey(),
+    epochAge: node.epochAge ?? 0,
+    epochWeight: node.epochWeight ?? 1,
+    epochValid: node.epochValid ?? true,
+
+    epochHistory: node.epochHistory ?? [],
+  }));
 }
 
-export function generateEpochKey(node) {
-  const base = `${node.id}|${node.epochAge}|${node.epochWeight.toFixed(
-    4
-  )}|${Math.round(node.trust)}|${node.status}`;
-
-  return hashString(base);
-}
-
-// =======================
-// EPOCH
-// =======================
+// ------------------------------
+// Epoch progression
+// ------------------------------
 export function runEpoch(nodes) {
-  return nodes.map((node) => {
-    const n = ensureNodeEpoch(node);
+  return nodes.map(node => {
+    const updated = { ...node };
 
-    const epochAge = n.epochAge + 1;
-    const epochWeight = Math.max(0.1, n.epochWeight * 0.995);
+    updated.epochAge += 1;
+    updated.epochWeight = Math.exp(-updated.epochAge / 200);
 
-    const updated = {
-      ...n,
-      epochAge,
-      epochWeight,
-    };
+    if (updated.epochAge > 50) {
+      updated.epochHistory = [
+        ...updated.epochHistory,
+        {
+          key: updated.epochKey,
+          trust: updated.trust,
+        },
+      ].slice(-10);
 
-    return {
-      ...updated,
-      epochKey: generateEpochKey(updated),
-      epochValid: true,
-    };
-  });
-}
-
-// =======================
-// VALIDATION
-// =======================
-export function validateEpochs(nodes) {
-  return nodes.map((node) => {
-    const expectedKey = generateEpochKey(node);
-    const isValid = node.epochKey === expectedKey;
-
-    return {
-      ...node,
-      epochValid: isValid,
-      recovering: isValid && node.trust < 20, // 🔥 earlier recovery trigger
-    };
-  });
-}
-
-// =======================
-// TAMPER
-// =======================
-export function tamperNode(nodes) {
-  return nodes.map((node) => {
-    if (node.id === 19 && node.epochAge > 10 && node.epochAge < 40) {
-      return {
-        ...node,
-        epochKey: "tampered_key",
-      };
+      updated.epochKey = randomKey();
+      updated.epochAge = 0;
+      updated.epochValid = true;
     }
-    return node;
+
+    return updated;
   });
 }
 
-// =======================
-// ENFORCEMENT
-// =======================
-export function enforceEpochRules(nodes) {
-  return nodes.map((node) => {
-    if (node.recovering) return node;
+// ------------------------------
+// Validation
+// ------------------------------
+export function validateEpochs(nodes) {
+  return nodes.map(node => ({
+    ...node,
+    epochValid: node.epochKey !== "tampered_key",
+  }));
+}
 
+// ------------------------------
+// Attack (SAFE)
+// ------------------------------
+export function tamperNode(nodes) {
+  if (Math.random() < 0.1) {
+    const i = Math.floor(Math.random() * nodes.length);
+    const updated = [...nodes];
+
+    updated[i] = {
+      ...updated[i],
+      epochKey: "tampered_key",
+      trust: updated[i].trust - 20,
+      drift: updated[i].drift + 50,
+      status: "attacked",
+    };
+
+    return updated;
+  }
+
+  return nodes;
+}
+
+// ------------------------------
+// Enforcement
+// ------------------------------
+export function enforceEpochRules(nodes) {
+  return nodes.map(node => {
     if (!node.epochValid) {
       return {
         ...node,
-        trust: node.trust * 0.5,
-        influence: node.influence * 0.2,
+        trust: node.trust - 3,
+        drift: node.drift + 5,
       };
     }
     return node;
   });
 }
 
-// =======================
-// DISCONNECT
-// =======================
+// ------------------------------
+// 🔥 IMPORTANT: DO NOT REMOVE CONNECTIONS
+// ------------------------------
 export function disconnectInvalidNodes(nodes) {
-  const invalidIds = new Set(
-    nodes.filter(n => !n.epochValid).map(n => n.id)
-  );
-
-  return nodes.map((node) => {
-    const filteredConnections = node.connections.filter(
-      (id) => !invalidIds.has(id)
-    );
-
-    return {
-      ...node,
-      connections: node.epochValid ? filteredConnections : [],
-    };
-  });
+  // no-op for stability
+  return nodes;
 }
 
-// =======================
-// RECOVERY
-// =======================
+// ------------------------------
+// Recovery
+// ------------------------------
 export function recoverNodes(nodes) {
-  return nodes.map((node) => {
-    if (!node.epochValid && node.epochAge > 40) {
+  return nodes.map(node => {
+    if (node.epochValid) {
       return {
         ...node,
-        epochKey: generateEpochKey(node),
-        epochValid: true,
+        trust: node.trust + 1.5,
+        drift: node.drift * 0.9,
       };
     }
     return node;
   });
 }
 
-// =======================
-// 🧬 TRUST DIFFUSION (NEW)
-// =======================
+// ------------------------------
+// Diffusion (SAFE)
+// ------------------------------
 export function diffuseTrust(nodes) {
-  return nodes.map((node) => {
+  return nodes.map(node => {
     if (!node.connections.length) return node;
 
     let total = 0;
     let count = 0;
 
-    node.connections.forEach((id) => {
-      const neighbor = nodes[id];
-      if (!neighbor) return;
-
-      total += neighbor.trust;
-      count++;
+    node.connections.forEach(id => {
+      const n = nodes[id];
+      if (n && typeof n.trust === "number") {
+        total += n.trust;
+        count++;
+      }
     });
 
-    if (count === 0) return node;
+    if (!count) return node;
 
-    const avgNeighborTrust = total / count;
-
-    // 🔥 Pull node toward neighbor average
-    const adjustment = (avgNeighborTrust - node.trust) * 0.05;
+    const avg = total / count;
 
     return {
       ...node,
-      trust: node.trust + adjustment,
+      trust: node.trust + (avg - node.trust) * 0.05,
     };
   });
 }
 
-// =======================
-// REHABILITATION
-// =======================
+// ------------------------------
+// 🧬 Lineage (SAFE)
+// ------------------------------
+function applyLineage(nodes) {
+  return nodes.map(node => {
+    if (!node.epochHistory.length) return node;
+
+    const avg =
+      node.epochHistory.reduce((a, b) => a + b.trust, 0) /
+      node.epochHistory.length;
+
+    return {
+      ...node,
+      trust: node.trust + (avg - node.trust) * 0.02,
+    };
+  });
+}
+
+// ------------------------------
+// Rehabilitation
+// ------------------------------
 export function rehabilitateNodes(nodes) {
-  return nodes.map((node) => {
-    if (node.recovering) {
+  return nodes.map(node => {
+    if (!node.epochValid && node.drift < 100) {
       return {
         ...node,
-        trust: node.trust + 4,      // 🔥 stronger push
-        influence: node.influence + 2,
+        epochKey: randomKey(),
+        epochValid: true,
+        status: "warning",
       };
     }
-
-    if (node.epochValid && node.trust < 50) {
-      return {
-        ...node,
-        trust: node.trust + 1,
-        influence: node.influence + 0.5,
-      };
-    }
-
     return node;
   });
 }
 
-// =======================
-// FINAL CLAMP
-// =======================
+// ------------------------------
+// Final stabilizer
+// ------------------------------
 export function stabilizeNetwork(nodes) {
-  return nodes.map((node) => ({
+  let updated = diffuseTrust(nodes);
+  updated = applyLineage(updated);
+
+  return updated.map(node => ({
     ...node,
-    trust: Math.max(-100, Math.min(100, node.trust)),
-    influence: Math.max(-1000, Math.min(1000, node.influence)),
+    trust: clamp(node.trust, -100, 100),
+    drift: clamp(node.drift, 0, 1000),
+    influence: clamp(node.influence, 0, 300),
   }));
 }
