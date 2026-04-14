@@ -1,6 +1,5 @@
-// ==============================
-// FLUXLOCK TRUST ENGINE (WORKING BASE)
-// ==============================
+// trustEngine.js
+// 🔥 FINAL BALANCED SYSTEM
 
 export function createNetwork(size = 20) {
   const nodes = [];
@@ -8,69 +7,80 @@ export function createNetwork(size = 20) {
   for (let i = 0; i < size; i++) {
     nodes.push({
       id: i,
-      trust: 90 + Math.random() * 10,
+      trust: 70 + Math.random() * 20,
+      influence: 50 + Math.random() * 20,
       drift: 0,
-      behavior: 90 + Math.random() * 10,
-      influence: 50 + Math.random() * 50,
-      status: "normal",
+      status: "healthy",
       connections: [],
-      x: 0,
-      y: 0,
     });
   }
 
-  nodes.forEach((node) => {
-    const connectionCount = 3 + Math.floor(Math.random() * 3);
+  nodes.forEach(node => {
+    const numConnections = 4 + Math.floor(Math.random() * 4);
+    const connections = new Set();
 
-    for (let i = 0; i < connectionCount; i++) {
-      const target = Math.floor(Math.random() * nodes.length);
-
-      if (target !== node.id && !node.connections.includes(target)) {
-        node.connections.push(target);
-      }
+    while (connections.size < numConnections) {
+      const target = Math.floor(Math.random() * size);
+      if (target !== node.id) connections.add(target);
     }
+
+    node.connections = Array.from(connections);
   });
 
   return nodes;
 }
 
 export function simulateStep(nodes) {
-  const updated = nodes.map((n) => ({ ...n }));
+  return nodes.map(node => {
+    let trust = node.trust;
+    let drift = node.drift;
+    let status = node.status;
 
-  const attacker = updated[19];
-
-  if (attacker.status === "normal") {
-    attacker.status = "drifting";
-  } else if (attacker.status === "drifting") {
-    attacker.status = "attacked";
-  }
-
-  attacker.trust -= 10;
-  attacker.drift += 20;
-  attacker.behavior -= 10;
-  attacker.influence -= 15;
-
-  updated.forEach((node) => {
-    if (node.id === attacker.id) return;
-
-    const isConnected = node.connections.includes(attacker.id);
-
-    if (isConnected) {
-      node.trust -= 5;
-      node.drift += 8;
-
-      if (node.drift > 25 && node.status === "normal") {
-        node.status = "warning";
-      }
-
-      if (node.drift > 60) {
-        node.status = "drifting";
-      }
+    // =========================
+    // 🔥 SHORTER ATTACK WINDOW
+    // =========================
+    if (node.id === 19 && drift < 150) {
+      drift += 15;
+      trust -= 4; // softer hit
+      status = "attacked";
     }
 
-    node.trust = Math.max(0, node.trust);
-    node.influence = Math.max(0, node.influence);
-  });
+    // =========================
+    // 🔥 DRIFT DECAY (FASTER)
+    // =========================
+    else if (drift > 0) {
+      drift *= 0.75;              // faster decay
+      trust -= drift * 0.015;     // lighter damage
+      status = "drifting";
+    }
 
-  return updated;
+    // =========================
+    // 🔥 STRONGER NATURAL HEALING
+    // =========================
+    else {
+      drift = Math.max(0, drift - 3);
+      trust += 2.5;               // 🔥 stronger recovery
+      status = "healthy";
+    }
+
+    // =========================
+    // 🔥 HARD CLAMP
+    // =========================
+    trust = Math.max(-100, Math.min(100, trust));
+
+    // =========================
+    // 🔥 STATUS NORMALIZATION
+    // =========================
+    if (trust > 60) status = "healthy";
+    else if (trust > 30) status = "warning";
+    else if (trust > 0) status = "drifting";
+    else status = "attacked";
+
+    return {
+      ...node,
+      trust,
+      drift,
+      status,
+    };
+  });
 }

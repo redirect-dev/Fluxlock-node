@@ -10,6 +10,9 @@ import {
   enforceEpochRules,
   disconnectInvalidNodes,
   recoverNodes,
+  diffuseTrust,        // 🔥 NEW
+  rehabilitateNodes,
+  stabilizeNetwork,
 } from "./epochs";
 
 function App() {
@@ -32,8 +35,12 @@ function App() {
         updated = enforceEpochRules(updated);
         updated = disconnectInvalidNodes(updated);
 
-        // 🌱 RECOVERY STEP
         updated = recoverNodes(updated);
+
+        // 🔥 NEW ORDER (CRITICAL)
+        updated = diffuseTrust(updated);      // ← NETWORK HEALING
+        updated = rehabilitateNodes(updated); // ← SELF RECOVERY
+        updated = stabilizeNetwork(updated);  // ← HARD LIMIT
 
         return updated;
       });

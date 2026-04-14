@@ -1,5 +1,5 @@
 // epochs.js
-// PHASE 41 — RECOVERY ADDED
+// PHASE 44 — TRUST DIFFUSION ENABLED
 
 function hashString(str) {
   let hash = 0;
@@ -18,6 +18,7 @@ function createEpoch(node) {
     epochWeight: 1,
     epochKey: "",
     epochValid: true,
+    recovering: false,
   };
 }
 
@@ -50,6 +51,9 @@ export function generateEpochKey(node) {
   return hashString(base);
 }
 
+// =======================
+// EPOCH
+// =======================
 export function runEpoch(nodes) {
   return nodes.map((node) => {
     const n = ensureNodeEpoch(node);
@@ -71,7 +75,9 @@ export function runEpoch(nodes) {
   });
 }
 
-// 🔍 VALIDATION
+// =======================
+// VALIDATION
+// =======================
 export function validateEpochs(nodes) {
   return nodes.map((node) => {
     const expectedKey = generateEpochKey(node);
@@ -80,11 +86,14 @@ export function validateEpochs(nodes) {
     return {
       ...node,
       epochValid: isValid,
+      recovering: isValid && node.trust < 20, // 🔥 earlier recovery trigger
     };
   });
 }
 
-// 🔥 TAMPER TEST
+// =======================
+// TAMPER
+// =======================
 export function tamperNode(nodes) {
   return nodes.map((node) => {
     if (node.id === 19 && node.epochAge > 10 && node.epochAge < 40) {
@@ -97,9 +106,13 @@ export function tamperNode(nodes) {
   });
 }
 
-// 🚨 ENFORCEMENT
+// =======================
+// ENFORCEMENT
+// =======================
 export function enforceEpochRules(nodes) {
   return nodes.map((node) => {
+    if (node.recovering) return node;
+
     if (!node.epochValid) {
       return {
         ...node,
@@ -111,7 +124,9 @@ export function enforceEpochRules(nodes) {
   });
 }
 
-// 🔌 DISCONNECT
+// =======================
+// DISCONNECT
+// =======================
 export function disconnectInvalidNodes(nodes) {
   const invalidIds = new Set(
     nodes.filter(n => !n.epochValid).map(n => n.id)
@@ -129,22 +144,86 @@ export function disconnectInvalidNodes(nodes) {
   });
 }
 
-// 🌱 RECOVERY SYSTEM
+// =======================
+// RECOVERY
+// =======================
 export function recoverNodes(nodes) {
   return nodes.map((node) => {
-    // recovery condition
     if (!node.epochValid && node.epochAge > 40) {
-      const recovered = {
+      return {
         ...node,
-        epochKey: generateEpochKey(node), // regenerate correct key
+        epochKey: generateEpochKey(node),
         epochValid: true,
-        trust: Math.max(5, node.trust + 10), // small trust restore
-        influence: Math.max(1, node.influence + 5),
       };
+    }
+    return node;
+  });
+}
 
-      return recovered;
+// =======================
+// 🧬 TRUST DIFFUSION (NEW)
+// =======================
+export function diffuseTrust(nodes) {
+  return nodes.map((node) => {
+    if (!node.connections.length) return node;
+
+    let total = 0;
+    let count = 0;
+
+    node.connections.forEach((id) => {
+      const neighbor = nodes[id];
+      if (!neighbor) return;
+
+      total += neighbor.trust;
+      count++;
+    });
+
+    if (count === 0) return node;
+
+    const avgNeighborTrust = total / count;
+
+    // 🔥 Pull node toward neighbor average
+    const adjustment = (avgNeighborTrust - node.trust) * 0.05;
+
+    return {
+      ...node,
+      trust: node.trust + adjustment,
+    };
+  });
+}
+
+// =======================
+// REHABILITATION
+// =======================
+export function rehabilitateNodes(nodes) {
+  return nodes.map((node) => {
+    if (node.recovering) {
+      return {
+        ...node,
+        trust: node.trust + 4,      // 🔥 stronger push
+        influence: node.influence + 2,
+      };
+    }
+
+    if (node.epochValid && node.trust < 50) {
+      return {
+        ...node,
+        trust: node.trust + 1,
+        influence: node.influence + 0.5,
+      };
     }
 
     return node;
   });
+}
+
+// =======================
+// FINAL CLAMP
+// =======================
+export function stabilizeNetwork(nodes) {
+  return nodes.map((node) => ({
+    ...node,
+    trust: Math.max(-100, Math.min(100, node.trust)),
+    influence: Math.max(-1000, Math.min(1000, node.influence)),
+  }));
 }
