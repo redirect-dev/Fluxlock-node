@@ -1,5 +1,5 @@
 // ==============================
-// FLUXLOCK TRUST ENGINE (PHASE 36)
+// FLUXLOCK TRUST ENGINE (WORKING BASE)
 // ==============================
 
 export function createNetwork(size = 20) {
@@ -14,17 +14,17 @@ export function createNetwork(size = 20) {
       influence: 50 + Math.random() * 50,
       status: "normal",
       connections: [],
-      x: Math.random() * 800,
-      y: Math.random() * 500,
+      x: 0,
+      y: 0,
     });
   }
 
-  // Create random connections
   nodes.forEach((node) => {
     const connectionCount = 3 + Math.floor(Math.random() * 3);
 
     for (let i = 0; i < connectionCount; i++) {
       const target = Math.floor(Math.random() * nodes.length);
+
       if (target !== node.id && !node.connections.includes(target)) {
         node.connections.push(target);
       }
@@ -37,8 +37,7 @@ export function createNetwork(size = 20) {
 export function simulateStep(nodes) {
   const updated = nodes.map((n) => ({ ...n }));
 
-  // Pick attacker
-  const attacker = updated[19]; // keep consistent for demo
+  const attacker = updated[19];
 
   if (attacker.status === "normal") {
     attacker.status = "drifting";
@@ -51,7 +50,6 @@ export function simulateStep(nodes) {
   attacker.behavior -= 10;
   attacker.influence -= 15;
 
-  // Propagation
   updated.forEach((node) => {
     if (node.id === attacker.id) return;
 
@@ -70,7 +68,6 @@ export function simulateStep(nodes) {
       }
     }
 
-    // clamp values
     node.trust = Math.max(0, node.trust);
     node.influence = Math.max(0, node.influence);
   });

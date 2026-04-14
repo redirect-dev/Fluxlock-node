@@ -1,182 +1,230 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { runEpoch, rebalanceTrust } from "./epochs";
 
 const NODE_COUNT = 20;
-const WIDTH = 900;
-const HEIGHT = 600;
-const RADIUS = 220;
-const CENTER_X = WIDTH / 2;
-const CENTER_Y = HEIGHT / 2;
+const RADIUS = 260;
+const CENTER = 350;
+const MAX_EDGES_PER_NODE = 4;
+
+// 🔗 Smart edge builder (CONTROLLED)
+const buildEdges = (nodes) => {
+  const edges = [];
+  const connectionCount = {};
+
+  nodes.forEach((n) => (connectionCount[n.id] = 0));
+
+  const tryAddEdge = (a, b) => {
+    if (a === b) return;
+
+    if (
+      connectionCount[a] >= MAX_EDGES_PER_NODE ||
+      connectionCount[b] >= MAX_EDGES_PER_NODE
+    )
+      return;
+
+    if (nodes[a].status === "attacked" || nodes[b].status === "attacked")
+      return;
+
+    const exists = edges.some(
+      ([x, y]) => (x === a && y === b) || (x === b && y === a)
+    );
+
+    if (!exists) {
+      edges.push([a, b]);
+      connectionCount[a]++;
+      connectionCount[b]++;
+    }
+  };
+
+  nodes.forEach((node) => {
+    const next = (node.id + 1) % nodes.length;
+    const prev = (node.id - 1 + nodes.length) % nodes.length;
+
+    // 🔵 Ring stability (baseline)
+    tryAddEdge(node.id, next);
+    tryAddEdge(node.id, prev);
+
+    // 🧠 Smart skip connection (like real networks)
+    const skip = (node.id + 3) % nodes.length;
+    tryAddEdge(node.id, skip);
+
+    // 🟢 Immune nodes get ONE extra strategic link
+    if (node.immune) {
+      const target = (node.id + 10) % nodes.length;
+      tryAddEdge(node.id, target);
+    }
+
+    // 🟠 Medium trust nodes get occasional link
+    if (node.trust > 60 && Math.random() < 0.3) {
+      const random =
+        nodes[Math.floor(Math.random() * nodes.length)].id;
+      tryAddEdge(node.id, random);
+    }
+  });
+
+  return edges;
+};
+
+const createInitialNodes = () =>
+  Array.from({ length: NODE_COUNT }, (_, i) => ({
+    id: i,
+    angle: (i / NODE_COUNT) * 2 * Math.PI,
+    trust: 100,
+    drift: 0,
+    status: "normal",
+    immune: false,
+  }));
 
 export default function FluxlockDashboard() {
-  const [nodes, setNodes] = useState([]);
-  const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const [nodes, setNodes] = useState(createInitialNodes());
+  const [edges, setEdges] = useState([]);
+  const [selected, setSelected] = useState(null);
 
-  // 👉 Live selected node
-  const selectedNode = nodes.find(n => n.id === selectedNodeId);
-
-  // 🧠 Initialize network
+  // 🔴 Initial attack
   useEffect(() => {
-    const initial = Array.from({ length: NODE_COUNT }).map((_, i) => {
-      const angle = (i / NODE_COUNT) * Math.PI * 2;
-
-      return {
-        id: i,
-        x: CENTER_X + Math.cos(angle) * RADIUS,
-        y: CENTER_Y + Math.sin(angle) * RADIUS,
-        trust: 100,
-        drift: 0,
-        status: "normal",
-        neighbors: [],
-      };
-    });
-
-    // 🔥 HYBRID TOPOLOGY (fixes ring problem)
-    initial.forEach((node) => {
-      const others = initial.filter(n => n.id !== node.id);
-
-      // 🔹 2 nearest neighbors (local structure)
-      const nearest = others
-        .map(n => ({
-          id: n.id,
-          dist: Math.hypot(node.x - n.x, node.y - n.y)
-        }))
-        .sort((a, b) => a.dist - b.dist)
-        .slice(0, 2)
-        .map(n => n.id);
-
-      // 🔹 1 random long-range connection (break symmetry)
-      const random =
-        others[Math.floor(Math.random() * others.length)].id;
-
-      node.neighbors = [...new Set([...nearest, random])];
-    });
-
-    // 🔴 Simulate attack
-    initial[19].status = "attacked";
-    initial[19].trust = 0;
-
-    setNodes(initial);
+    setNodes((prev) =>
+      prev.map((n) =>
+        n.id === 19 ? { ...n, status: "attacked", trust: 0 } : n
+      )
+    );
   }, []);
+
+  // 🔴 Attack spread
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNodes((prev) =>
+        prev.map((node) => {
+          if (node.status === "attacked") {
+            return {
+              ...node,
+              drift: node.drift + 5,
+              trust: Math.max(0, node.trust - 5),
+            };
+          }
+
+          if (!node.immune && node.trust < 30 && Math.random() < 0.15) {
+            return { ...node, status: "attacked" };
+          }
+
+          return node;
+        })
+      );
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // 🟢 Healing
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNodes((prev) =>
+        prev.map((node) => {
+          if (node.status === "attacked") return node;
+
+          const trust = Math.min(100, node.trust + 2);
+          const drift = Math.max(0, node.drift - 2);
+          const immune = trust > 90 && drift < 5;
+
+          return { ...node, trust, drift, immune };
+        })
+      );
+    }, 1200);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // 🔁 Epoch engine
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNodes((prev) => {
+        let updated = runEpoch(prev);
+        updated = rebalanceTrust(updated);
+        return updated;
+      });
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // 🔗 Controlled edge rebuild
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setEdges(buildEdges(nodes));
+    }, 800);
+
+    return () => clearInterval(interval);
+  }, [nodes]);
+
+  const getColor = (node) => {
+    if (node.immune) return "#22c55e";
+    if (node.status === "attacked") return "#ff3b3b";
+    if (node.trust < 40) return "#f59e0b";
+    return "#4cc9f0";
+  };
+
+  const getPosition = (node) => ({
+    x: CENTER + RADIUS * Math.cos(node.angle),
+    y: CENTER + RADIUS * Math.sin(node.angle),
+  });
 
   return (
     <div style={{ background: "#020617", height: "100vh", color: "white" }}>
-      
-      {/* 🧠 TITLE */}
-      <h1
-        style={{
-          textAlign: "center",
-          letterSpacing: "4px",
-          fontWeight: "300",
-          marginBottom: "10px"
-        }}
-      >
+      <h1 style={{ textAlign: "center", letterSpacing: "6px" }}>
         FLUXLOCK NETWORK GRAPH
       </h1>
 
-      {/* 🔷 GRAPH */}
-      <svg
-        width={WIDTH}
-        height={HEIGHT}
-        style={{ display: "block", margin: "0 auto" }}
-      >
+      <svg width="100%" height="100%">
         {/* 🔗 EDGES */}
-        {nodes.map(node =>
-          node.neighbors.map(nId => {
-            const target = nodes.find(n => n.id === nId);
-            if (!target) return null;
+        {edges.map(([a, b], i) => {
+          const p1 = getPosition(nodes[a]);
+          const p2 = getPosition(nodes[b]);
 
-            const isAttackEdge =
-              node.status === "attacked" ||
-              target.status === "attacked";
-
-            return (
-              <line
-                key={`${node.id}-${nId}`}
-                x1={node.x}
-                y1={node.y}
-                x2={target.x}
-                y2={target.y}
-                stroke={isAttackEdge ? "#ff3b3b" : "#38bdf8"}
-                strokeWidth={isAttackEdge ? 2.5 : 1.5}
-                opacity={0.85}
-              />
-            );
-          })
-        )}
+          return (
+            <line
+              key={i}
+              x1={p1.x}
+              y1={p1.y}
+              x2={p2.x}
+              y2={p2.y}
+              stroke="#4cc9f0"
+              strokeOpacity="0.35"
+            />
+          );
+        })}
 
         {/* 🔵 NODES */}
-        {nodes.map(node => (
-          <g
-            key={node.id}
-            onClick={() => setSelectedNodeId(node.id)}
-            style={{ cursor: "pointer" }}
-          >
-            <circle
-              cx={node.x}
-              cy={node.y}
-              r={18}
-              fill={
-                node.status === "attacked"
-                  ? "#ff3b3b"
-                  : node.trust < 50
-                  ? "#f59e0b"
-                  : "#38bdf8"
-              }
-              style={{
-                filter: "drop-shadow(0 0 10px rgba(56,189,248,0.6))"
-              }}
-            />
-            <text
-              x={node.x}
-              y={node.y + 4}
-              textAnchor="middle"
-              fontSize="10"
-              fill="#fff"
-            >
-              {node.id}
-            </text>
-          </g>
-        ))}
+        {nodes.map((node) => {
+          const { x, y } = getPosition(node);
+
+          return (
+            <g key={node.id}>
+              <circle
+                cx={x}
+                cy={y}
+                r={18}
+                fill={getColor(node)}
+                onClick={() => setSelected(node)}
+                style={{ cursor: "pointer" }}
+              />
+              <text x={x} y={y + 4} textAnchor="middle" fontSize="10">
+                {node.id}
+              </text>
+            </g>
+          );
+        })}
       </svg>
 
-      {/* 📊 SIDE PANEL */}
-      {selectedNode && (
-        <div
-          style={{
-            position: "absolute",
-            right: "40px",
-            top: "120px",
-            background: "#0f172a",
-            padding: "20px",
-            borderRadius: "10px",
-            width: "220px",
-            boxShadow: "0 0 20px rgba(0,0,0,0.5)"
-          }}
-        >
-          <h3>Validator {selectedNode.id}</h3>
-          <p>Trust: {selectedNode.trust.toFixed(2)}</p>
-          <p>Drift: {selectedNode.drift.toFixed(2)}</p>
-          <p>Status: {selectedNode.status}</p>
-
-          <button
-            onClick={() => setSelectedNodeId(null)}
-            style={{ marginTop: "10px" }}
-          >
-            Close
-          </button>
+      {/* 📊 PANEL */}
+      {selected && (
+        <div style={{ position: "absolute", right: 40, top: 120 }}>
+          <h3>Validator {selected.id}</h3>
+          <p>Trust: {selected.trust.toFixed(2)}</p>
+          <p>Drift: {selected.drift.toFixed(2)}</p>
+          <p>Status: {selected.status}</p>
+          <p>Immune: {selected.immune ? "Yes" : "No"}</p>
+          <button onClick={() => setSelected(null)}>Close</button>
         </div>
       )}
-
-      {/* 🧠 FOOTER */}
-      <div
-        style={{
-          textAlign: "center",
-          marginTop: "10px",
-          opacity: 0.7
-        }}
-      >
-        Adaptive trust network — stabilized topology
-      </div>
     </div>
   );
 }
