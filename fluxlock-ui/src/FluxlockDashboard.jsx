@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { runEpoch, rebalanceTrust } from "./epochs";
+import {
+  runEpoch,
+  rebalanceTrust,
+  ensureAllEpochs,
+  ensureNodeEpoch,
+} from "./epochs";
 
 const NODE_COUNT = 20;
 const RADIUS = 260;
 const CENTER = 350;
 const MAX_EDGES_PER_NODE = 4;
 
-// 🔗 Smart edge builder (CONTROLLED)
 const buildEdges = (nodes) => {
   const edges = [];
   const connectionCount = {};
@@ -40,21 +44,17 @@ const buildEdges = (nodes) => {
     const next = (node.id + 1) % nodes.length;
     const prev = (node.id - 1 + nodes.length) % nodes.length;
 
-    // 🔵 Ring stability (baseline)
     tryAddEdge(node.id, next);
     tryAddEdge(node.id, prev);
 
-    // 🧠 Smart skip connection (like real networks)
     const skip = (node.id + 3) % nodes.length;
     tryAddEdge(node.id, skip);
 
-    // 🟢 Immune nodes get ONE extra strategic link
     if (node.immune) {
       const target = (node.id + 10) % nodes.length;
       tryAddEdge(node.id, target);
     }
 
-    // 🟠 Medium trust nodes get occasional link
     if (node.trust > 60 && Math.random() < 0.3) {
       const random =
         nodes[Math.floor(Math.random() * nodes.length)].id;
@@ -76,77 +76,85 @@ const createInitialNodes = () =>
   }));
 
 export default function FluxlockDashboard() {
-  const [nodes, setNodes] = useState(createInitialNodes());
+  const [nodes, setNodes] = useState(() =>
+    ensureAllEpochs(createInitialNodes())
+  );
   const [edges, setEdges] = useState([]);
-  const [selected, setSelected] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
 
-  // 🔴 Initial attack
   useEffect(() => {
     setNodes((prev) =>
-      prev.map((n) =>
-        n.id === 19 ? { ...n, status: "attacked", trust: 0 } : n
+      ensureAllEpochs(
+        prev.map((n) =>
+          n.id === 19 ? { ...n, status: "attacked", trust: 0 } : n
+        )
       )
     );
   }, []);
 
-  // 🔴 Attack spread
   useEffect(() => {
     const interval = setInterval(() => {
       setNodes((prev) =>
-        prev.map((node) => {
-          if (node.status === "attacked") {
-            return {
-              ...node,
-              drift: node.drift + 5,
-              trust: Math.max(0, node.trust - 5),
-            };
-          }
+        ensureAllEpochs(
+          prev.map((node) => {
+            node = ensureNodeEpoch(node);
 
-          if (!node.immune && node.trust < 30 && Math.random() < 0.15) {
-            return { ...node, status: "attacked" };
-          }
+            if (node.status === "attacked") {
+              return {
+                ...node,
+                drift: node.drift + 5,
+                trust: Math.max(0, node.trust - 5),
+              };
+            }
 
-          return node;
-        })
+            if (!node.immune && node.trust < 30 && Math.random() < 0.15) {
+              return { ...node, status: "attacked" };
+            }
+
+            return node;
+          })
+        )
       );
     }, 1500);
 
     return () => clearInterval(interval);
   }, []);
 
-  // 🟢 Healing
   useEffect(() => {
     const interval = setInterval(() => {
       setNodes((prev) =>
-        prev.map((node) => {
-          if (node.status === "attacked") return node;
+        ensureAllEpochs(
+          prev.map((node) => {
+            node = ensureNodeEpoch(node);
 
-          const trust = Math.min(100, node.trust + 2);
-          const drift = Math.max(0, node.drift - 2);
-          const immune = trust > 90 && drift < 5;
+            if (node.status === "attacked") return node;
 
-          return { ...node, trust, drift, immune };
-        })
+            const trust = Math.min(100, node.trust + 2);
+            const drift = Math.max(0, node.drift - 2);
+            const immune = trust > 90 && drift < 5;
+
+            return { ...node, trust, drift, immune };
+          })
+        )
       );
     }, 1200);
 
     return () => clearInterval(interval);
   }, []);
 
-  // 🔁 Epoch engine
   useEffect(() => {
     const interval = setInterval(() => {
       setNodes((prev) => {
-        let updated = runEpoch(prev);
+        let updated = ensureAllEpochs(prev);
+        updated = runEpoch(updated);
         updated = rebalanceTrust(updated);
-        return updated;
+        return ensureAllEpochs(updated);
       });
     }, 10000);
 
     return () => clearInterval(interval);
   }, []);
 
-  // 🔗 Controlled edge rebuild
   useEffect(() => {
     const interval = setInterval(() => {
       setEdges(buildEdges(nodes));
@@ -154,6 +162,8 @@ export default function FluxlockDashboard() {
 
     return () => clearInterval(interval);
   }, [nodes]);
+
+  const selectedNode = nodes.find((n) => n.id === selectedId);
 
   const getColor = (node) => {
     if (node.immune) return "#22c55e";
@@ -174,7 +184,6 @@ export default function FluxlockDashboard() {
       </h1>
 
       <svg width="100%" height="100%">
-        {/* 🔗 EDGES */}
         {edges.map(([a, b], i) => {
           const p1 = getPosition(nodes[a]);
           const p2 = getPosition(nodes[b]);
@@ -192,7 +201,6 @@ export default function FluxlockDashboard() {
           );
         })}
 
-        {/* 🔵 NODES */}
         {nodes.map((node) => {
           const { x, y } = getPosition(node);
 
@@ -203,7 +211,7 @@ export default function FluxlockDashboard() {
                 cy={y}
                 r={18}
                 fill={getColor(node)}
-                onClick={() => setSelected(node)}
+                onClick={() => setSelectedId(node.id)}
                 style={{ cursor: "pointer" }}
               />
               <text x={x} y={y + 4} textAnchor="middle" fontSize="10">
@@ -214,15 +222,21 @@ export default function FluxlockDashboard() {
         })}
       </svg>
 
-      {/* 📊 PANEL */}
-      {selected && (
+      {selectedNode && (
         <div style={{ position: "absolute", right: 40, top: 120 }}>
-          <h3>Validator {selected.id}</h3>
-          <p>Trust: {selected.trust.toFixed(2)}</p>
-          <p>Drift: {selected.drift.toFixed(2)}</p>
-          <p>Status: {selected.status}</p>
-          <p>Immune: {selected.immune ? "Yes" : "No"}</p>
-          <button onClick={() => setSelected(null)}>Close</button>
+          <h3>Validator {selectedNode.id}</h3>
+          <p>Trust: {selectedNode.trust.toFixed(2)}</p>
+          <p>Drift: {selectedNode.drift.toFixed(2)}</p>
+          <p>Status: {selectedNode.status}</p>
+          <p>Immune: {selectedNode.immune ? "Yes" : "No"}</p>
+
+          <hr />
+
+          <p>Epoch ID: {selectedNode.epochId}</p>
+          <p>Epoch Age: {selectedNode.epochAge}</p>
+          <p>Epoch Weight: {selectedNode.epochWeight}</p>
+
+          <button onClick={() => setSelectedId(null)}>Close</button>
         </div>
       )}
     </div>

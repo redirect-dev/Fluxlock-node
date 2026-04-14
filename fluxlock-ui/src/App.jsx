@@ -2,15 +2,28 @@ import { useEffect, useState } from "react";
 import * as d3 from "d3";
 import "./index.css";
 import { createNetwork, simulateStep } from "./trustEngine";
+import { ensureAllEpochs, runEpoch } from "./epochs";
 
 function App() {
-  const [nodes, setNodes] = useState(() => createNetwork());
-  const [selectedNode, setSelectedNode] = useState(null);
+  const [nodes, setNodes] = useState(() =>
+    ensureAllEpochs(createNetwork())
+  );
+  const [selectedId, setSelectedId] = useState(null);
 
   // simulation loop
   useEffect(() => {
     const interval = setInterval(() => {
-      setNodes((prev) => simulateStep(prev));
+      setNodes((prev) => {
+        let updated = simulateStep(prev);
+
+        // 🔥 ensure epochs always exist
+        updated = ensureAllEpochs(updated);
+
+        // 🔁 run epoch progression
+        updated = runEpoch(updated);
+
+        return updated;
+      });
     }, 1500);
 
     return () => clearInterval(interval);
@@ -25,14 +38,12 @@ function App() {
     const height = 600;
     const radius = 220;
 
-    // position nodes
     nodes.forEach((node, i) => {
       const angle = (i / nodes.length) * 2 * Math.PI;
       node.x = width / 2 + radius * Math.cos(angle);
       node.y = height / 2 + radius * Math.sin(angle);
     });
 
-    // links
     nodes.forEach((node) => {
       node.connections.forEach((targetId) => {
         const target = nodes[targetId];
@@ -47,7 +58,6 @@ function App() {
       });
     });
 
-    // nodes
     const nodeSelection = svg.selectAll(".node")
       .data(nodes)
       .enter()
@@ -63,13 +73,11 @@ function App() {
         return "#22c55e";
       });
 
-    // 🔥 FIXED CLICK HANDLER
+    // ✅ FIXED: store ID, not object
     nodeSelection.on("click", function (event, d) {
-      console.log("CLICKED NODE:", d); // debug
-      setSelectedNode({ ...d }); // force React update
+      setSelectedId(d.id);
     });
 
-    // labels
     svg.selectAll(".label")
       .data(nodes)
       .enter()
@@ -83,6 +91,9 @@ function App() {
 
   }, [nodes]);
 
+  // ✅ derived node (NO stale state)
+  const selectedNode = nodes.find(n => n.id === selectedId);
+
   return (
     <div>
       <h1>FLUXLOCK NETWORK GRAPH</h1>
@@ -95,7 +106,15 @@ function App() {
           <p>Drift: {selectedNode.drift.toFixed(2)}</p>
           <p>Status: {selectedNode.status}</p>
           <p>Influence: {selectedNode.influence.toFixed(2)}</p>
-          <button onClick={() => setSelectedNode(null)}>Close</button>
+
+          <hr />
+
+          {/* 🔥 EPOCH DATA (NOW WILL SHOW) */}
+          <p>Epoch ID: {selectedNode.epochId}</p>
+          <p>Epoch Age: {selectedNode.epochAge}</p>
+          <p>Epoch Weight: {selectedNode.epochWeight}</p>
+
+          <button onClick={() => setSelectedId(null)}>Close</button>
         </div>
       )}
     </div>
