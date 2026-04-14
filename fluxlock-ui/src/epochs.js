@@ -1,5 +1,5 @@
 // epochs.js
-// PHASE 39 — KEYS + VALIDATION + TAMPER + ENFORCEMENT
+// PHASE 40 — KEYS + VALIDATION + TAMPER + ENFORCEMENT + DISCONNECT
 
 function hashString(str) {
   let hash = 0;
@@ -103,10 +103,30 @@ export function enforceEpochRules(nodes) {
     if (!node.epochValid) {
       return {
         ...node,
-        trust: node.trust * 0.5,           // 🔻 rapid decay
-        influence: node.influence * 0.2,   // 🔻 near zero
+        trust: node.trust * 0.5,
+        influence: node.influence * 0.2,
       };
     }
     return node;
+  });
+}
+
+// 🔌 FULL DISCONNECT (BIDIRECTIONAL CLEANUP)
+export function disconnectInvalidNodes(nodes) {
+  // collect invalid node IDs
+  const invalidIds = new Set(
+    nodes.filter(n => !n.epochValid).map(n => n.id)
+  );
+
+  return nodes.map((node) => {
+    // remove ALL connections pointing to invalid nodes
+    const filteredConnections = node.connections.filter(
+      (id) => !invalidIds.has(id)
+    );
+
+    return {
+      ...node,
+      connections: node.epochValid ? filteredConnections : [], // invalid = no edges at all
+    };
   });
 }

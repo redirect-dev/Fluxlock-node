@@ -8,6 +8,7 @@ import {
   validateEpochs,
   tamperNode,
   enforceEpochRules,
+  disconnectInvalidNodes,
 } from "./epochs";
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
   );
   const [selectedId, setSelectedId] = useState(null);
 
+  // 🔁 Simulation loop
   useEffect(() => {
     const interval = setInterval(() => {
       setNodes((prev) => {
@@ -24,14 +26,17 @@ function App() {
         updated = ensureAllEpochs(updated);
         updated = runEpoch(updated);
 
-        // 🔥 tamper
+        // 🔥 Simulated attack
         updated = tamperNode(updated);
 
-        // 🔍 validate
+        // 🔍 Validate identity
         updated = validateEpochs(updated);
 
-        // 🚨 enforce
+        // 🚨 Enforce penalties
         updated = enforceEpochRules(updated);
+
+        // 🔌 Disconnect invalid nodes
+        updated = disconnectInvalidNodes(updated);
 
         return updated;
       });
@@ -40,6 +45,7 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // 🎨 Render graph
   useEffect(() => {
     const svg = d3.select("#graph");
     svg.selectAll("*").remove();
@@ -54,6 +60,7 @@ function App() {
       node.y = height / 2 + radius * Math.sin(angle);
     });
 
+    // Draw connections
     nodes.forEach((node) => {
       node.connections.forEach((targetId) => {
         const target = nodes[targetId];
@@ -68,6 +75,7 @@ function App() {
       });
     });
 
+    // Draw nodes
     const nodeSelection = svg.selectAll(".node")
       .data(nodes)
       .enter()
@@ -77,7 +85,7 @@ function App() {
       .attr("cy", d => d.y)
       .attr("r", 10)
       .attr("fill", d => {
-        if (!d.epochValid) return "#ff00ff";
+        if (!d.epochValid) return "#ff00ff"; // invalid = purple
         if (d.status === "attacked") return "#ef4444";
         if (d.status === "drifting") return "#f97316";
         if (d.status === "warning") return "#facc15";
@@ -88,6 +96,7 @@ function App() {
       setSelectedId(d.id);
     });
 
+    // Labels
     svg.selectAll(".label")
       .data(nodes)
       .enter()
