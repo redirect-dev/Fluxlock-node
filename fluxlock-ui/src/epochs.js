@@ -1,5 +1,5 @@
 // epochs.js
-// PHASE 39 — KEY GENERATION + VALIDATION
+// PHASE 39 — KEYS + VALIDATION + TAMPER + ENFORCEMENT
 
 function hashString(str) {
   let hash = 0;
@@ -63,28 +63,50 @@ export function runEpoch(nodes) {
       epochWeight,
     };
 
-    const newKey = generateEpochKey(updated);
-
     return {
       ...updated,
-      epochKey: newKey,
-      epochValid: true, // will validate separately
+      epochKey: generateEpochKey(updated),
+      epochValid: true,
     };
   });
 }
 
-/**
- * 🔍 VALIDATION STEP
- */
+// 🔍 VALIDATION
 export function validateEpochs(nodes) {
   return nodes.map((node) => {
     const expectedKey = generateEpochKey(node);
-
     const isValid = node.epochKey === expectedKey;
 
     return {
       ...node,
       epochValid: isValid,
     };
+  });
+}
+
+// 🔥 TAMPER TEST
+export function tamperNode(nodes) {
+  return nodes.map((node) => {
+    if (node.id === 19 && node.epochAge > 10) {
+      return {
+        ...node,
+        epochKey: "tampered_key",
+      };
+    }
+    return node;
+  });
+}
+
+// 🚨 ENFORCEMENT
+export function enforceEpochRules(nodes) {
+  return nodes.map((node) => {
+    if (!node.epochValid) {
+      return {
+        ...node,
+        trust: node.trust * 0.5,           // 🔻 rapid decay
+        influence: node.influence * 0.2,   // 🔻 near zero
+      };
+    }
+    return node;
   });
 }

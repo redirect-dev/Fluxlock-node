@@ -6,6 +6,8 @@ import {
   ensureAllEpochs,
   runEpoch,
   validateEpochs,
+  tamperNode,
+  enforceEpochRules,
 } from "./epochs";
 
 function App() {
@@ -22,8 +24,14 @@ function App() {
         updated = ensureAllEpochs(updated);
         updated = runEpoch(updated);
 
-        // 🔥 VALIDATION STEP
+        // 🔥 tamper
+        updated = tamperNode(updated);
+
+        // 🔍 validate
         updated = validateEpochs(updated);
+
+        // 🚨 enforce
+        updated = enforceEpochRules(updated);
 
         return updated;
       });
@@ -69,7 +77,7 @@ function App() {
       .attr("cy", d => d.y)
       .attr("r", 10)
       .attr("fill", d => {
-        if (!d.epochValid) return "#ff00ff"; // 🔥 INVALID = PURPLE
+        if (!d.epochValid) return "#ff00ff";
         if (d.status === "attacked") return "#ef4444";
         if (d.status === "drifting") return "#f97316";
         if (d.status === "warning") return "#facc15";
