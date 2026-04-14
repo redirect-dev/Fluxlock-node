@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import * as d3 from "d3";
 import "./index.css";
 import { createNetwork, simulateStep } from "./trustEngine";
-import { ensureAllEpochs, runEpoch } from "./epochs";
+import {
+  ensureAllEpochs,
+  runEpoch,
+  validateEpochs,
+} from "./epochs";
 
 function App() {
   const [nodes, setNodes] = useState(() =>
@@ -10,17 +14,16 @@ function App() {
   );
   const [selectedId, setSelectedId] = useState(null);
 
-  // simulation loop
   useEffect(() => {
     const interval = setInterval(() => {
       setNodes((prev) => {
         let updated = simulateStep(prev);
 
-        // 🔥 ensure epochs always exist
         updated = ensureAllEpochs(updated);
-
-        // 🔁 run epoch progression
         updated = runEpoch(updated);
+
+        // 🔥 VALIDATION STEP
+        updated = validateEpochs(updated);
 
         return updated;
       });
@@ -29,7 +32,6 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // render graph
   useEffect(() => {
     const svg = d3.select("#graph");
     svg.selectAll("*").remove();
@@ -67,13 +69,13 @@ function App() {
       .attr("cy", d => d.y)
       .attr("r", 10)
       .attr("fill", d => {
+        if (!d.epochValid) return "#ff00ff"; // 🔥 INVALID = PURPLE
         if (d.status === "attacked") return "#ef4444";
         if (d.status === "drifting") return "#f97316";
         if (d.status === "warning") return "#facc15";
         return "#22c55e";
       });
 
-    // ✅ FIXED: store ID, not object
     nodeSelection.on("click", function (event, d) {
       setSelectedId(d.id);
     });
@@ -91,7 +93,6 @@ function App() {
 
   }, [nodes]);
 
-  // ✅ derived node (NO stale state)
   const selectedNode = nodes.find(n => n.id === selectedId);
 
   return (
@@ -109,10 +110,19 @@ function App() {
 
           <hr />
 
-          {/* 🔥 EPOCH DATA (NOW WILL SHOW) */}
           <p>Epoch ID: {selectedNode.epochId}</p>
           <p>Epoch Age: {selectedNode.epochAge}</p>
-          <p>Epoch Weight: {selectedNode.epochWeight}</p>
+          <p>Epoch Weight: {selectedNode.epochWeight.toFixed(4)}</p>
+
+          <p><strong>Epoch Key:</strong></p>
+          <p style={{ wordBreak: "break-all", fontSize: "12px" }}>
+            {selectedNode.epochKey}
+          </p>
+
+          <p>
+            <strong>Valid:</strong>{" "}
+            {selectedNode.epochValid ? "YES ✅" : "NO ❌"}
+          </p>
 
           <button onClick={() => setSelectedId(null)}>Close</button>
         </div>
