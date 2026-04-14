@@ -1,5 +1,5 @@
 // epochs.js
-// PHASE 40 — KEYS + VALIDATION + TAMPER + ENFORCEMENT + DISCONNECT
+// PHASE 41 — RECOVERY ADDED
 
 function hashString(str) {
   let hash = 0;
@@ -87,7 +87,7 @@ export function validateEpochs(nodes) {
 // 🔥 TAMPER TEST
 export function tamperNode(nodes) {
   return nodes.map((node) => {
-    if (node.id === 19 && node.epochAge > 10) {
+    if (node.id === 19 && node.epochAge > 10 && node.epochAge < 40) {
       return {
         ...node,
         epochKey: "tampered_key",
@@ -111,22 +111,40 @@ export function enforceEpochRules(nodes) {
   });
 }
 
-// 🔌 FULL DISCONNECT (BIDIRECTIONAL CLEANUP)
+// 🔌 DISCONNECT
 export function disconnectInvalidNodes(nodes) {
-  // collect invalid node IDs
   const invalidIds = new Set(
     nodes.filter(n => !n.epochValid).map(n => n.id)
   );
 
   return nodes.map((node) => {
-    // remove ALL connections pointing to invalid nodes
     const filteredConnections = node.connections.filter(
       (id) => !invalidIds.has(id)
     );
 
     return {
       ...node,
-      connections: node.epochValid ? filteredConnections : [], // invalid = no edges at all
+      connections: node.epochValid ? filteredConnections : [],
     };
+  });
+}
+
+// 🌱 RECOVERY SYSTEM
+export function recoverNodes(nodes) {
+  return nodes.map((node) => {
+    // recovery condition
+    if (!node.epochValid && node.epochAge > 40) {
+      const recovered = {
+        ...node,
+        epochKey: generateEpochKey(node), // regenerate correct key
+        epochValid: true,
+        trust: Math.max(5, node.trust + 10), // small trust restore
+        influence: Math.max(1, node.influence + 5),
+      };
+
+      return recovered;
+    }
+
+    return node;
   });
 }
