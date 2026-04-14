@@ -1,30 +1,26 @@
-// ==============================
-// FLUXLOCK TRUST ENGINE (WORKING BASE)
-// ==============================
+// src/trustEngine.js
 
-export function createNetwork(size = 20) {
+export function createInitialNodes(count = 20) {
   const nodes = [];
 
-  for (let i = 0; i < size; i++) {
+  for (let i = 0; i < count; i++) {
     nodes.push({
       id: i,
-      trust: 90 + Math.random() * 10,
+      trust: 100,
       drift: 0,
-      behavior: 90 + Math.random() * 10,
-      influence: 50 + Math.random() * 50,
+      momentum: 0,
       status: "normal",
+      influence: 50,
       connections: [],
-      x: 0,
-      y: 0,
     });
   }
 
-  nodes.forEach((node) => {
-    const connectionCount = 3 + Math.floor(Math.random() * 3);
+  // generate connections
+  nodes.forEach(node => {
+    const connectionCount = 3 + Math.floor(Math.random() * 4);
 
     for (let i = 0; i < connectionCount; i++) {
-      const target = Math.floor(Math.random() * nodes.length);
-
+      const target = Math.floor(Math.random() * count);
       if (target !== node.id && !node.connections.includes(target)) {
         node.connections.push(target);
       }
@@ -34,43 +30,90 @@ export function createNetwork(size = 20) {
   return nodes;
 }
 
-export function simulateStep(nodes) {
-  const updated = nodes.map((n) => ({ ...n }));
+export function simulateStep(prevNodes) {
+  const nodes = prevNodes.map(n => ({
+    ...n,
+    connections: [...n.connections],
+  }));
 
-  const attacker = updated[19];
+  // -------------------------
+  // 1. WAVE ATTACK SYSTEM
+  // -------------------------
+  if (Math.random() < 0.15) {
+    const epicenter = nodes[Math.floor(Math.random() * nodes.length)];
 
-  if (attacker.status === "normal") {
-    attacker.status = "drifting";
-  } else if (attacker.status === "drifting") {
-    attacker.status = "attacked";
+    epicenter.drift += 50;
+    epicenter.momentum += 20;
+
+    // blast neighbors
+    epicenter.connections.forEach(id => {
+      const neighbor = nodes[id];
+      if (!neighbor) return;
+
+      neighbor.drift += 25;
+      neighbor.momentum += 10;
+    });
   }
 
-  attacker.trust -= 10;
-  attacker.drift += 20;
-  attacker.behavior -= 10;
-  attacker.influence -= 15;
+  // -------------------------
+  // 2. PROPAGATION (with momentum)
+  // -------------------------
+  nodes.forEach(node => {
+    // decay but keep some force
+    node.drift *= 0.9;
+    node.momentum *= 0.85;
 
-  updated.forEach((node) => {
-    if (node.id === attacker.id) return;
+    const spread = (node.drift + node.momentum) * 0.05;
 
-    const isConnected = node.connections.includes(attacker.id);
+    node.connections.forEach(id => {
+      const neighbor = nodes[id];
+      if (!neighbor) return;
 
-    if (isConnected) {
-      node.trust -= 5;
-      node.drift += 8;
-
-      if (node.drift > 25 && node.status === "normal") {
-        node.status = "warning";
-      }
-
-      if (node.drift > 60) {
-        node.status = "drifting";
-      }
-    }
-
-    node.trust = Math.max(0, node.trust);
-    node.influence = Math.max(0, node.influence);
+      neighbor.drift += spread / node.connections.length;
+      neighbor.momentum += spread * 0.3;
+    });
   });
 
-  return updated;
+  // -------------------------
+  // 3. CLUSTER EFFECT
+  // -------------------------
+  nodes.forEach(node => {
+    const neighborDrift =
+      node.connections.reduce((sum, id) => {
+        const n = nodes[id];
+        return sum + (n ? n.drift : 0);
+      }, 0) / (node.connections.length || 1);
+
+    node.drift += neighborDrift * 0.02;
+  });
+
+  // -------------------------
+  // 4. RECOVERY (RESISTANCE)
+  // -------------------------
+  nodes.forEach(node => {
+    if (node.drift < 10) {
+      node.drift *= 0.7; // fast heal
+    } else if (node.drift < 40) {
+      node.drift *= 0.85;
+    } else {
+      node.drift *= 0.95; // slow recovery if heavily attacked
+    }
+  });
+
+  // -------------------------
+  // 5. CLAMP + CLASSIFY
+  // -------------------------
+  nodes.forEach(node => {
+    if (node.drift > 150) node.drift = 150;
+
+    if (node.drift > 80) node.status = "attacked";
+    else if (node.drift > 50) node.status = "drifting";
+    else if (node.drift > 20) node.status = "warning";
+    else node.status = "normal";
+
+    node.trust = Math.max(0, 100 - node.drift);
+    node.influence = node.trust * 0.8;
+  });
+
+  return nodes;
 }

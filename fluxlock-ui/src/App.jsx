@@ -1,93 +1,101 @@
+// src/App.jsx
+
 import { useEffect, useState } from "react";
-import * as d3 from "d3";
 import "./index.css";
-import { createNetwork, simulateStep } from "./trustEngine";
+import { createInitialNodes, simulateStep } from "./trustEngine";
 
 function App() {
-  const [nodes, setNodes] = useState(() => createNetwork());
-  const [selectedNode, setSelectedNode] = useState(null);
+  const [nodes, setNodes] = useState(() => createInitialNodes(20));
+  const [selectedId, setSelectedId] = useState(null);
 
-  // simulation loop
   useEffect(() => {
     const interval = setInterval(() => {
-      setNodes((prev) => simulateStep(prev));
-    }, 1500);
+      setNodes(prev => simulateStep(prev));
+    }, 700); // slightly faster for visible waves
 
     return () => clearInterval(interval);
   }, []);
 
-  // render graph
-  useEffect(() => {
-    const svg = d3.select("#graph");
-    svg.selectAll("*").remove();
+  const radius = 220;
+  const centerX = 400;
+  const centerY = 300;
 
-    const width = 800;
-    const height = 600;
-    const radius = 220;
+  const positionedNodes = nodes.map((node, i) => {
+    const angle = (i / nodes.length) * Math.PI * 2;
 
-    // position nodes
-    nodes.forEach((node, i) => {
-      const angle = (i / nodes.length) * 2 * Math.PI;
-      node.x = width / 2 + radius * Math.cos(angle);
-      node.y = height / 2 + radius * Math.sin(angle);
-    });
+    return {
+      ...node,
+      x: centerX + radius * Math.cos(angle),
+      y: centerY + radius * Math.sin(angle),
+    };
+  });
 
-    // links
-    nodes.forEach((node) => {
-      node.connections.forEach((targetId) => {
-        const target = nodes[targetId];
-        if (!target) return;
-
-        svg.append("line")
-          .attr("class", "link")
-          .attr("x1", node.x)
-          .attr("y1", node.y)
-          .attr("x2", target.x)
-          .attr("y2", target.y);
-      });
-    });
-
-    // nodes
-    const nodeSelection = svg.selectAll(".node")
-      .data(nodes)
-      .enter()
-      .append("circle")
-      .attr("class", "node")
-      .attr("cx", d => d.x)
-      .attr("cy", d => d.y)
-      .attr("r", 10)
-      .attr("fill", d => {
-        if (d.status === "attacked") return "#ef4444";
-        if (d.status === "drifting") return "#f97316";
-        if (d.status === "warning") return "#facc15";
-        return "#22c55e";
-      });
-
-    // 🔥 FIXED CLICK HANDLER
-    nodeSelection.on("click", function (event, d) {
-      console.log("CLICKED NODE:", d); // debug
-      setSelectedNode({ ...d }); // force React update
-    });
-
-    // labels
-    svg.selectAll(".label")
-      .data(nodes)
-      .enter()
-      .append("text")
-      .attr("x", d => d.x)
-      .attr("y", d => d.y + 4)
-      .attr("text-anchor", "middle")
-      .attr("font-size", "10px")
-      .attr("fill", "black")
-      .text(d => d.id);
-
-  }, [nodes]);
+  const selectedNode = nodes.find(n => n.id === selectedId);
 
   return (
-    <div>
+    <div className="app">
       <h1>FLUXLOCK NETWORK GRAPH</h1>
-      <svg id="graph" width="800" height="600"></svg>
 
+      <svg width="800" height="600">
+        {/* connections */}
+        {positionedNodes.map(node =>
+          node.connections.map(targetId => {
+            const target = positionedNodes[targetId];
+            if (!target) return null;
+
+            return (
+              <line
+                key={`${node.id}-${targetId}`}
+                x1={node.x}
+                y1={node.y}
+                x2={target.x}
+                y2={target.y}
+                className="link"
+              />
+            );
+          })
+        )}
+
+        {/* nodes */}
+        {positionedNodes.map(node => {
+          let color = "#22c55e";
+
+          if (node.status === "warning") color = "#facc15";
+          if (node.status === "drifting") color = "#f97316";
+          if (node.status === "attacked") color = "#ef4444";
+
+          // size reflects BOTH drift and momentum
+          const size = Math.min(30, 8 + (node.drift + node.momentum) * 0.12);
+
+          return (
+            <g
+              key={node.id}
+              onClick={() => setSelectedId(node.id)}
+              style={{ cursor: "pointer" }}
+            >
+              <circle
+                cx={node.x}
+                cy={node.y}
+                r={size}
+                fill={color}
+                className="node"
+              />
+
+              <text
+                x={node.x}
+                y={node.y + 4}
+                textAnchor="middle"
+                fontSize="10"
+                fill="black"
+              >
+                {node.id}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* side panel */}
       {selectedNode && (
         <div className="panel">
           <h2>Validator {selectedNode.id}</h2>
@@ -95,7 +103,7 @@ function App() {
           <p>Drift: {selectedNode.drift.toFixed(2)}</p>
           <p>Status: {selectedNode.status}</p>
           <p>Influence: {selectedNode.influence.toFixed(2)}</p>
-          <button onClick={() => setSelectedNode(null)}>Close</button>
+          <button onClick={() => setSelectedId(null)}>Close</button>
         </div>
       )}
     </div>
