@@ -1,49 +1,17 @@
 import { useEffect, useState } from "react";
 import * as d3 from "d3";
 import "./index.css";
-import { createNetwork, simulateStep } from "./trustEngine";
-import {
-  ensureAllEpochs,
-  runEpoch,
-  validateEpochs,
-  tamperNode,
-  enforceEpochRules,
-  disconnectInvalidNodes,
-  recoverNodes,
-  diffuseTrust,        // 🔥 NEW
-  rehabilitateNodes,
-  stabilizeNetwork,
-} from "./epochs";
+
+import { createNetwork } from "./trustEngine";
+import { evaluateNetwork } from "./fluxlock-core";
 
 function App() {
-  const [nodes, setNodes] = useState(() =>
-    ensureAllEpochs(createNetwork())
-  );
+  const [nodes, setNodes] = useState(() => createNetwork());
   const [selectedId, setSelectedId] = useState(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setNodes((prev) => {
-        let updated = simulateStep(prev);
-
-        updated = ensureAllEpochs(updated);
-        updated = runEpoch(updated);
-
-        updated = tamperNode(updated);
-        updated = validateEpochs(updated);
-
-        updated = enforceEpochRules(updated);
-        updated = disconnectInvalidNodes(updated);
-
-        updated = recoverNodes(updated);
-
-        // 🔥 NEW ORDER (CRITICAL)
-        updated = diffuseTrust(updated);      // ← NETWORK HEALING
-        updated = rehabilitateNodes(updated); // ← SELF RECOVERY
-        updated = stabilizeNetwork(updated);  // ← HARD LIMIT
-
-        return updated;
-      });
+      setNodes((prev) => evaluateNetwork(prev));
     }, 1500);
 
     return () => clearInterval(interval);
