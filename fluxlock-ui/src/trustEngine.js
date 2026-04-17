@@ -3,50 +3,55 @@ function generateKey() {
 }
 
 // =========================
-// 🔗 CHAIN VALIDATION
+// 🔗 VALIDATION
 // =========================
 function validateChain(node) {
-  const chain = node.identityChain;
+  const { identityChain, trust, drift, tainted } = node;
 
-  if (!chain || chain.length === 0) {
+  if (!identityChain || identityChain.length === 0) {
     return { valid: false, reason: "missing identity chain" };
   }
 
-  // Check continuity (trust shouldn't jump wildly)
-  for (let i = 1; i < chain.length; i++) {
-    const prev = chain[i - 1];
-    const curr = chain[i];
+  for (let i = 1; i < identityChain.length; i++) {
+    const prev = identityChain[i - 1];
+    const curr = identityChain[i];
 
-    const diff = Math.abs(curr.trust - prev.trust);
-
-    if (diff > 50) {
-      return {
-        valid: false,
-        reason: "identity discontinuity detected",
-      };
+    if (Math.abs(curr.trust - prev.trust) > 50) {
+      return { valid: false, reason: "identity discontinuity detected" };
     }
   }
 
-  // Check current vs last known state
-  const last = chain[chain.length - 1];
+  const last = identityChain[identityChain.length - 1];
 
-  if (Math.abs(node.trust - last.trust) > 60) {
+  if (Math.abs(trust - last.trust) > 60) {
     return {
       valid: false,
       reason: "current state deviates from identity history",
     };
   }
 
-  // Drift sanity check
-  if (node.drift > 120) {
+  if (tainted && trust < 75) {
     return {
       valid: false,
-      reason: "critical instability",
+      reason: "identity recovering from compromise",
     };
+  }
+
+  if (drift > 120) {
+    return { valid: false, reason: "critical instability" };
   }
 
   return { valid: true, reason: "chain valid" };
 }
+
+// =========================
+// ⚖️ EPOCH WEIGHT
+// =========================
+function epochWeight(age) {
+  return Math.min(1, 0.3 + age / 50);
+}
+
+const STABILITY_THRESHOLD = 15; // 🔒 enforced window
 
 export function createNetwork(size = 20) {
   const nodes = [];
@@ -57,7 +62,6 @@ export function createNetwork(size = 20) {
     nodes.push({
       id: i,
       trust: 70 + Math.random() * 20,
-      influence: 50,
       drift: Math.random() * 5,
       status: "healthy",
       connections: [],
@@ -72,9 +76,14 @@ export function createNetwork(size = 20) {
       key,
       identityChain: [{ key, trust: 100 }],
 
-      // 🔥 NEW
       chainValid: true,
       chainReason: "init",
+
+      tainted: false,
+      taintTimer: 0,
+
+      // 🔥 NEW
+      stabilityCounter: STABILITY_THRESHOLD,
     });
   }
 
@@ -99,14 +108,19 @@ export function simulateStep(nodes) {
       recoveryTimer,
       immunityTimer,
       recoveryPenalty,
-      status,
       epoch,
       epochAge,
       key,
       identityChain,
+      tainted,
+      taintTimer,
+      stabilityCounter,
     } = node;
 
+    let status = node.status;
+
     epochAge += 1;
+    const weight = epochWeight(epochAge);
 
     if (immunityTimer > 0) immunityTimer--;
 
@@ -116,7 +130,13 @@ export function simulateStep(nodes) {
     if (compromised) {
       recoveryTimer++;
       drift *= 0.995;
-      trust += 0.03;
+      trust += 0.02 * weight;
+
+      tainted = true;
+      taintTimer = 50;
+
+      stabilityCounter = 0; // 🔒 reset
+
       status = "attacked";
     }
 
@@ -125,12 +145,12 @@ export function simulateStep(nodes) {
     // =========================
     if (compromised && recoveryTimer > 25) {
       drift *= 0.94;
-      trust += 0.4;
+      trust += 0.3 * weight;
       status = "warning";
     }
 
     // =========================
-    // EXIT COMPROMISE → ROTATE KEY
+    // EXIT COMPROMISE
     // =========================
     if (compromised && drift < 35 && trust > 65) {
       compromised = false;
@@ -149,8 +169,10 @@ export function simulateStep(nodes) {
       epoch += 1;
       epochAge = 0;
 
+      stabilityCounter = 0; // 🔒 restart window
+
       immunityTimer = 10;
-      status = "drifting";
+      status = "recovering";
     }
 
     // =========================
@@ -160,13 +182,23 @@ export function simulateStep(nodes) {
       drift *= 0.97;
 
       const penalty = recoveryPenalty > 0 ? 0.4 : 1;
+      const taintFactor = tainted ? 0.5 : 1;
 
       if (drift < 25) {
-        trust += 0.6 * penalty;
-        status = "healthy";
+        trust += 0.6 * penalty * weight * taintFactor;
       } else {
         trust -= drift * 0.015;
-        status = "drifting";
+      }
+    }
+
+    // =========================
+    // TAINT DECAY
+    // =========================
+    if (tainted) {
+      taintTimer--;
+
+      if (taintTimer <= 0 && trust > 80) {
+        tainted = false;
       }
     }
 
@@ -176,13 +208,34 @@ export function simulateStep(nodes) {
     drift = Math.max(0, drift);
 
     // =========================
-    // 🔥 VALIDATE CHAIN
+    // VALIDATION
     // =========================
     const validation = validateChain({
       trust,
       drift,
       identityChain,
+      tainted,
     });
+
+    // =========================
+    // 🔒 STABILITY WINDOW LOGIC
+    // =========================
+    if (validation.valid) {
+      stabilityCounter++;
+    } else {
+      stabilityCounter = 0;
+    }
+
+    // =========================
+    // FINAL STATUS CONTROL
+    // =========================
+    if (!validation.valid) {
+      status = tainted ? "recovering" : "drifting";
+    } else if (stabilityCounter >= STABILITY_THRESHOLD && !tainted && drift < 25) {
+      status = "healthy";
+    } else {
+      status = "recovering";
+    }
 
     return {
       ...node,
@@ -197,8 +250,9 @@ export function simulateStep(nodes) {
       epochAge,
       key,
       identityChain,
-
-      // 🔥 NEW OUTPUT
+      tainted,
+      taintTimer,
+      stabilityCounter,
       chainValid: validation.valid,
       chainReason: validation.reason,
     };
