@@ -1,103 +1,77 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useRef } from "react";
+import * as d3 from "d3";
 
-function decodeIdentity(arr) {
-  if (typeof arr === "string") return arr;
-  if (!Array.isArray(arr)) return "";
-  return new TextDecoder().decode(new Uint8Array(arr));
-}
-
-export default function IdentityGraph() {
-  const [chains, setChains] = useState([]);
+const IdentityGraph = ({ validators }) => {
+  const svgRef = useRef();
 
   useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/events.json?ts=" + Date.now());
-        const data = await res.json();
+    const width = 800;
+    const height = 800;
 
-        const newChains = [];
+    const svg = d3.select(svgRef.current);
+    svg.selectAll("*").remove();
 
-        data.forEach((event) => {
-          if (event.RotationSuccess) {
-            newChains.push({
-              from: decodeIdentity(event.RotationSuccess.identity),
-              to: decodeIdentity(event.RotationSuccess.new_identity),
-              valid: true,
-            });
-          }
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = 300;
 
-          if (event.InvalidContinuity) {
-            newChains.push({
-              from: decodeIdentity(event.InvalidContinuity.identity),
-              to: "❌",
-              valid: false,
-            });
-          }
-        });
+    const nodes = validators.map((v, i) => {
+      const angle = (i / validators.length) * 2 * Math.PI;
 
-        setChains(newChains);
-      } catch (err) {
-        console.error(err);
-      }
-    }, 2000);
+      return {
+        ...v,
+        x: centerX + radius * Math.cos(angle),
+        y: centerY + radius * Math.sin(angle),
+      };
+    });
 
-    return () => clearInterval(interval);
-  }, []);
+    // Draw links (full mesh)
+    nodes.forEach((source) => {
+      nodes.forEach((target) => {
+        svg.append("line")
+          .attr("x1", source.x)
+          .attr("y1", source.y)
+          .attr("x2", target.x)
+          .attr("y2", target.y)
+          .attr("stroke", "#00ffff22");
+      });
+    });
+
+    // Draw nodes
+    svg.selectAll("circle")
+      .data(nodes)
+      .enter()
+      .append("circle")
+      .attr("cx", (d) => d.x)
+      .attr("cy", (d) => d.y)
+      .attr("r", 12)
+      .attr("fill", (d) => {
+        if (d.valid === false) return "red";
+        if (d.valid === true) return "green";
+        return "blue";
+      });
+
+    // Labels
+    svg.selectAll("text")
+      .data(nodes)
+      .enter()
+      .append("text")
+      .attr("x", (d) => d.x)
+      .attr("y", (d) => d.y - 15)
+      .attr("text-anchor", "middle")
+      .attr("fill", "white")
+      .text((d) => d.id);
+
+  }, [validators]);
 
   return (
-    <div style={{ marginTop: "40px", textAlign: "center" }}>
-      <h2>🔗 Identity Chain</h2>
-
-      {chains.map((chain, index) => (
-        <div
-          key={index}
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            marginBottom: "15px",
-            gap: "10px",
-            animation: "fadeIn 0.5s ease",
-          }}
-        >
-          <div
-            style={{
-              padding: "10px 15px",
-              borderRadius: "8px",
-              border: "1px solid #4dff88",
-              transition: "all 0.3s ease",
-            }}
-          >
-            {chain.from}
-          </div>
-
-          <div style={{ fontSize: "20px" }}>→</div>
-
-          <div
-            style={{
-              padding: "10px 15px",
-              borderRadius: "8px",
-              border: `1px solid ${
-                chain.valid ? "#4dff88" : "#ff4d4d"
-              }`,
-              color: chain.valid ? "#4dff88" : "#ff4d4d",
-              transform: chain.valid ? "scale(1)" : "scale(1.1)",
-              transition: "all 0.3s ease",
-            }}
-          >
-            {chain.to}
-          </div>
-        </div>
-      ))}
-
-      <style>
-        {`
-          @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-        `}
-      </style>
-    </div>
+    <svg
+      ref={svgRef}
+      width={800}
+      height={800}
+      style={{ background: "#020c1b" }}
+    />
   );
-}
+};
+
+export default IdentityGraph;

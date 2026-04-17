@@ -1,111 +1,29 @@
-/* ==============================
-   FLUXLOCK GLOBAL STYLES
-============================== */
-
 body {
   margin: 0;
-  background: radial-gradient(circle at center, #020617, #000814);
+  background: radial-gradient(circle at center, #001a2f, #000814);
   font-family: Arial, sans-serif;
   color: white;
-  overflow: hidden;
 }
 
-/* ==============================
-   HEADER
-============================== */
-
-h1 {
+.container {
   text-align: center;
-  letter-spacing: 6px;
-  font-weight: 300;
-  margin-top: 20px;
 }
 
-/* ==============================
-   SVG GRAPH
-============================== */
-
-svg {
-  display: block;
-  margin: auto;
+#graph {
+  width: 100vw;
+  height: 75vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
-
-/* ==============================
-   LINKS (CONNECTIONS)
-============================== */
-
-.link {
-  stroke: #38bdf8;
-  stroke-opacity: 0.4;
-}
-
-/* ==============================
-   NODES
-============================== */
-
-circle {
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-circle:hover {
-  stroke: white;
-  stroke-width: 2px;
-  r: 14;
-}
-
-/* ==============================
-   INFO PANEL (RIGHT SIDE)
-============================== */
 
 .panel {
-  position: absolute;
+  position: fixed;
   right: 40px;
-  top: 100px;
-  background: rgba(15, 23, 42, 0.92);
+  top: 120px;
+  background: rgba(20, 30, 50, 0.95);
   padding: 20px;
   border-radius: 12px;
-  min-width: 200px;
-  color: white;
-
-  box-shadow:
-    0 0 20px rgba(56, 189, 248, 0.25),
-    inset 0 0 10px rgba(56, 189, 248, 0.08);
-
-  backdrop-filter: blur(6px);
-}
-
-.panel h3 {
-  margin-top: 0;
-  margin-bottom: 10px;
-}
-
-.panel p {
-  margin: 6px 0;
-  font-size: 14px;
-}
-
-/* ==============================
-   BUTTON
-============================== */
-
-button {
-  margin-top: 10px;
-  padding: 6px 10px;
-  border: none;
-  background: #38bdf8;
-  color: black;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-button:hover {
-  background: #0ea5e9;
-}/* ==============================
-   GLOW EFFECT
-============================== */
-
-circle {
-  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.6));
+  width: 250px;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
 }

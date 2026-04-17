@@ -1,6 +1,3 @@
-// epochs.js
-// PHASE 5 SAFE — NO GRAPH BREAK VERSION
-
 function randomKey() {
   return Math.random().toString(16).slice(2, 10);
 }
@@ -9,8 +6,6 @@ function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v));
 }
 
-// ------------------------------
-// Ensure schema (CRITICAL)
 // ------------------------------
 export function ensureAllEpochs(nodes) {
   return nodes.map(node => ({
@@ -30,8 +25,6 @@ export function ensureAllEpochs(nodes) {
   }));
 }
 
-// ------------------------------
-// Epoch progression
 // ------------------------------
 export function runEpoch(nodes) {
   return nodes.map(node => {
@@ -59,8 +52,6 @@ export function runEpoch(nodes) {
 }
 
 // ------------------------------
-// Validation
-// ------------------------------
 export function validateEpochs(nodes) {
   return nodes.map(node => ({
     ...node,
@@ -68,30 +59,6 @@ export function validateEpochs(nodes) {
   }));
 }
 
-// ------------------------------
-// Attack (SAFE)
-// ------------------------------
-export function tamperNode(nodes) {
-  if (Math.random() < 0.1) {
-    const i = Math.floor(Math.random() * nodes.length);
-    const updated = [...nodes];
-
-    updated[i] = {
-      ...updated[i],
-      epochKey: "tampered_key",
-      trust: updated[i].trust - 20,
-      drift: updated[i].drift + 50,
-      status: "attacked",
-    };
-
-    return updated;
-  }
-
-  return nodes;
-}
-
-// ------------------------------
-// Enforcement
 // ------------------------------
 export function enforceEpochRules(nodes) {
   return nodes.map(node => {
@@ -107,15 +74,10 @@ export function enforceEpochRules(nodes) {
 }
 
 // ------------------------------
-// 🔥 IMPORTANT: DO NOT REMOVE CONNECTIONS
-// ------------------------------
 export function disconnectInvalidNodes(nodes) {
-  // no-op for stability
   return nodes;
 }
 
-// ------------------------------
-// Recovery
 // ------------------------------
 export function recoverNodes(nodes) {
   return nodes.map(node => {
@@ -131,7 +93,7 @@ export function recoverNodes(nodes) {
 }
 
 // ------------------------------
-// Diffusion (SAFE)
+// 🔥 STRONG GROUP HEAL
 // ------------------------------
 export function diffuseTrust(nodes) {
   return nodes.map(node => {
@@ -152,15 +114,18 @@ export function diffuseTrust(nodes) {
 
     const avg = total / count;
 
+    // 🔥 stronger when node is weak
+    const strength = node.trust < 40 ? 0.15 : 0.05;
+
     return {
       ...node,
-      trust: node.trust + (avg - node.trust) * 0.05,
+      trust: node.trust + (avg - node.trust) * strength,
     };
   });
 }
 
 // ------------------------------
-// 🧬 Lineage (SAFE)
+// 🔥 LINEAGE BOOST
 // ------------------------------
 function applyLineage(nodes) {
   return nodes.map(node => {
@@ -170,15 +135,15 @@ function applyLineage(nodes) {
       node.epochHistory.reduce((a, b) => a + b.trust, 0) /
       node.epochHistory.length;
 
+    const strength = node.trust < 40 ? 0.08 : 0.02;
+
     return {
       ...node,
-      trust: node.trust + (avg - node.trust) * 0.02,
+      trust: node.trust + (avg - node.trust) * strength,
     };
   });
 }
 
-// ------------------------------
-// Rehabilitation
 // ------------------------------
 export function rehabilitateNodes(nodes) {
   return nodes.map(node => {
@@ -194,8 +159,6 @@ export function rehabilitateNodes(nodes) {
   });
 }
 
-// ------------------------------
-// Final stabilizer
 // ------------------------------
 export function stabilizeNetwork(nodes) {
   let updated = diffuseTrust(nodes);

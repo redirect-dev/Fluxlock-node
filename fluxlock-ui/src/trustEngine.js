@@ -1,30 +1,41 @@
-// trustEngine.js
-// 🔥 FINAL BALANCED SYSTEM
+function generateKey() {
+  return Math.random().toString(16).substring(2, 10);
+}
 
 export function createNetwork(size = 20) {
   const nodes = [];
 
   for (let i = 0; i < size; i++) {
+    const key = generateKey();
+
     nodes.push({
       id: i,
       trust: 70 + Math.random() * 20,
-      influence: 50 + Math.random() * 20,
-      drift: 0,
+      influence: 50,
+      drift: Math.random() * 5,
       status: "healthy",
       connections: [],
+      compromised: false,
+      recoveryTimer: 0,
+      immunityTimer: 0,
+      recoveryPenalty: 0,
+
+      epoch: i,
+      epochAge: 0,
+
+      // 🔑 NEW
+      key,
+      identityChain: [{ key, trust: 100 }],
     });
   }
 
   nodes.forEach(node => {
-    const numConnections = 4 + Math.floor(Math.random() * 4);
     const connections = new Set();
-
-    while (connections.size < numConnections) {
+    while (connections.size < 4) {
       const target = Math.floor(Math.random() * size);
       if (target !== node.id) connections.add(target);
     }
-
-    node.connections = Array.from(connections);
+    node.connections = [...connections];
   });
 
   return nodes;
@@ -32,55 +43,94 @@ export function createNetwork(size = 20) {
 
 export function simulateStep(nodes) {
   return nodes.map(node => {
-    let trust = node.trust;
-    let drift = node.drift;
-    let status = node.status;
+    let {
+      trust,
+      drift,
+      compromised,
+      recoveryTimer,
+      immunityTimer,
+      recoveryPenalty,
+      status,
+      epoch,
+      epochAge,
+      key,
+      identityChain,
+    } = node;
 
-    // =========================
-    // 🔥 SHORTER ATTACK WINDOW
-    // =========================
-    if (node.id === 19 && drift < 150) {
-      drift += 15;
-      trust -= 4; // softer hit
+    epochAge += 1;
+
+    if (immunityTimer > 0) immunityTimer--;
+
+    // COMPROMISE
+    if (compromised) {
+      recoveryTimer++;
+      drift *= 0.995;
+      trust += 0.03;
       status = "attacked";
     }
 
-    // =========================
-    // 🔥 DRIFT DECAY (FASTER)
-    // =========================
-    else if (drift > 0) {
-      drift *= 0.75;              // faster decay
-      trust -= drift * 0.015;     // lighter damage
+    // RECOVERY
+    if (compromised && recoveryTimer > 25) {
+      drift *= 0.94;
+      trust += 0.4;
+      status = "warning";
+    }
+
+    // 🔥 EXIT COMPROMISE → ROTATE KEY
+    if (compromised && drift < 35 && trust > 65) {
+      compromised = false;
+      recoveryTimer = 0;
+      recoveryPenalty = 30;
+
+      const newKey = generateKey();
+
+      identityChain = [
+        ...identityChain.slice(-5),
+        { key, trust: Math.round(trust) },
+      ];
+
+      key = newKey;
+
+      epoch += 1;
+      epochAge = 0;
+
+      immunityTimer = 10;
       status = "drifting";
     }
 
-    // =========================
-    // 🔥 STRONGER NATURAL HEALING
-    // =========================
-    else {
-      drift = Math.max(0, drift - 3);
-      trust += 2.5;               // 🔥 stronger recovery
-      status = "healthy";
+    // NORMAL
+    if (!compromised) {
+      drift *= 0.97;
+
+      const penalty = recoveryPenalty > 0 ? 0.4 : 1;
+
+      if (drift < 25) {
+        trust += 0.6 * penalty;
+        status = "healthy";
+      } else {
+        trust -= drift * 0.015;
+        status = "drifting";
+      }
     }
 
-    // =========================
-    // 🔥 HARD CLAMP
-    // =========================
-    trust = Math.max(-100, Math.min(100, trust));
+    if (recoveryPenalty > 0) recoveryPenalty--;
 
-    // =========================
-    // 🔥 STATUS NORMALIZATION
-    // =========================
-    if (trust > 60) status = "healthy";
-    else if (trust > 30) status = "warning";
-    else if (trust > 0) status = "drifting";
-    else status = "attacked";
+    trust = Math.max(0, Math.min(100, trust));
+    drift = Math.max(0, drift);
 
     return {
       ...node,
       trust,
       drift,
+      compromised,
+      recoveryTimer,
+      immunityTimer,
+      recoveryPenalty,
       status,
+      epoch,
+      epochAge,
+      key,
+      identityChain,
     };
   });
 }

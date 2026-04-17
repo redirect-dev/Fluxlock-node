@@ -1,6 +1,3 @@
-// Fluxlock Core API
-// This wraps your internal engine into a usable external interface
-
 import { simulateStep } from "./trustEngine";
 import {
   ensureAllEpochs,
@@ -13,9 +10,7 @@ import {
   stabilizeNetwork,
 } from "./epochs";
 
-/**
- * Runs one full Fluxlock evaluation cycle
- */
+// ---------------- CORE ENGINE ----------------
 export function evaluateNetwork(nodes) {
   let updated = simulateStep(nodes);
 
@@ -33,31 +28,20 @@ export function evaluateNetwork(nodes) {
   return updated;
 }
 
-/**
- * Get trust score for a specific node
- */
+// ---------------- UTILITIES ----------------
 export function getTrustScore(nodes, nodeId) {
   const node = nodes.find((n) => n.id === nodeId);
   return node ? node.trust : null;
 }
 
-/**
- * Get full node state (for inspection / UI / external use)
- */
 export function getNodeState(nodes, nodeId) {
   return nodes.find((n) => n.id === nodeId) || null;
 }
 
-/**
- * Verify identity integrity (epoch validity)
- */
 export function verifyIdentity(node) {
   return node.epochValid === true;
 }
 
-/**
- * Get network health summary
- */
 export function getNetworkHealth(nodes) {
   const total = nodes.length;
 
