@@ -1,6 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import * as d3 from "d3";
-import { createNetwork, simulateStep } from "./trustEngine";
+import {
+  createNetwork,
+  simulateStep,
+  requestSignature,
+  verifySignature,
+} from "./trustEngine";
 
 function getColor(node) {
   if (node.compromised) return "#ff00ff";
@@ -10,18 +15,21 @@ function getColor(node) {
   return "#00ffaa";
 }
 
+function shortKey(key) {
+  if (!key) return "—";
+  return key.slice(0, 8);
+}
+
 export default function FluxlockDashboard() {
   const [nodes, setNodes] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const svgRef = useRef();
 
-  // derive selected node safely
   const selected = nodes.find(n => n.id === selectedId);
 
   // INIT
   useEffect(() => {
-    const initial = createNetwork(20);
-    setNodes(initial);
+    setNodes(createNetwork(20));
   }, []);
 
   // SIM LOOP
@@ -29,14 +37,67 @@ export default function FluxlockDashboard() {
     const interval = setInterval(() => {
       setNodes(prev => simulateStep(prev));
     }, 300);
-
     return () => clearInterval(interval);
   }, []);
 
+  // =========================
+  // 🔥 SIGNATURE + VERIFY ENGINE
+  // =========================
+  useEffect(() => {
+    nodes.forEach(node => {
+      node.identityChain.forEach((entry, idx) => {
+        // SIGN
+        if (!entry.signature && entry.needsSignature) {
+          requestSignature(entry.needsSignature.message, node.id).then(sig => {
+            setNodes(prev =>
+              prev.map(n => {
+                if (n.id !== node.id) return n;
+
+                const updatedChain = [...n.identityChain];
+                updatedChain[idx] = {
+                  ...updatedChain[idx],
+                  signature: sig,
+                  needsSignature: null,
+                };
+
+                return { ...n, identityChain: updatedChain };
+              })
+            );
+          });
+        }
+
+        // VERIFY
+        if (
+          entry.signature &&
+          entry.signature !== "genesis" &&
+          !entry.verified
+        ) {
+          verifySignature(entry.publicKey, entry.signature, node.id).then(valid => {
+            setNodes(prev =>
+              prev.map(n => {
+                if (n.id !== node.id) return n;
+
+                const updatedChain = [...n.identityChain];
+                updatedChain[idx] = {
+                  ...updatedChain[idx],
+                  verified: true,
+                  invalidSignature: !valid,
+                };
+
+                return { ...n, identityChain: updatedChain };
+              })
+            );
+          });
+        }
+      });
+    });
+  }, [nodes]);
+
+  // =========================
   // ATTACKS
+  // =========================
   const spikeAttack = () => {
     if (!selected) return;
-
     setNodes(prev =>
       prev.map(n =>
         n.id === selected.id
@@ -48,7 +109,6 @@ export default function FluxlockDashboard() {
 
   const criticalBreach = () => {
     if (!selected) return;
-
     setNodes(prev =>
       prev.map(n =>
         n.id === selected.id
@@ -66,7 +126,6 @@ export default function FluxlockDashboard() {
 
   const networkAttack = () => {
     if (!selected) return;
-
     setNodes(prev =>
       prev.map(n => {
         if (n.id === selected.id || selected.connections.includes(n.id)) {
@@ -81,7 +140,9 @@ export default function FluxlockDashboard() {
     );
   };
 
+  // =========================
   // GRAPH
+  // =========================
   useEffect(() => {
     if (!nodes.length) return;
 
@@ -103,7 +164,6 @@ export default function FluxlockDashboard() {
       node.y = cy + radius * Math.sin(angle);
     });
 
-    // edges
     nodes.forEach(node => {
       node.connections.forEach(i => {
         const t = nodes[i];
@@ -118,53 +178,51 @@ export default function FluxlockDashboard() {
       });
     });
 
-    // nodes
     svg.selectAll("circle")
       .data(nodes)
       .enter()
       .append("circle")
       .attr("cx", d => d.x)
       .attr("cy", d => d.y)
-      .attr("r", 14)
+      .attr("r", 10)
       .attr("fill", d => getColor(d))
       .style("cursor", "pointer")
-      .on("click", (_, d) => {
-        setSelectedId(d.id); // ✅ FIXED
-      });
+      .on("click", (_, d) => setSelectedId(d.id));
 
-    // labels
     svg.selectAll("text")
       .data(nodes)
       .enter()
       .append("text")
       .attr("x", d => d.x)
-      .attr("y", d => d.y + 4)
+      .attr("y", d => d.y + 3)
       .attr("text-anchor", "middle")
       .attr("fill", "#000")
-      .style("font-size", "10px")
+      .style("font-size", "9px")
       .text(d => d.id);
 
   }, [nodes]);
 
+  // =========================
+  // UI
+  // =========================
   return (
     <div style={{ display: "flex", padding: "20px", color: "white" }}>
       <div>
         <h1>FLUXLOCK NETWORK GRAPH</h1>
         <h3>Node Count: {nodes.length}</h3>
-        <svg ref={svgRef}></svg>
+        <svg ref={svgRef} style={{ background: "#020c1b" }} />
       </div>
 
       {selected && (
         <div style={{
           marginLeft: "40px",
           padding: "20px",
-          width: "320px",
+          width: "340px",
           background: "#111827",
           borderRadius: "10px"
         }}>
           <h2>Validator {selected.id}</h2>
 
-          {/* CORE STATE */}
           <p>🔑 Epoch: {selected.epoch}</p>
           <p>⏱ Age: {selected.epochAge}</p>
 
@@ -172,39 +230,53 @@ export default function FluxlockDashboard() {
           <p>🌪 Drift: {selected.drift.toFixed(2)}</p>
           <p>Status: {selected.status}</p>
 
-          {selected.compromised && (
-            <p style={{ color: "#ff00ff" }}>⚠️ COMPROMISED</p>
-          )}
-
-          {/* KEY + CHAIN */}
           <hr />
 
-          <p>🔑 Current Key: {selected.key}</p>
+          <p>🔑 Current Key: {shortKey(selected.publicKey)}</p>
 
           <h4>🔗 Identity Chain</h4>
           {selected.identityChain?.map((k, i) => (
             <div key={i}>
-              🔑 {k.key} → {k.trust}
+              🔑 {shortKey(k.publicKey)} → {k.trust}
+              <div style={{ fontSize: "0.7rem", opacity: 0.6 }}>
+                sig: {k.signature === "genesis"
+                  ? "GENESIS"
+                  : k.signature
+                  ? shortKey(k.signature)
+                  : "pending"}
+              </div>
+
+              {k.invalidSignature && (
+                <div style={{ color: "red", fontSize: "0.7rem" }}>
+                  INVALID SIGNATURE
+                </div>
+              )}
             </div>
           ))}
 
-          {/* CHAIN VALIDATION */}
           <hr />
 
           <h4>🧪 Chain Validation</h4>
-
           <p style={{
-            color: selected.chainValid === false ? "#ff4d4d" : "#00ff99",
+            color:
+              selected.chainReason === "awaiting cryptographic signature"
+                ? "#ffaa00"
+                : selected.chainValid
+                ? "#00ff99"
+                : "#ff4d4d",
             fontWeight: "bold"
           }}>
-            {selected.chainValid === false ? "INVALID" : "VALID"}
+            {
+              selected.chainReason === "awaiting cryptographic signature"
+                ? "PENDING"
+                : selected.chainValid
+                ? "VALID"
+                : "INVALID"
+            }
           </p>
 
-          <p style={{ fontSize: "0.9rem", opacity: 0.8 }}>
-            {selected.chainReason || "no validation data"}
-          </p>
+          <p>{selected.chainReason}</p>
 
-          {/* ATTACK PANEL */}
           <hr />
 
           <h3>⚔️ Attack Panel</h3>

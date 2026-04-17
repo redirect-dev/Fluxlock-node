@@ -1,9 +1,63 @@
-function generateKey() {
-  return Math.random().toString(16).substring(2, 10);
+function generateKeypair() {
+  const key = Math.random().toString(16).substring(2, 10);
+
+  return {
+    publicKey: "pub_" + key,
+    privateKey: "priv_" + key,
+  };
 }
 
 // =========================
-// 🔗 VALIDATION
+// SIGNING
+// =========================
+export async function requestSignature(message, validatorId) {
+  try {
+    const res = await fetch("http://127.0.0.1:3001/sign", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message,
+        validator_id: validatorId,
+      }),
+    });
+
+    const data = await res.json();
+    return data.signature;
+  } catch (err) {
+    console.error("Signing error:", err);
+    return null;
+  }
+}
+
+// =========================
+// VERIFY
+// =========================
+export async function verifySignature(message, signature, validatorId) {
+  try {
+    const res = await fetch("http://127.0.0.1:3001/verify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message,
+        signature,
+        validator_id: validatorId,
+      }),
+    });
+
+    const data = await res.json();
+    return data.valid;
+  } catch (err) {
+    console.error("Verify error:", err);
+    return false;
+  }
+}
+
+// =========================
+// 🔥 VALIDATION (FINAL FIX)
 // =========================
 function validateChain(node) {
   const { identityChain, trust, drift, tainted } = node;
@@ -12,16 +66,46 @@ function validateChain(node) {
     return { valid: false, reason: "missing identity chain" };
   }
 
+  let hasPending = false;
+  const lastIndex = identityChain.length - 1;
+
   for (let i = 1; i < identityChain.length; i++) {
     const prev = identityChain[i - 1];
     const curr = identityChain[i];
 
+    // skip genesis
+    if (curr.signature === "genesis") continue;
+
+    // 🔥 ONLY LAST ENTRY CAN BE PENDING
+    if (!curr.signature) {
+      if (i === lastIndex) {
+        hasPending = true;
+      }
+      continue;
+    }
+
+    // 🔥 HARD FAIL
+    if (curr.invalidSignature) {
+      return {
+        valid: false,
+        reason: "invalid cryptographic signature",
+      };
+    }
+
+    // continuity checks
+    if (curr.publicKey === prev.publicKey) {
+      return { valid: false, reason: "key reuse detected" };
+    }
+
     if (Math.abs(curr.trust - prev.trust) > 50) {
-      return { valid: false, reason: "identity discontinuity detected" };
+      return {
+        valid: false,
+        reason: "identity discontinuity detected",
+      };
     }
   }
 
-  const last = identityChain[identityChain.length - 1];
+  const last = identityChain[lastIndex];
 
   if (Math.abs(trust - last.trust) > 60) {
     return {
@@ -41,23 +125,37 @@ function validateChain(node) {
     return { valid: false, reason: "critical instability" };
   }
 
+  // 🔥 NEW: pending only matters if node is NOT stable
+  const isStable = drift < 25 && trust > 80 && !tainted;
+
+  if (hasPending && !isStable) {
+    return {
+      valid: false,
+      reason: "awaiting cryptographic signature",
+      pending: true,
+    };
+  }
+
   return { valid: true, reason: "chain valid" };
 }
 
 // =========================
-// ⚖️ EPOCH WEIGHT
+// EPOCH WEIGHT
 // =========================
 function epochWeight(age) {
   return Math.min(1, 0.3 + age / 50);
 }
 
-const STABILITY_THRESHOLD = 15; // 🔒 enforced window
+const STABILITY_THRESHOLD = 15;
 
+// =========================
+// NETWORK
+// =========================
 export function createNetwork(size = 20) {
   const nodes = [];
 
   for (let i = 0; i < size; i++) {
-    const key = generateKey();
+    const keypair = generateKeypair();
 
     nodes.push({
       id: i,
@@ -73,16 +171,21 @@ export function createNetwork(size = 20) {
       epoch: i,
       epochAge: 0,
 
-      key,
-      identityChain: [{ key, trust: 100 }],
+      ...keypair,
+
+      identityChain: [
+        {
+          publicKey: keypair.publicKey,
+          trust: 100,
+          signature: "genesis",
+        },
+      ],
 
       chainValid: true,
       chainReason: "init",
 
       tainted: false,
       taintTimer: 0,
-
-      // 🔥 NEW
       stabilityCounter: STABILITY_THRESHOLD,
     });
   }
@@ -99,6 +202,9 @@ export function createNetwork(size = 20) {
   return nodes;
 }
 
+// =========================
+// SIMULATION
+// =========================
 export function simulateStep(nodes) {
   return nodes.map(node => {
     let {
@@ -110,7 +216,8 @@ export function simulateStep(nodes) {
       recoveryPenalty,
       epoch,
       epochAge,
-      key,
+      publicKey,
+      privateKey,
       identityChain,
       tainted,
       taintTimer,
@@ -124,9 +231,7 @@ export function simulateStep(nodes) {
 
     if (immunityTimer > 0) immunityTimer--;
 
-    // =========================
     // COMPROMISE
-    // =========================
     if (compromised) {
       recoveryTimer++;
       drift *= 0.995;
@@ -134,50 +239,51 @@ export function simulateStep(nodes) {
 
       tainted = true;
       taintTimer = 50;
-
-      stabilityCounter = 0; // 🔒 reset
+      stabilityCounter = 0;
 
       status = "attacked";
     }
 
-    // =========================
     // RECOVERY
-    // =========================
     if (compromised && recoveryTimer > 25) {
       drift *= 0.94;
       trust += 0.3 * weight;
       status = "warning";
     }
 
-    // =========================
-    // EXIT COMPROMISE
-    // =========================
+    // ROTATION
     if (compromised && drift < 35 && trust > 65) {
       compromised = false;
       recoveryTimer = 0;
       recoveryPenalty = 30;
 
-      const newKey = generateKey();
+      const newKeypair = generateKeypair();
 
       identityChain = [
         ...identityChain.slice(-5),
-        { key, trust: Math.round(trust) },
+        {
+          publicKey,
+          trust: Math.round(trust),
+          signature: null,
+          needsSignature: {
+            message: publicKey,
+          },
+        },
       ];
 
-      key = newKey;
+      publicKey = newKeypair.publicKey;
+      privateKey = newKeypair.privateKey;
 
       epoch += 1;
       epochAge = 0;
 
-      stabilityCounter = 0; // 🔒 restart window
-
+      stabilityCounter = 0;
       immunityTimer = 10;
+
       status = "recovering";
     }
 
-    // =========================
     // NORMAL
-    // =========================
     if (!compromised) {
       drift *= 0.97;
 
@@ -191,12 +297,9 @@ export function simulateStep(nodes) {
       }
     }
 
-    // =========================
     // TAINT DECAY
-    // =========================
     if (tainted) {
       taintTimer--;
-
       if (taintTimer <= 0 && trust > 80) {
         tainted = false;
       }
@@ -207,9 +310,6 @@ export function simulateStep(nodes) {
     trust = Math.max(0, Math.min(100, trust));
     drift = Math.max(0, drift);
 
-    // =========================
-    // VALIDATION
-    // =========================
     const validation = validateChain({
       trust,
       drift,
@@ -217,21 +317,23 @@ export function simulateStep(nodes) {
       tainted,
     });
 
-    // =========================
-    // 🔒 STABILITY WINDOW LOGIC
-    // =========================
     if (validation.valid) {
       stabilityCounter++;
     } else {
       stabilityCounter = 0;
     }
 
-    // =========================
-    // FINAL STATUS CONTROL
-    // =========================
     if (!validation.valid) {
-      status = tainted ? "recovering" : "drifting";
-    } else if (stabilityCounter >= STABILITY_THRESHOLD && !tainted && drift < 25) {
+      if (validation.pending) {
+        status = "recovering";
+      } else {
+        status = tainted ? "recovering" : "drifting";
+      }
+    } else if (
+      stabilityCounter >= STABILITY_THRESHOLD &&
+      !tainted &&
+      drift < 25
+    ) {
       status = "healthy";
     } else {
       status = "recovering";
@@ -248,7 +350,8 @@ export function simulateStep(nodes) {
       status,
       epoch,
       epochAge,
-      key,
+      publicKey,
+      privateKey,
       identityChain,
       tainted,
       taintTimer,
