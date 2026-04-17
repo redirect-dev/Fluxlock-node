@@ -12,8 +12,11 @@ function getColor(node) {
 
 export default function FluxlockDashboard() {
   const [nodes, setNodes] = useState([]);
-  const [selected, setSelected] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
   const svgRef = useRef();
+
+  // derive selected node safely
+  const selected = nodes.find(n => n.id === selectedId);
 
   // INIT
   useEffect(() => {
@@ -32,6 +35,8 @@ export default function FluxlockDashboard() {
 
   // ATTACKS
   const spikeAttack = () => {
+    if (!selected) return;
+
     setNodes(prev =>
       prev.map(n =>
         n.id === selected.id
@@ -42,6 +47,8 @@ export default function FluxlockDashboard() {
   };
 
   const criticalBreach = () => {
+    if (!selected) return;
+
     setNodes(prev =>
       prev.map(n =>
         n.id === selected.id
@@ -58,6 +65,8 @@ export default function FluxlockDashboard() {
   };
 
   const networkAttack = () => {
+    if (!selected) return;
+
     setNodes(prev =>
       prev.map(n => {
         if (n.id === selected.id || selected.connections.includes(n.id)) {
@@ -120,7 +129,7 @@ export default function FluxlockDashboard() {
       .attr("fill", d => getColor(d))
       .style("cursor", "pointer")
       .on("click", (_, d) => {
-        setSelected(d);
+        setSelectedId(d.id); // ✅ FIXED
       });
 
     // labels
@@ -167,7 +176,7 @@ export default function FluxlockDashboard() {
             <p style={{ color: "#ff00ff" }}>⚠️ COMPROMISED</p>
           )}
 
-          {/* 🔥 KEY + CHAIN (CORRECT PLACEMENT) */}
+          {/* KEY + CHAIN */}
           <hr />
 
           <p>🔑 Current Key: {selected.key}</p>
@@ -179,9 +188,25 @@ export default function FluxlockDashboard() {
             </div>
           ))}
 
+          {/* CHAIN VALIDATION */}
           <hr />
 
+          <h4>🧪 Chain Validation</h4>
+
+          <p style={{
+            color: selected.chainValid === false ? "#ff4d4d" : "#00ff99",
+            fontWeight: "bold"
+          }}>
+            {selected.chainValid === false ? "INVALID" : "VALID"}
+          </p>
+
+          <p style={{ fontSize: "0.9rem", opacity: 0.8 }}>
+            {selected.chainReason || "no validation data"}
+          </p>
+
           {/* ATTACK PANEL */}
+          <hr />
+
           <h3>⚔️ Attack Panel</h3>
 
           <button onClick={spikeAttack}>⚡ Spike Attack</button>
@@ -193,7 +218,7 @@ export default function FluxlockDashboard() {
           <button onClick={networkAttack}>🌊 Network Attack</button>
 
           <br /><br />
-          <button onClick={() => setSelected(null)}>Close</button>
+          <button onClick={() => setSelectedId(null)}>Close</button>
         </div>
       )}
     </div>

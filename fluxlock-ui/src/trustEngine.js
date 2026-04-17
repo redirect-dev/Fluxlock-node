@@ -2,6 +2,52 @@ function generateKey() {
   return Math.random().toString(16).substring(2, 10);
 }
 
+// =========================
+// 🔗 CHAIN VALIDATION
+// =========================
+function validateChain(node) {
+  const chain = node.identityChain;
+
+  if (!chain || chain.length === 0) {
+    return { valid: false, reason: "missing identity chain" };
+  }
+
+  // Check continuity (trust shouldn't jump wildly)
+  for (let i = 1; i < chain.length; i++) {
+    const prev = chain[i - 1];
+    const curr = chain[i];
+
+    const diff = Math.abs(curr.trust - prev.trust);
+
+    if (diff > 50) {
+      return {
+        valid: false,
+        reason: "identity discontinuity detected",
+      };
+    }
+  }
+
+  // Check current vs last known state
+  const last = chain[chain.length - 1];
+
+  if (Math.abs(node.trust - last.trust) > 60) {
+    return {
+      valid: false,
+      reason: "current state deviates from identity history",
+    };
+  }
+
+  // Drift sanity check
+  if (node.drift > 120) {
+    return {
+      valid: false,
+      reason: "critical instability",
+    };
+  }
+
+  return { valid: true, reason: "chain valid" };
+}
+
 export function createNetwork(size = 20) {
   const nodes = [];
 
@@ -23,9 +69,12 @@ export function createNetwork(size = 20) {
       epoch: i,
       epochAge: 0,
 
-      // 🔑 NEW
       key,
       identityChain: [{ key, trust: 100 }],
+
+      // 🔥 NEW
+      chainValid: true,
+      chainReason: "init",
     });
   }
 
@@ -61,7 +110,9 @@ export function simulateStep(nodes) {
 
     if (immunityTimer > 0) immunityTimer--;
 
+    // =========================
     // COMPROMISE
+    // =========================
     if (compromised) {
       recoveryTimer++;
       drift *= 0.995;
@@ -69,14 +120,18 @@ export function simulateStep(nodes) {
       status = "attacked";
     }
 
+    // =========================
     // RECOVERY
+    // =========================
     if (compromised && recoveryTimer > 25) {
       drift *= 0.94;
       trust += 0.4;
       status = "warning";
     }
 
-    // 🔥 EXIT COMPROMISE → ROTATE KEY
+    // =========================
+    // EXIT COMPROMISE → ROTATE KEY
+    // =========================
     if (compromised && drift < 35 && trust > 65) {
       compromised = false;
       recoveryTimer = 0;
@@ -98,7 +153,9 @@ export function simulateStep(nodes) {
       status = "drifting";
     }
 
+    // =========================
     // NORMAL
+    // =========================
     if (!compromised) {
       drift *= 0.97;
 
@@ -118,6 +175,15 @@ export function simulateStep(nodes) {
     trust = Math.max(0, Math.min(100, trust));
     drift = Math.max(0, drift);
 
+    // =========================
+    // 🔥 VALIDATE CHAIN
+    // =========================
+    const validation = validateChain({
+      trust,
+      drift,
+      identityChain,
+    });
+
     return {
       ...node,
       trust,
@@ -131,6 +197,10 @@ export function simulateStep(nodes) {
       epochAge,
       key,
       identityChain,
+
+      // 🔥 NEW OUTPUT
+      chainValid: validation.valid,
+      chainReason: validation.reason,
     };
   });
 }
