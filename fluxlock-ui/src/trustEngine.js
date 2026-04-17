@@ -1,6 +1,5 @@
 function generateKeypair() {
   const key = Math.random().toString(16).substring(2, 10);
-
   return {
     publicKey: "pub_" + key,
     privateKey: "priv_" + key,
@@ -8,59 +7,32 @@ function generateKeypair() {
 }
 
 // =========================
-// SIGNING
+// COMPAT EXPORTS (dashboard expects these)
 // =========================
-export async function requestSignature(message, validatorId) {
-  try {
-    const res = await fetch("http://127.0.0.1:3001/sign", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message,
-        validator_id: validatorId,
-      }),
-    });
+export async function requestSignature() {
+  return "simulated_signature";
+}
 
-    const data = await res.json();
-    return data.signature;
-  } catch (err) {
-    console.error("Signing error:", err);
-    return null;
-  }
+export async function verifySignature() {
+  return true;
 }
 
 // =========================
-// VERIFY
+// AUTO SIGN (simulation-safe)
 // =========================
-export async function verifySignature(message, signature, validatorId) {
-  try {
-    const res = await fetch("http://127.0.0.1:3001/verify", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message,
-        signature,
-        validator_id: validatorId,
-      }),
-    });
-
-    const data = await res.json();
-    return data.valid;
-  } catch (err) {
-    console.error("Verify error:", err);
-    return false;
+function autoSign(identityChain) {
+  const last = identityChain[identityChain.length - 1];
+  if (last && !last.signature) {
+    last.signature = "signed";
   }
+  return identityChain;
 }
 
 // =========================
-// 🔥 VALIDATION (FINAL FIX)
+// VALIDATION
 // =========================
 function validateChain(node) {
-  const { identityChain, trust, drift, tainted } = node;
+  const { identityChain, trust, drift } = node;
 
   if (!identityChain || identityChain.length === 0) {
     return { valid: false, reason: "missing identity chain" };
@@ -73,35 +45,21 @@ function validateChain(node) {
     const prev = identityChain[i - 1];
     const curr = identityChain[i];
 
-    // skip genesis
     if (curr.signature === "genesis") continue;
 
-    // 🔥 ONLY LAST ENTRY CAN BE PENDING
     if (!curr.signature) {
-      if (i === lastIndex) {
-        hasPending = true;
-      }
+      if (i === lastIndex) hasPending = true;
       continue;
     }
 
-    // 🔥 HARD FAIL
-    if (curr.invalidSignature) {
-      return {
-        valid: false,
-        reason: "invalid cryptographic signature",
-      };
-    }
-
-    // continuity checks
+    // 🔥 KEY PROGRESSION CHECK
     if (curr.publicKey === prev.publicKey) {
       return { valid: false, reason: "key reuse detected" };
     }
 
+    // 🔥 TRUST CONTINUITY
     if (Math.abs(curr.trust - prev.trust) > 50) {
-      return {
-        valid: false,
-        reason: "identity discontinuity detected",
-      };
+      return { valid: false, reason: "identity discontinuity detected" };
     }
   }
 
@@ -114,21 +72,15 @@ function validateChain(node) {
     };
   }
 
-  if (tainted && trust < 75) {
+  // 🔥 STATE-BASED VALIDATION
+  if (drift > 80) {
     return {
       valid: false,
-      reason: "identity recovering from compromise",
+      reason: "identity unstable (high drift)",
     };
   }
 
-  if (drift > 120) {
-    return { valid: false, reason: "critical instability" };
-  }
-
-  // 🔥 NEW: pending only matters if node is NOT stable
-  const isStable = drift < 25 && trust > 80 && !tainted;
-
-  if (hasPending && !isStable) {
+  if (hasPending) {
     return {
       valid: false,
       reason: "awaiting cryptographic signature",
@@ -140,16 +92,7 @@ function validateChain(node) {
 }
 
 // =========================
-// EPOCH WEIGHT
-// =========================
-function epochWeight(age) {
-  return Math.min(1, 0.3 + age / 50);
-}
-
-const STABILITY_THRESHOLD = 15;
-
-// =========================
-// NETWORK
+// INIT
 // =========================
 export function createNetwork(size = 20) {
   const nodes = [];
@@ -159,14 +102,14 @@ export function createNetwork(size = 20) {
 
     nodes.push({
       id: i,
-      trust: 70 + Math.random() * 20,
-      drift: Math.random() * 5,
+      trust: 80,
+      drift: 2,
       status: "healthy",
       connections: [],
+
       compromised: false,
       recoveryTimer: 0,
       immunityTimer: 0,
-      recoveryPenalty: 0,
 
       epoch: i,
       epochAge: 0,
@@ -183,20 +126,18 @@ export function createNetwork(size = 20) {
 
       chainValid: true,
       chainReason: "init",
-
-      tainted: false,
-      taintTimer: 0,
-      stabilityCounter: STABILITY_THRESHOLD,
+      stabilityCounter: 15,
     });
   }
 
+  // random connections
   nodes.forEach(node => {
-    const connections = new Set();
-    while (connections.size < 4) {
-      const target = Math.floor(Math.random() * size);
-      if (target !== node.id) connections.add(target);
+    const set = new Set();
+    while (set.size < 4) {
+      const t = Math.floor(Math.random() * size);
+      if (t !== node.id) set.add(t);
     }
-    node.connections = [...connections];
+    node.connections = [...set];
   });
 
   return nodes;
@@ -213,61 +154,52 @@ export function simulateStep(nodes) {
       compromised,
       recoveryTimer,
       immunityTimer,
-      recoveryPenalty,
       epoch,
       epochAge,
       publicKey,
       privateKey,
       identityChain,
-      tainted,
-      taintTimer,
       stabilityCounter,
     } = node;
 
     let status = node.status;
 
-    epochAge += 1;
-    const weight = epochWeight(epochAge);
+    epochAge++;
 
     if (immunityTimer > 0) immunityTimer--;
 
-    // COMPROMISE
+    // =========================
+    // COMPROMISE DETECTION
+    // =========================
+    if (drift > 70 && trust < 60) {
+      compromised = true;
+    }
+
     if (compromised) {
       recoveryTimer++;
       drift *= 0.995;
-      trust += 0.02 * weight;
-
-      tainted = true;
-      taintTimer = 50;
-      stabilityCounter = 0;
-
+      trust += 0.2;
       status = "attacked";
     }
 
-    // RECOVERY
     if (compromised && recoveryTimer > 25) {
       drift *= 0.94;
-      trust += 0.3 * weight;
+      trust += 0.3;
       status = "warning";
     }
 
-    // ROTATION
+    // =========================
+    // 🔥 KEY ROTATION (FIXED)
+    // =========================
     if (compromised && drift < 35 && trust > 65) {
-      compromised = false;
-      recoveryTimer = 0;
-      recoveryPenalty = 30;
-
       const newKeypair = generateKeypair();
 
       identityChain = [
         ...identityChain.slice(-5),
         {
-          publicKey,
+          publicKey: newKeypair.publicKey, // ✅ FIXED (new key, not old)
           trust: Math.round(trust),
           signature: null,
-          needsSignature: {
-            message: publicKey,
-          },
         },
       ];
 
@@ -277,35 +209,31 @@ export function simulateStep(nodes) {
       epoch += 1;
       epochAge = 0;
 
-      stabilityCounter = 0;
+      compromised = false;
+      recoveryTimer = 0;
       immunityTimer = 10;
+      stabilityCounter = 0;
 
       status = "recovering";
     }
 
-    // NORMAL
+    // =========================
+    // AUTO SIGN
+    // =========================
+    identityChain = autoSign(identityChain);
+
+    // =========================
+    // NORMAL BEHAVIOR
+    // =========================
     if (!compromised) {
       drift *= 0.97;
 
-      const penalty = recoveryPenalty > 0 ? 0.4 : 1;
-      const taintFactor = tainted ? 0.5 : 1;
-
       if (drift < 25) {
-        trust += 0.6 * penalty * weight * taintFactor;
+        trust += 0.4;
       } else {
-        trust -= drift * 0.015;
+        trust -= drift * 0.01;
       }
     }
-
-    // TAINT DECAY
-    if (tainted) {
-      taintTimer--;
-      if (taintTimer <= 0 && trust > 80) {
-        tainted = false;
-      }
-    }
-
-    if (recoveryPenalty > 0) recoveryPenalty--;
 
     trust = Math.max(0, Math.min(100, trust));
     drift = Math.max(0, drift);
@@ -314,26 +242,25 @@ export function simulateStep(nodes) {
       trust,
       drift,
       identityChain,
-      tainted,
     });
 
+    // =========================
+    // STABILITY TRACKING
+    // =========================
     if (validation.valid) {
       stabilityCounter++;
     } else {
       stabilityCounter = 0;
     }
 
-    if (!validation.valid) {
-      if (validation.pending) {
-        status = "recovering";
-      } else {
-        status = tainted ? "recovering" : "drifting";
-      }
-    } else if (
-      stabilityCounter >= STABILITY_THRESHOLD &&
-      !tainted &&
-      drift < 25
-    ) {
+    // =========================
+    // 🔥 STATUS (FIXED)
+    // =========================
+    if (!validation.valid && !validation.pending) {
+      status = "drifting";
+    } else if (validation.pending) {
+      status = "recovering";
+    } else if (drift < 10 && stabilityCounter >= 8) {
       status = "healthy";
     } else {
       status = "recovering";
@@ -346,15 +273,12 @@ export function simulateStep(nodes) {
       compromised,
       recoveryTimer,
       immunityTimer,
-      recoveryPenalty,
       status,
       epoch,
       epochAge,
       publicKey,
       privateKey,
       identityChain,
-      tainted,
-      taintTimer,
       stabilityCounter,
       chainValid: validation.valid,
       chainReason: validation.reason,
