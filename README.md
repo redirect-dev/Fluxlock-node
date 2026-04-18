@@ -1,22 +1,8 @@
 # 🔐 Fluxlock
+A self-healing, time-bound identity and trust protocol.
 
-A protocol for time-bound, self-healing identity.
-
-Fluxlock introduces a new security model where identity is not permanent — it must evolve with time or becomes invalid.
-
----
-
-## ⚡ Try It
-
-Run the demo:
-
-```bash
-cargo run -p fluxlock-protocol --bin fluxlock-demo
-# 🔐 Fluxlock
-
-A protocol for time-bound, self-healing identity.
-
-Fluxlock introduces a new security model where identity is not permanent — it must evolve with time or becomes invalid.
+Fluxlock introduces a new security model where identity is not permanent —  
+it must evolve, behave, and remain stable over time or becomes invalid.
 
 ---
 
@@ -29,50 +15,165 @@ cargo run -p fluxlock-protocol --bin fluxlock-demo
 Watch what happens:
 
 Identity rotates
-Identity expires
-Expired identity is rejected
-The network enforces validity over time
+Identity becomes unstable under attack
+Trust degrades
+Recovery begins
+Identity revalidates
+System returns to a healthy state
 ⚔ Attack Mode
 
-Simulate repeated attempts to reuse expired identity:
+Simulate instability and compromise:
 
 cargo run -p fluxlock-protocol --bin fluxlock-demo -- --attack
 
 Watch how the protocol:
 
-rejects each attempt
-penalizes invalid behavior
-prevents identity reuse
-## 🖥 Fluxlock CLI
-
-Run Fluxlock as a simple tool:
-
-```bash
+increases drift (instability)
+reduces trust
+invalidates compromised identity
+forces recovery before reuse
+prevents identity reuse without continuity
+🖥 Fluxlock CLI
 cargo run -p fluxlock-protocol --bin fluxlock run
 cargo run -p fluxlock-protocol --bin fluxlock attack
-cargo run -p fluxlock-protocol --bin fluxlock explain
-
+cargo run -p fluxlock-protocol --bin fluxlock validate
 🧭 What is Fluxlock?
 
-Fluxlock is a protocol-level identity system that enforces time-bound validity.
+Fluxlock is a protocol-level identity system that enforces:
 
-Instead of treating identity as persistent, Fluxlock ensures that identities must continuously rotate and remain in sync with the network. Once an identity falls out of its valid time window, it is automatically rejected — even if cryptographic signatures are correct.
+time-bound validity
+behavioral continuity
+stability under stress
 
-This shifts identity from something that is verified once, to something that must remain valid over time.
+Instead of treating identity as static, Fluxlock ensures:
+
+Identity must continuously prove it is still valid.
+
+🧠 Core Model
+
+Fluxlock defines identity as:
+
+identity = key + time + history + behavior + stability
+
+This means:
+
+identities must rotate forward (no reuse)
+identity history must remain continuous
+behavior affects trust over time
+instability (drift) can invalidate identity
+identity must recover before regaining validity
+🔄 Identity Lifecycle
+
+A node in Fluxlock follows a full lifecycle:
+
+Healthy
+ → Attacked
+ → Unstable (drift ↑, trust ↓)
+ → Recovering
+ → Key Rotation
+ → Pending Signature
+ → Revalidated
+ → Healthy
+
+This lifecycle is:
+
+deterministic
+enforceable
+repeatable under simulation
+🧪 Validation Engine
+
+Fluxlock does not just check identity history.
+
+It validates:
+
+identity chain integrity
+key continuity (no reuse)
+trust level
+drift (instability)
+signature presence
+recovery state
+Validity Conditions
+
+A node is considered locally valid only if:
+
+identity chain is intact
+no key reuse
+drift is below threshold
+trust is sufficient
+signature is present
+⚖️ Stability & Drift
+
+Fluxlock introduces a new concept:
+
+Identity stability over time
+
+Drift increases under attack or bad behavior
+Trust decreases with instability
+High drift → identity becomes invalid
+Recovery reduces drift gradually
+
+This prevents:
+
+instant recovery exploits
+trust resets
+unstable identities appearing valid
+✍️ Signature System
+
+Currently:
+
+signatures are simulated (autoSign())
+
+Planned:
+
+real post-quantum signatures (Dilithium)
+🌐 Network (In Progress)
+
+Current system:
+
+nodes validate themselves (local truth)
+
+Next phase:
+
+nodes validate each other (network truth)
+Upcoming: Consensus Layer
+
+Fluxlock will introduce:
+
+peer validation
+network voting
+trust-weighted influence
+agreement thresholds
+
+Future model:
+
+GLOBAL_VALID = LOCAL_VALID + NETWORK_ACCEPTED
+🔐 Post-Quantum Design
+
+Fluxlock is designed for post-quantum environments:
+
+supports PQ signatures (Dilithium planned)
+enforces short-lived identity
+reduces replay windows
+limits impact of key compromise
+
+Even if cryptography weakens:
+
+identity cannot be reused indefinitely
 
 🧱 Where Fluxlock Fits
 
 Fluxlock is not a replacement for cryptography.
 
-It is an enforcement layer on top of cryptographic identity systems.
-
-It sits between:
+It is an enforcement layer between:
 
 key generation
-and transaction validation
+and system validation
 
-Ensuring that identity is not only valid, but current.
+Ensuring identity is:
 
+valid
+current
+stable
 🔥 Why It Matters
 
 Most systems assume:
@@ -81,7 +182,7 @@ valid key = valid identity
 
 Fluxlock enforces:
 
-valid key + valid time = valid identity
+valid key + valid time + valid behavior + stability = valid identity
 
 This reduces the impact of:
 
@@ -89,85 +190,48 @@ key compromise
 credential replay
 long-lived access
 delayed breach detection
-
-By making identity expire, the system limits how long any compromise can be exploited.
-
-🧠 Core Concept
-
-Fluxlock defines identity as:
-
-identity = evolving + time-bound + enforced
-
-This means:
-
-identities must rotate regularly
-identities fall out of sync with the network
-outdated identities are automatically rejected
-even valid cryptographic signatures can fail if identity is no longer current
-🔥 What Makes It Different
-🔐 Hybrid cryptography (Ed25519 + Dilithium)
-🔁 Atomic identity rotation (commit → reveal)
-⏱ Epoch-based identity enforcement
-❌ Automatic rejection of outdated identities
-⚔ Validator slashing for invalid execution
-
-Fluxlock does not just verify identity — it verifies when that identity is valid.
-
+identity spoofing
 🧩 Potential Applications
 
-Fluxlock can be applied anywhere identity persistence creates risk:
+Fluxlock can be applied to:
 
-🔐 Enterprise Identity Systems
-Limit the lifetime of compromised credentials
-Enforce continuous identity validity across systems
-Reduce reliance on detection-based security
-☁️ Cloud & Workload Identity
-Prevent long-lived service credentials
-Enforce identity freshness in distributed systems
-Eliminate stale identity reuse
-⛓ Blockchain & Distributed Systems
-Enforce epoch-based identity validity
-Prevent replay of outdated signatures
-Enable protocol-level identity enforcement
-🛡 Zero Trust Architectures
-Move from “verify once” to continuous validation
-Bind identity to time as a security constraint
-
-Fluxlock introduces a new primitive:
-
-identity validity is enforced over time, not assumed
-
-🎬 Live Demo
-
-Run the protocol and observe identity lifecycle in real time:
-
-cargo run -p fluxlock-protocol --bin fluxlock-demo
+🔐 Enterprise Identity
+continuous identity validation
+eliminate stale credentials
+☁️ Cloud & Workloads
+prevent long-lived service identity
+enforce rotation and stability
+⛓ Blockchain / Validators
+prevent identity resets
+enforce behavior-based trust
+enable weighted consensus
+🤖 AI / Agent Systems
+persistent identity with accountability
+trust-aware coordination
 🧪 Example Output
---- ROTATION PHASE ---
-Identity ID-1000 → ID-1001
+--- ATTACK EVENT ---
+Drift increased → trust decreased
 
---- EXPIRATION EVENT ---
-ID-1000 is now INVALID
+--- VALIDATION FAILURE ---
+Node marked INVALID
 
---- ATTACK ATTEMPT ---
-Transaction rejected: ID-1000 is expired
+--- RECOVERY ---
+Drift decreasing → trust rebuilding
+
+--- ROTATION ---
+New key issued
 
 --- RESULT ---
-Expired identity cannot be reused
-🛠 CLI Usage
-
-Run full demo:
-
-cargo run -p fluxlock-protocol --bin fluxlock-demo
-
-Run attack simulation:
-
-cargo run -p fluxlock-protocol --bin fluxlock-demo -- --attack
+Identity VALID → state HEALTHY
 ⚠️ Project Status
 
-Fluxlock is currently a prototype / research system.
+Fluxlock is currently:
 
-It demonstrates a new identity model but is not yet production-ready.
+a working prototype
+a simulated network environment
+a stable identity engine
+
+Not yet production-ready.
 
 🧭 Vision
 
@@ -176,32 +240,21 @@ Fluxlock explores a future where:
 Identity is not something you have —
 it is something you continuously maintain.
 
-📌 Why This Matters
-
-Most systems assume:
-
-secure key = long-term access
-
-Fluxlock enforces:
-
-secure key = temporary access
-
-This reduces the impact of:
-
-key theft
-long-term credential leaks
-delayed detection breaches
-## 🔎 Identity Validation
-
-Fluxlock can be used to validate identity state:
-
-```bash
-cargo run -p fluxlock-protocol --bin fluxlock validate --identity ID-1001 --epoch 1
+🚀 Roadmap
+ Network consensus layer
+ Real cryptographic signatures (Dilithium)
+ Persistent identity storage
+ API layer
+ Use-case integration
 📬 Contact
 
-If you are working on identity, post-quantum systems, or distributed security and want to explore this model, feel free to connect or reach out.
+If you're working on:
 
-Fluxlock is currently in an early research and prototype phase.
+identity systems
+post-quantum security
+distributed networks
+
+and want to explore this model, reach out.
 
 🤝 Contributing
 
