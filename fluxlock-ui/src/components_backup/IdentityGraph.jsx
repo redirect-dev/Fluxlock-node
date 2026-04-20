@@ -1,10 +1,12 @@
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
 
-const IdentityGraph = ({ validators }) => {
+const IdentityGraph = ({ validators, onSelectNode }) => {
   const svgRef = useRef();
 
   useEffect(() => {
+    if (!validators || validators.length === 0) return;
+
     const width = 800;
     const height = 800;
 
@@ -15,6 +17,7 @@ const IdentityGraph = ({ validators }) => {
     const centerY = height / 2;
     const radius = 300;
 
+    // ---------------- BUILD NODE POSITIONS ----------------
     const nodes = validators.map((v, i) => {
       const angle = (i / validators.length) * 2 * Math.PI;
 
@@ -25,10 +28,12 @@ const IdentityGraph = ({ validators }) => {
       };
     });
 
-    // Draw links (full mesh)
-    nodes.forEach((source) => {
-      nodes.forEach((target) => {
-        svg.append("line")
+    // ---------------- LINKS ----------------
+    const linkGroup = svg.append("g");
+
+    nodes.forEach((source, i) => {
+      nodes.slice(i + 1).forEach((target) => {
+        linkGroup.append("line")
           .attr("x1", source.x)
           .attr("y1", source.y)
           .attr("x2", target.x)
@@ -37,32 +42,69 @@ const IdentityGraph = ({ validators }) => {
       });
     });
 
-    // Draw nodes
-    svg.selectAll("circle")
+    // ---------------- NODE GROUP ----------------
+    const nodeGroup = svg.append("g");
+
+    const nodeEnter = nodeGroup
+      .selectAll("g.node")
       .data(nodes)
       .enter()
-      .append("circle")
-      .attr("cx", (d) => d.x)
-      .attr("cy", (d) => d.y)
-      .attr("r", 12)
-      .attr("fill", (d) => {
-        if (d.valid === false) return "red";
-        if (d.valid === true) return "green";
-        return "blue";
+      .append("g")
+      .attr("class", "node")
+      .attr("transform", d => `translate(${d.x}, ${d.y})`)
+      .style("cursor", "pointer")
+      .on("click", (event, d) => {
+        if (onSelectNode) {
+          onSelectNode(d.id); // ✅ FIXED
+        }
       });
 
-    // Labels
-    svg.selectAll("text")
-      .data(nodes)
-      .enter()
-      .append("text")
-      .attr("x", (d) => d.x)
-      .attr("y", (d) => d.y - 15)
-      .attr("text-anchor", "middle")
-      .attr("fill", "white")
-      .text((d) => d.id);
+    // ---------------- NODE CIRCLE ----------------
+    nodeEnter.append("circle")
+      .attr("r", 12)
+      .attr("fill", d => {
+        if (d.status === "attacked") return "#ff4d4d";
+        if (d.status === "warning") return "#ffaa00";
+        if (d.status === "healthy") return "#00ff88";
+        return "#3399ff";
+      })
+      .attr("stroke", "#ffffff22")
+      .attr("stroke-width", 1);
 
-  }, [validators]);
+    // ---------------- HOVER EFFECT ----------------
+    nodeEnter
+      .on("mouseover", function () {
+        d3.select(this).select("circle")
+          .transition()
+          .duration(150)
+          .attr("r", 16);
+      })
+      .on("mouseout", function () {
+        d3.select(this).select("circle")
+          .transition()
+          .duration(150)
+          .attr("r", 12);
+      });
+
+    // ---------------- LABELS ----------------
+    nodeEnter.append("text")
+      .attr("text-anchor", "middle")
+      .attr("dy", "0.35em")
+      .attr("fill", "white")
+      .attr("font-size", "10px")
+      .attr("font-weight", "bold")
+      .text(d => d.id);
+
+  }, [validators, onSelectNode]);
+
+  // ---------------- FALLBACK ----------------
+  if (!validators || validators.length === 0) {
+    return (
+      <div style={{ color: "white", padding: 20 }}>
+        No validators loaded
+      </div>
+    );
+  }
 
   return (
     <svg

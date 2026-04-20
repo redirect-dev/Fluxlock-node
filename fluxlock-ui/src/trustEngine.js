@@ -1,90 +1,40 @@
+// =========================
+// 🔐 PSEUDO-DILITHIUM KEY GEN
+// =========================
 function generateKeypair() {
-  const key = Math.random().toString(16).substring(2, 10);
+  const rand = () =>
+    Math.random().toString(36).substring(2, 10);
+
   return {
-    publicKey: "pub_" + key,
-    privateKey: "priv_" + key,
+    publicKey: `dil_${rand()}${rand()}${rand()}`,
+    privateKey: `priv_${rand()}${rand()}`,
+    fingerprint: rand().substring(0, 8),
   };
 }
 
 // =========================
-// COMPAT EXPORTS (dashboard expects these)
-// =========================
-export async function requestSignature() {
-  return "simulated_signature";
-}
-
-export async function verifySignature() {
-  return true;
-}
-
-// =========================
-// AUTO SIGN (simulation-safe)
-// =========================
-function autoSign(identityChain) {
-  const last = identityChain[identityChain.length - 1];
-  if (last && !last.signature) {
-    last.signature = "signed";
-  }
-  return identityChain;
-}
-
-// =========================
-// VALIDATION
+// 🔗 VALIDATION
 // =========================
 function validateChain(node) {
-  const { identityChain, trust, drift } = node;
+  const chain = node.identityChain;
 
-  if (!identityChain || identityChain.length === 0) {
+  if (!chain || chain.length === 0) {
     return { valid: false, reason: "missing identity chain" };
   }
 
-  let hasPending = false;
-  const lastIndex = identityChain.length - 1;
+  const last = chain[chain.length - 1];
 
-  for (let i = 1; i < identityChain.length; i++) {
-    const prev = identityChain[i - 1];
-    const curr = identityChain[i];
-
-    if (curr.signature === "genesis") continue;
-
-    if (!curr.signature) {
-      if (i === lastIndex) hasPending = true;
-      continue;
-    }
-
-    // 🔥 KEY PROGRESSION CHECK
-    if (curr.publicKey === prev.publicKey) {
-      return { valid: false, reason: "key reuse detected" };
-    }
-
-    // 🔥 TRUST CONTINUITY
-    if (Math.abs(curr.trust - prev.trust) > 50) {
-      return { valid: false, reason: "identity discontinuity detected" };
-    }
-  }
-
-  const last = identityChain[lastIndex];
-
-  if (Math.abs(trust - last.trust) > 60) {
+  if (Math.abs(node.trust - last.trust) > 60) {
     return {
       valid: false,
       reason: "current state deviates from identity history",
     };
   }
 
-  // 🔥 STATE-BASED VALIDATION
-  if (drift > 80) {
+  if (node.drift > 120) {
     return {
       valid: false,
-      reason: "identity unstable (high drift)",
-    };
-  }
-
-  if (hasPending) {
-    return {
-      valid: false,
-      reason: "awaiting cryptographic signature",
-      pending: true,
+      reason: "critical instability",
     };
   }
 
@@ -92,13 +42,13 @@ function validateChain(node) {
 }
 
 // =========================
-// INIT
+// 🧠 CREATE NETWORK
 // =========================
 export function createNetwork(size = 20) {
   const nodes = [];
 
   for (let i = 0; i < size; i++) {
-    const keypair = generateKeypair();
+    const kp = generateKeypair();
 
     nodes.push({
       id: i,
@@ -114,37 +64,38 @@ export function createNetwork(size = 20) {
       epoch: i,
       epochAge: 0,
 
-      ...keypair,
+      ...kp,
 
       identityChain: [
         {
-          publicKey: keypair.publicKey,
+          publicKey: kp.publicKey,
+          fingerprint: kp.fingerprint,
           trust: 100,
-          signature: "genesis",
+          sig: "GENESIS",
         },
       ],
 
       chainValid: true,
       chainReason: "init",
-      stabilityCounter: 15,
+
+      stabilityCounter: 0,
     });
   }
 
-  // random connections
-  nodes.forEach(node => {
-    const set = new Set();
-    while (set.size < 4) {
-      const t = Math.floor(Math.random() * size);
-      if (t !== node.id) set.add(t);
+  // Dense mesh
+  for (let i = 0; i < size; i++) {
+    for (let j = 0; j < size; j++) {
+      if (i !== j && Math.random() < 0.5) {
+        nodes[i].connections.push(j);
+      }
     }
-    node.connections = [...set];
-  });
+  }
 
   return nodes;
 }
 
 // =========================
-// SIMULATION
+// ⚙️ SIMULATION (FIXED STATE MACHINE)
 // =========================
 export function simulateStep(nodes) {
   return nodes.map(node => {
@@ -158,113 +109,99 @@ export function simulateStep(nodes) {
       epochAge,
       publicKey,
       privateKey,
+      fingerprint,
       identityChain,
-      stabilityCounter,
+      status,
     } = node;
-
-    let status = node.status;
 
     epochAge++;
 
     if (immunityTimer > 0) immunityTimer--;
 
     // =========================
-    // COMPROMISE DETECTION
+    // ENTER COMPROMISE
     // =========================
-    if (drift > 70 && trust < 60) {
+    if (!compromised && drift > 70 && trust < 60) {
       compromised = true;
-    }
-
-    if (compromised) {
-      recoveryTimer++;
-      drift *= 0.995;
-      trust += 0.2;
+      recoveryTimer = 0;
       status = "attacked";
     }
 
-    if (compromised && recoveryTimer > 25) {
-      drift *= 0.94;
-      trust += 0.3;
+    // =========================
+    // COMPROMISED BEHAVIOR
+    // =========================
+    if (compromised) {
+      recoveryTimer++;
+
+      drift *= 0.97;     // stronger decay
+      trust += 0.2;
+
+      status = "attacked";
+    }
+
+    // =========================
+    // RECOVERY PHASE
+    // =========================
+    if (compromised && drift < 50 && trust > 50) {
       status = "warning";
     }
 
     // =========================
-    // 🔥 KEY ROTATION (FIXED)
+    // FULL RECOVERY → KEY ROTATION
     // =========================
-    if (compromised && drift < 35 && trust > 65) {
-      const newKeypair = generateKeypair();
+    if (compromised && drift < 25 && trust > 65) {
+      const kp = generateKeypair();
 
       identityChain = [
         ...identityChain.slice(-5),
         {
-          publicKey: newKeypair.publicKey, // ✅ FIXED (new key, not old)
+          publicKey: kp.publicKey,
+          fingerprint: kp.fingerprint,
           trust: Math.round(trust),
-          signature: null,
+          sig: "ROTATED",
         },
       ];
 
-      publicKey = newKeypair.publicKey;
-      privateKey = newKeypair.privateKey;
+      publicKey = kp.publicKey;
+      privateKey = kp.privateKey;
+      fingerprint = kp.fingerprint;
 
-      epoch += 1;
+      epoch++;
       epochAge = 0;
 
       compromised = false;
       recoveryTimer = 0;
       immunityTimer = 10;
-      stabilityCounter = 0;
 
-      status = "recovering";
+      status = "healthy";
     }
-
-    // =========================
-    // AUTO SIGN
-    // =========================
-    identityChain = autoSign(identityChain);
 
     // =========================
     // NORMAL BEHAVIOR
     // =========================
     if (!compromised) {
-      drift *= 0.97;
+      drift *= 0.96;
 
       if (drift < 25) {
         trust += 0.4;
+        status = "healthy";
       } else {
-        trust -= drift * 0.01;
+        trust -= drift * 0.015;
+        status = "warning";
       }
     }
 
     trust = Math.max(0, Math.min(100, trust));
     drift = Math.max(0, drift);
 
+    // =========================
+    // VALIDATION
+    // =========================
     const validation = validateChain({
       trust,
       drift,
       identityChain,
     });
-
-    // =========================
-    // STABILITY TRACKING
-    // =========================
-    if (validation.valid) {
-      stabilityCounter++;
-    } else {
-      stabilityCounter = 0;
-    }
-
-    // =========================
-    // 🔥 STATUS (FIXED)
-    // =========================
-    if (!validation.valid && !validation.pending) {
-      status = "drifting";
-    } else if (validation.pending) {
-      status = "recovering";
-    } else if (drift < 10 && stabilityCounter >= 8) {
-      status = "healthy";
-    } else {
-      status = "recovering";
-    }
 
     return {
       ...node,
@@ -273,13 +210,14 @@ export function simulateStep(nodes) {
       compromised,
       recoveryTimer,
       immunityTimer,
-      status,
       epoch,
       epochAge,
       publicKey,
       privateKey,
+      fingerprint,
       identityChain,
-      stabilityCounter,
+      status,
+
       chainValid: validation.valid,
       chainReason: validation.reason,
     };

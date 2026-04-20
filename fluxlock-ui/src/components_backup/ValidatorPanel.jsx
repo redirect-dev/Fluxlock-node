@@ -15,31 +15,15 @@ export default function ValidatorPanel({ node, onClose, onAttack }) {
     >
       <h2>Validator {node.id}</h2>
 
-      {/* ✅ EPOCH */}
-      <p>
-        🔑 <strong>Epoch:</strong> {node.epoch ?? "—"}
-      </p>
-
-      {/* ✅ AGE (THIS WAS MISSING) */}
-      <p>
-        ⏱ <strong>Age:</strong> {node.epochAge ?? "—"}
-      </p>
+      <p>🔑 <strong>Epoch:</strong> {node.epoch ?? "—"}</p>
+      <p>⏱ <strong>Age:</strong> {node.epochAge ?? "—"}</p>
 
       <hr />
 
-      <p>
-        📊 <strong>Trust:</strong> {node.trust.toFixed(2)}
-      </p>
+      <p>📊 <strong>Trust:</strong> {node.trust.toFixed(2)}</p>
+      <p>🌪 <strong>Drift:</strong> {node.drift.toFixed(2)}</p>
+      <p><strong>Status:</strong> {node.status}</p>
 
-      <p>
-        🌪 <strong>Drift:</strong> {node.drift.toFixed(2)}
-      </p>
-
-      <p>
-        <strong>Status:</strong> {node.status}
-      </p>
-
-      {/* 🔥 COMPROMISED FLAG */}
       {node.compromised && (
         <p style={{ color: "magenta", fontWeight: "bold" }}>
           ⚠️ COMPROMISED
@@ -48,31 +32,47 @@ export default function ValidatorPanel({ node, onClose, onAttack }) {
 
       <hr />
 
-      {/* 🧠 DECISION */}
+      {/* ✅ REAL CONSENSUS */}
+      <h3>🧠 Consensus</h3>
+
+      <p>Local: {node.localValid ? "✅" : "❌"}</p>
+      <p>Network: {node.networkAccepted ? "✅" : "❌"}</p>
+      <p>Global: {node.globalValid ? "✅" : "❌"}</p>
+
+      <p>
+        Votes → ✅ {node.peerVotes?.valid ?? 0} / ❌ {node.peerVotes?.invalid ?? 0}
+      </p>
+
+      <hr />
+
+      {/* ✅ FINAL DECISION BASED ON CONSENSUS */}
       <h3>🧠 Decision</h3>
+
       <p
         style={{
-          color: node.compromised
-            ? "red"
-            : node.drift > 80
+          color: node.globalValid
+            ? "lime"
+            : node.networkAccepted
             ? "orange"
-            : "lime",
+            : "red",
           fontWeight: "bold",
         }}
       >
-        {node.compromised
-          ? "REJECTED"
-          : node.drift > 80
-          ? "REJECTED"
-          : "ACCEPTED"}
+        {node.globalValid
+          ? "ACCEPTED"
+          : node.networkAccepted
+          ? "PARTIAL (NETWORK ONLY)"
+          : "REJECTED"}
       </p>
 
       <p style={{ fontSize: "0.9rem", opacity: 0.8 }}>
-        {node.compromised
-          ? "identity compromised (key breach detected)"
-          : node.drift > 80
-          ? "identity unstable (high drift)"
-          : "identity valid (stable + continuous)"}
+        {!node.localValid
+          ? "local identity invalid"
+          : !node.networkAccepted
+          ? "network rejected"
+          : !node.globalValid
+          ? "not globally finalized"
+          : "fully validated"}
       </p>
 
       <hr />
@@ -81,21 +81,18 @@ export default function ValidatorPanel({ node, onClose, onAttack }) {
       <h3>⚔️ Attack Panel</h3>
 
       <button onClick={() => onAttack("spike")}>⚡ Spike Attack</button>
-      <br />
-      <br />
+      <br /><br />
 
       <button onClick={() => onAttack("critical")}>
         ☠️ Critical Breach
       </button>
-      <br />
-      <br />
+      <br /><br />
 
       <button onClick={() => onAttack("network")}>
         🌐 Network Attack
       </button>
 
-      <br />
-      <br />
+      <br /><br />
 
       <button onClick={onClose}>Close</button>
     </div>
