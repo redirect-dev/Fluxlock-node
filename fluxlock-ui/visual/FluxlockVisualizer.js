@@ -1,33 +1,30 @@
 import React, { useEffect, useState } from "react";
 import IdentityGraph from "./components_backup/IdentityGraph";
 import Dashboard from "./Dashboard";
-import FluxlockVisualizer from "./FluxlockVisualizer";
 
 export default function FluxlockDashboard() {
   const [nodes, setNodes] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
 
-  // 🔥 NEW — auth pulse trigger
-  const [authPulse, setAuthPulse] = useState(0);
-
   // ================= BACKEND STATE LOOP =================
   useEffect(() => {
     const fetchState = () => {
       fetch("http://127.0.0.1:3001/state")
-        .then((res) => res.json())
-        .then((data) => {
+        .then(res => res.json())
+        .then(data => {
           setNodes(data.validators);
 
           if (selectedId === null && data.validators.length > 0) {
             setSelectedId(data.validators[0].id);
           }
         })
-        .catch((err) => console.error("State fetch error:", err));
+        .catch(err => console.error("State fetch error:", err));
     };
 
     fetchState();
 
     const interval = setInterval(fetchState, 300);
+
     return () => clearInterval(interval);
   }, [selectedId]);
 
@@ -36,11 +33,13 @@ export default function FluxlockDashboard() {
     setSelectedId(Number(id));
   };
 
-  // ================= ATTACKS =================
+  // ================= ATTACKS (REAL API) =================
   const spikeAttack = (id) => {
     fetch("http://127.0.0.1:3001/attack/spike", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ id }),
     });
   };
@@ -48,7 +47,9 @@ export default function FluxlockDashboard() {
   const breachAttack = (id) => {
     fetch("http://127.0.0.1:3001/attack/breach", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ id }),
     });
   };
@@ -59,57 +60,23 @@ export default function FluxlockDashboard() {
     });
   };
 
-  // ================= AUTH TEST TRIGGER =================
-  const triggerAuthPulse = () => {
-    setAuthPulse(Date.now());
-  };
-
   // ================= SELECTED =================
   const selected =
-    nodes.find((n) => n.id === selectedId) || nodes[0] || null;
+    nodes.find(n => n.id === selectedId) || nodes[0] || null;
 
   return (
-    <div style={{ display: "flex", position: "relative" }}>
-      
-      {/* 🌊 FLUXLOCK FIELD (BACKGROUND LAYER) */}
-      <FluxlockVisualizer
-        node={selected}
-        nodes={nodes}
-        authTrigger={authPulse}
-      />
-
-      {/* 🌐 GRAPH */}
+    <div style={{ display: "flex" }}>
       <IdentityGraph
         validators={nodes}
         onSelectNode={handleSelect}
       />
 
-      {/* 📊 SIDE PANEL */}
       <Dashboard
         node={selected}
         onSpike={spikeAttack}
         onBreach={breachAttack}
         onNetwork={networkAttack}
       />
-
-      {/* 🧪 TEST BUTTON (REMOVE LATER) */}
-      <button
-        onClick={triggerAuthPulse}
-        style={{
-          position: "fixed",
-          bottom: 20,
-          left: 20,
-          padding: "10px 16px",
-          background: "#00ffcc",
-          color: "#000",
-          border: "none",
-          borderRadius: "8px",
-          cursor: "pointer",
-          zIndex: 10,
-        }}
-      >
-        Trigger Auth Pulse
-      </button>
     </div>
   );
 }
