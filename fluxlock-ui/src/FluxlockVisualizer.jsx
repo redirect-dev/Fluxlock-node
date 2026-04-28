@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from "react";
 
-export default function FluxlockVisualizer({ node, nodes, authTrigger }) {
+export default function FluxlockVisualizer({ node, nodes, authTrigger, authData }) {
   const canvasRef = useRef(null);
   const pulsesRef = useRef([]);
+  const waveRef = useRef(null);
 
   useEffect(() => {
     if (!nodes || nodes.length === 0) return;
@@ -10,9 +11,6 @@ export default function FluxlockVisualizer({ node, nodes, authTrigger }) {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
 
-    // =========================
-    // 🔒 MATCH SVG EXACT SIZE
-    // =========================
     const GRAPH_SIZE = 800;
 
     const resize = () => {
@@ -25,7 +23,7 @@ export default function FluxlockVisualizer({ node, nodes, authTrigger }) {
     let frame;
 
     // =========================
-    // 📍 EXACT SAME LAYOUT AS D3
+    // 📍 SAME AS GRAPH
     // =========================
     const centerX = GRAPH_SIZE / 2;
     const centerY = GRAPH_SIZE / 2;
@@ -34,171 +32,152 @@ export default function FluxlockVisualizer({ node, nodes, authTrigger }) {
     const getNodePosition = (n, index, total) => {
       const angle = (index / total) * Math.PI * 2;
 
-      const instabilityOffset = (n.drift || 0) * 0.5;
-
       return {
-        x: centerX + (radius + instabilityOffset) * Math.cos(angle),
-        y: centerY + (radius + instabilityOffset) * Math.sin(angle),
+        x: centerX + radius * Math.cos(angle),
+        y: centerY + radius * Math.sin(angle),
       };
     };
 
     // =========================
-    // ⚡ AUTH PULSE
+    // 🔥 TRIGGER WAVE
     // =========================
     if (authTrigger && node) {
       const index = nodes.findIndex(n => n.id === node.id);
 
       if (index !== -1) {
-        const { x, y } = getNodePosition(node, index, nodes.length);
+        const origin = getNodePosition(node, index, nodes.length);
 
-        pulsesRef.current.push({
-          x,
-          y,
+        waveRef.current = {
+          x: origin.x,
+          y: origin.y,
           radius: 0,
-          max: 350,
+          max: 600,
+          alpha: 1,
+        };
+
+        // core pulse
+        pulsesRef.current.push({
+          x: origin.x,
+          y: origin.y,
+          radius: 0,
           alpha: 1,
         });
       }
     }
 
     // =========================
-    // 🌐 CONSENSUS FIELD (NEW)
+    // 🌈 COLOR FROM AUTH
     // =========================
-    const drawConsensusField = () => {
-      const total = nodes.length;
+    const getAuthColor = () => {
+      if (!authData) return "0,255,200";
 
-      const accept = nodes.filter(n => n.decision === "ACCEPT").length;
-      const weighted = nodes.filter(n => n.decision === "WEIGHTED").length;
-      const reject = nodes.filter(n => n.decision === "REJECT").length;
+      if (authData.resolvedStatus === "healthy") return "0,255,200";
+      if (authData.resolvedStatus === "recovering") return "255,170,0";
+      if (authData.resolvedStatus === "denied") return "255,80,80";
 
-      const consensusStrength = (accept + weighted * 0.5) / total;
-      const instability = reject / total;
-
-      // 🎨 COLOR SHIFT
-      let r = 0, g = 255, b = 200;
-
-      if (instability > 0.3) {
-        r = 255; g = 80; b = 80;
-      } else if (instability > 0.1) {
-        r = 255; g = 170; b = 0;
-      }
-
-      // 🌊 BREATHING
-      const pulse = Math.sin(Date.now() * 0.002) * 8;
-
-      const baseRadius = 70 + consensusStrength * 140;
-
-      ctx.shadowColor = `rgba(${r},${g},${b},0.5)`;
-      ctx.shadowBlur = 35;
-
-      // 🌀 FRACTAL RINGS (3 layers)
-      for (let i = 0; i < 3; i++) {
-        ctx.beginPath();
-
-        ctx.arc(
-          centerX,
-          centerY,
-          baseRadius + i * 45 + pulse,
-          0,
-          Math.PI * 2
-        );
-
-        ctx.strokeStyle = `rgba(${r},${g},${b},${0.18 - i * 0.04})`;
-        ctx.lineWidth = 2;
-
-        ctx.stroke();
-      }
-
-      ctx.shadowBlur = 0;
+      return "0,255,200";
     };
 
     // =========================
-    // 🌐 NODE FIELDS
+    // 🌐 NODE FIELD REACTION
     // =========================
-    const drawField = (n, index) => {
+    const drawNodeField = (n, index) => {
       const { x, y } = getNodePosition(n, index, nodes.length);
 
       const isSelected = node && n.id === node.id;
 
-      const trust = n.trust || 0;
-      const drift = n.drift || 0;
-      const epoch = n.epoch_age || 0;
+      const baseColor = getAuthColor();
 
-      const baseColor =
-        n.status === "healthy"
-          ? "0,255,200"
-          : n.status === "recovering"
-          ? "255,170,0"
-          : "255,80,80";
+      // distance from wave origin
+      let reaction = 0;
 
-      const intensity = isSelected ? 1 : 0.15;
+      if (waveRef.current) {
+        const dx = x - waveRef.current.x;
+        const dy = y - waveRef.current.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
 
-      ctx.strokeStyle = `rgba(${baseColor}, ${0.5 * intensity})`;
-      ctx.shadowColor = `rgba(${baseColor}, ${0.7 * intensity})`;
-      ctx.lineWidth = isSelected ? 2 : 1;
-      ctx.shadowBlur = isSelected ? 20 : 6;
+        const diff = Math.abs(dist - waveRef.current.radius);
 
-      const base = isSelected ? 42 : 18;
+        if (diff < 40) {
+          reaction = 1 - diff / 40; // smooth falloff
+        }
+      }
 
-      // trust
+      const intensity = isSelected ? 1 : 0.2 + reaction * 0.8;
+
+      ctx.strokeStyle = `rgba(${baseColor}, ${0.4 * intensity})`;
+      ctx.shadowColor = `rgba(${baseColor}, ${0.6 * intensity})`;
+      ctx.lineWidth = isSelected ? 2.5 : 1;
+      ctx.shadowBlur = isSelected ? 25 : 8 + reaction * 20;
+
+      const base = isSelected ? 40 : 18;
+
       ctx.beginPath();
-      ctx.arc(x, y, base + trust * 0.25, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // drift
-      ctx.beginPath();
-      ctx.arc(x, y, base + 35 + drift * 1.2, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // epoch
-      ctx.beginPath();
-      ctx.arc(x, y, base + 70 + (epoch % 50), 0, Math.PI * 2);
+      ctx.arc(x, y, base + reaction * 30, 0, Math.PI * 2);
       ctx.stroke();
 
       ctx.shadowBlur = 0;
     };
 
     // =========================
-    // ⚡ PULSES
+    // ⚡ DRAW CORE PULSE
     // =========================
     const drawPulses = () => {
       pulsesRef.current.forEach((p) => {
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(0,255,255,${p.alpha * 0.2})`;
-        ctx.lineWidth = 10;
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
         ctx.strokeStyle = `rgba(0,255,255,${p.alpha})`;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
         ctx.stroke();
 
-        p.radius += 4;
+        p.radius += 5;
         p.alpha *= 0.96;
       });
 
-      pulsesRef.current = pulsesRef.current.filter(
-        (p) => p.alpha > 0.05 && p.radius < p.max
-      );
+      pulsesRef.current = pulsesRef.current.filter(p => p.alpha > 0.05);
     };
 
     // =========================
-    // 🎬 MAIN LOOP
+    // 🌊 DRAW WAVE
+    // =========================
+    const drawWave = () => {
+      if (!waveRef.current) return;
+
+      const w = waveRef.current;
+
+      const color = getAuthColor();
+
+      ctx.beginPath();
+      ctx.arc(w.x, w.y, w.radius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(${color}, ${w.alpha * 0.25})`;
+      ctx.lineWidth = 8;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(w.x, w.y, w.radius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(${color}, ${w.alpha})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      w.radius += 6;
+      w.alpha *= 0.97;
+
+      if (w.radius > w.max || w.alpha < 0.05) {
+        waveRef.current = null;
+      }
+    };
+
+    // =========================
+    // 🎬 LOOP
     // =========================
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 🔥 GLOBAL CONSENSUS FIELD FIRST
-      drawConsensusField();
-
-      // nodes
       nodes.forEach((n, i) => {
-        drawField(n, i);
+        drawNodeField(n, i);
       });
 
-      // pulses
+      drawWave();
       drawPulses();
 
       frame = requestAnimationFrame(draw);
@@ -207,7 +186,7 @@ export default function FluxlockVisualizer({ node, nodes, authTrigger }) {
     draw();
 
     return () => cancelAnimationFrame(frame);
-  }, [node, nodes, authTrigger]);
+  }, [node, nodes, authTrigger, authData]);
 
   return (
     <canvas

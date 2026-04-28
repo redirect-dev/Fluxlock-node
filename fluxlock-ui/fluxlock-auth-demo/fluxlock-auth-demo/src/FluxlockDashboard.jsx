@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import IdentityGraph from "./components_backup/IdentityGraph";
-import Dashboard from "./Dashboard";
-import FluxlockVisualizer from "./FluxlockVisualizer";
+import IdentityGraph from "./components/IdentityGraph";
+import Dashboard from "./components/Dashboard";
+import FluxlockVisualizer from "./components/FluxlockVisualizer";
 
 export default function FluxlockDashboard() {
   const [nodes, setNodes] = useState([]);
