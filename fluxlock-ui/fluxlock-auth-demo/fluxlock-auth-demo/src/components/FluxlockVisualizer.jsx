@@ -1,187 +1,533 @@
-import React, { useEffect, useRef } from "react";
+import React, {
+  useEffect,
+  useRef,
+} from "react";
 
-export default function FluxlockVisualizer({ node, nodes, authTrigger, authData }) {
-  const canvasRef = useRef(null);
-  const consensusRef = useRef([]);
+export default function FluxlockVisualizer({
+  node,
+  nodes,
+  authTrigger,
+  authData,
+}) {
+
+  const canvasRef =
+    useRef(null);
+
+  const consensusRef =
+    useRef([]);
+
+  const orbitalRef =
+    useRef([]);
 
   useEffect(() => {
-    if (!nodes || nodes.length === 0) return;
 
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
+    if (
+      !nodes ||
+      nodes.length === 0
+    )
+      return;
+
+    const canvas =
+      canvasRef.current;
+
+    const ctx =
+      canvas.getContext("2d");
 
     const GRAPH_SIZE = 800;
-    canvas.width = GRAPH_SIZE;
-    canvas.height = GRAPH_SIZE;
+
+    canvas.width =
+      GRAPH_SIZE;
+
+    canvas.height =
+      GRAPH_SIZE;
 
     let frame;
 
-    const centerX = GRAPH_SIZE / 2;
-    const centerY = GRAPH_SIZE / 2;
+    const centerX =
+      GRAPH_SIZE / 2;
+
+    const centerY =
+      GRAPH_SIZE / 2;
+
     const radius = 300;
 
     // =========================
     // 📍 NODE POSITION
     // =========================
-    const getNodePosition = (n, index, total) => {
-      const angle = (index / total) * Math.PI * 2;
-      const driftOffset = (n.drift || 0) * 0.5;
+    const getNodePosition = (
+      n,
+      index,
+      total
+    ) => {
+
+      const angle =
+        (index / total) *
+        Math.PI *
+        2;
+
+      const driftOffset =
+        (n.drift || 0) * 0.5;
 
       return {
-        x: centerX + (radius + driftOffset) * Math.cos(angle),
-        y: centerY + (radius + driftOffset) * Math.sin(angle),
+
+        x:
+          centerX +
+          (radius + driftOffset)
+            * Math.cos(angle),
+
+        y:
+          centerY +
+          (radius + driftOffset)
+            * Math.sin(angle),
       };
     };
 
     // =========================
-    // ⚡ AUTH → BUILD WEIGHTED WAVE
+    // 🌊 BUILD CONSENSUS
     // =========================
-    if (authTrigger && authData) {
-      consensusRef.current = [];
+    if (
+      authTrigger &&
+      authData
+    ) {
 
-      const confidence = authData.confidence || 0;
+      consensusRef.current = [];
+      orbitalRef.current = [];
+
+      const confidence =
+        authData.confidence || 0;
 
       nodes.forEach((n, i) => {
-        const trust = n.trust || 0;
-        const drift = n.drift || 0;
 
-        // 🔥 strength formula
-        let strength = (trust / 100) * confidence - drift * 0.2;
-        strength = Math.max(0.05, Math.min(1, strength));
+        const trust =
+          n.trust || 0;
 
-        // 🔥 delay influenced by trust
-        let delay = i * 35 - trust * 0.15;
+        const drift =
+          n.drift || 0;
 
-        // recovering adds instability
-        if (authData.resolvedStatus === "recovering") {
-          delay += Math.random() * 30;
-        }
+        let strength =
+          (trust / 100)
+          * confidence
+          - drift * 0.2;
 
-        // denied breaks early + weakens
-        if (authData.resolvedStatus === "denied" && i > nodes.length * 0.4) {
-          return;
-        }
+        strength =
+          Math.max(
+            0.05,
+            Math.min(1, strength)
+          );
 
         consensusRef.current.push({
+
           id: n.id,
-          delay,
+
+          delay:
+            i * 30,
+
           strength,
+
           alpha: 1,
+
           active: false,
-          start: performance.now(),
+
+          start:
+            performance.now(),
+        });
+
+        // 🔥 ORBITALS
+        orbitalRef.current.push({
+
+          id: n.id,
+
+          angle:
+            Math.random()
+            * Math.PI * 2,
+
+          speed:
+            0.004
+            + Math.random()
+            * 0.01,
+
+          radius:
+            30
+            + Math.random()
+            * 40,
+
+          size:
+            2
+            + Math.random()
+            * 4,
         });
       });
     }
 
     // =========================
-    // 🌐 NODE FIELD (unchanged base)
+    // 🧠 STATUS VISUALS
     // =========================
-    const drawField = (n, index) => {
-      const { x, y } = getNodePosition(n, index, nodes.length);
-      const isSelected = node && n.id === node.id;
+    const getLifecycleVisuals =
+      (status) => {
 
-      const trust = n.trust || 0;
-      const drift = n.drift || 0;
-      const epoch = n.epoch_age || 0;
+      switch (status) {
 
-      const baseColor =
-        n.status === "healthy"
-          ? "0,255,200"
-          : n.status === "recovering"
-          ? "255,170,0"
-          : "255,80,80";
+        case "emerging":
 
-      const intensity = isSelected ? 1 : 0.15;
+          return {
+            scale: 1,
+            glow: 10,
+            pulse: 1,
+          };
 
-      ctx.strokeStyle = `rgba(${baseColor}, ${0.5 * intensity})`;
-      ctx.shadowColor = `rgba(${baseColor}, ${0.7 * intensity})`;
-      ctx.lineWidth = isSelected ? 2 : 1;
-      ctx.shadowBlur = isSelected ? 20 : 6;
+        case "maturing":
 
-      const base = isSelected ? 42 : 18;
+          return {
+            scale: 1.4,
+            glow: 18,
+            pulse: 1.5,
+          };
 
+        case "established":
+
+          return {
+            scale: 1.8,
+            glow: 28,
+            pulse: 2,
+          };
+
+        case "sovereign":
+
+          return {
+            scale: 2.5,
+            glow: 40,
+            pulse: 3,
+          };
+
+        case "recovering":
+
+          return {
+            scale: 1.2,
+            glow: 12,
+            pulse: 0.6,
+          };
+
+        default:
+
+          return {
+            scale: 1,
+            glow: 8,
+            pulse: 1,
+          };
+      }
+    };
+
+    // =========================
+    // 🌊 FIELD
+    // =========================
+    const drawField = (
+      n,
+      index
+    ) => {
+
+      const {
+        x,
+        y,
+      } =
+        getNodePosition(
+          n,
+          index,
+          nodes.length
+        );
+
+      const isSelected =
+        node &&
+        n.id === node.id;
+
+      const lifecycle =
+        getLifecycleVisuals(
+          authData?.status
+        );
+
+      const trust =
+        n.trust || 0;
+
+      const drift =
+        n.drift || 0;
+
+      const pulse =
+        Math.sin(
+          performance.now()
+          * 0.002
+          * lifecycle.pulse
+        ) * 6;
+
+      let color =
+        "0,255,220";
+
+      if (
+        authData?.status
+        === "recovering"
+      ) {
+
+        color =
+          "255,180,0";
+      }
+
+      ctx.shadowColor =
+        `rgba(${color},0.9)`;
+
+      ctx.shadowBlur =
+        lifecycle.glow;
+
+      const base =
+        isSelected
+          ? 55
+          : 20;
+
+      // 🔥 MAIN FIELD
+      for (
+        let i = 0;
+        i < 4;
+        i++
+      ) {
+
+        ctx.beginPath();
+
+        ctx.arc(
+          x,
+          y,
+          base
+          + i * 35
+          + pulse
+          + trust * 0.08
+          + drift,
+          0,
+          Math.PI * 2
+        );
+
+        ctx.strokeStyle =
+          `rgba(${color},
+          ${0.12 - i * 0.02})`;
+
+        ctx.lineWidth =
+          2 - i * 0.3;
+
+        ctx.stroke();
+      }
+
+      // 🔥 CORE
       ctx.beginPath();
-      ctx.arc(x, y, base + trust * 0.25, 0, Math.PI * 2);
-      ctx.stroke();
 
-      ctx.beginPath();
-      ctx.arc(x, y, base + 35 + drift * 1.2, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.arc(
+        x,
+        y,
+        isSelected
+          ? 16
+          : 10,
+        0,
+        Math.PI * 2
+      );
 
-      ctx.beginPath();
-      ctx.arc(x, y, base + 70 + (epoch % 50), 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.fillStyle =
+        `rgba(${color},1)`;
+
+      ctx.fill();
 
       ctx.shadowBlur = 0;
     };
 
     // =========================
-    // ⚡ WEIGHTED CONSENSUS DRAW
+    // 🔗 ORBITALS
     // =========================
-    const drawConsensus = () => {
-      const now = performance.now();
+    const drawOrbitals =
+      () => {
 
-      consensusRef.current.forEach((c) => {
-        const n = nodes.find(n => n.id === c.id);
-        if (!n) return;
+      orbitalRef.current
+        .forEach((o) => {
 
-        const index = nodes.findIndex(n2 => n2.id === c.id);
-        const { x, y } = getNodePosition(n, index, nodes.length);
+        const n =
+          nodes.find(
+            n => n.id === o.id
+          );
 
-        if (now - c.start > c.delay) {
+        if (!n)
+          return;
+
+        const index =
+          nodes.findIndex(
+            n2 => n2.id === o.id
+          );
+
+        const {
+          x,
+          y,
+        } =
+          getNodePosition(
+            n,
+            index,
+            nodes.length
+          );
+
+        o.angle += o.speed;
+
+        const ox =
+          x
+          + Math.cos(o.angle)
+          * o.radius;
+
+        const oy =
+          y
+          + Math.sin(o.angle)
+          * o.radius;
+
+        ctx.beginPath();
+
+        ctx.arc(
+          ox,
+          oy,
+          o.size,
+          0,
+          Math.PI * 2
+        );
+
+        ctx.fillStyle =
+          "rgba(0,255,255,0.9)";
+
+        ctx.fill();
+
+        // 🔥 ORBIT TRAIL
+        ctx.beginPath();
+
+        ctx.moveTo(x, y);
+
+        ctx.lineTo(ox, oy);
+
+        ctx.strokeStyle =
+          "rgba(0,255,255,0.08)";
+
+        ctx.stroke();
+      });
+    };
+
+    // =========================
+    // ⚡ CONSENSUS
+    // =========================
+    const drawConsensus =
+      () => {
+
+      const now =
+        performance.now();
+
+      consensusRef.current
+        .forEach((c) => {
+
+        const n =
+          nodes.find(
+            n => n.id === c.id
+          );
+
+        if (!n)
+          return;
+
+        const index =
+          nodes.findIndex(
+            n2 => n2.id === c.id
+          );
+
+        const {
+          x,
+          y,
+        } =
+          getNodePosition(
+            n,
+            index,
+            nodes.length
+          );
+
+        if (
+          now - c.start
+          > c.delay
+        ) {
+
           c.active = true;
         }
 
-        if (!c.active) return;
+        if (!c.active)
+          return;
 
-        // 🎨 color by state
-        let color = "0,255,255";
-        if (authData?.resolvedStatus === "recovering") color = "255,200,0";
-        if (authData?.resolvedStatus === "denied") {
-          color = "255,60,60";
-          c.alpha *= 0.95;
-        }
+        const radius =
+          25
+          + c.strength * 28;
 
-        const strength = c.strength;
-
-        // 🔥 dynamic visuals
-        const radius = 18 + strength * 20;
-        const alpha = 0.3 + strength * 0.7;
-
-        // glow
         ctx.beginPath();
-        ctx.arc(x, y, radius + 6, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${color}, ${0.08 * alpha})`;
-        ctx.fill();
 
-        // core ring
-        ctx.beginPath();
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(${color}, ${alpha})`;
-        ctx.lineWidth = 2 + strength * 1.5;
+        ctx.arc(
+          x,
+          y,
+          radius,
+          0,
+          Math.PI * 2
+        );
+
+        ctx.strokeStyle =
+          `rgba(
+            0,
+            255,
+            255,
+            ${0.5 * c.alpha}
+          )`;
+
+        ctx.lineWidth =
+          3;
+
         ctx.stroke();
+
+        c.alpha *= 0.992;
       });
 
-      // cleanup fade
-      consensusRef.current = consensusRef.current.filter(c => c.alpha > 0.05);
+      consensusRef.current =
+        consensusRef.current
+          .filter(
+            c => c.alpha > 0.05
+          );
     };
 
     // =========================
     // 🎬 MAIN LOOP
     // =========================
     const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      nodes.forEach((n, i) => drawField(n, i));
+      ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+      nodes.forEach(
+        (n, i) =>
+          drawField(n, i)
+      );
+
+      drawOrbitals();
+
       drawConsensus();
 
-      frame = requestAnimationFrame(draw);
+      frame =
+        requestAnimationFrame(
+          draw
+        );
     };
 
     draw();
 
-    return () => cancelAnimationFrame(frame);
-  }, [node, nodes, authTrigger, authData]);
+    return () =>
+      cancelAnimationFrame(
+        frame
+      );
+
+  }, [
+    node,
+    nodes,
+    authTrigger,
+    authData,
+  ]);
 
   return (
     <canvas
