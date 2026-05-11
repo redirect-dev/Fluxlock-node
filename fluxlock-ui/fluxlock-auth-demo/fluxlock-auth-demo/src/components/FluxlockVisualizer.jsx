@@ -13,19 +13,27 @@ export default function FluxlockVisualizer({
   const canvasRef =
     useRef(null);
 
-  const consensusRef =
-    useRef([]);
-
   const orbitalRef =
     useRef([]);
+
+  const pulseFieldRef =
+    useRef([]);
+
+  const shockwaveRef =
+    useRef([]);
+
+  const scarFieldRef =
+    useRef([]);
+
+  const frameRef =
+    useRef(null);
 
   useEffect(() => {
 
     if (
       !nodes ||
       nodes.length === 0
-    )
-      return;
+    ) return;
 
     const canvas =
       canvasRef.current;
@@ -33,107 +41,124 @@ export default function FluxlockVisualizer({
     const ctx =
       canvas.getContext("2d");
 
-    const GRAPH_SIZE = 800;
+    const WIDTH = 900;
+    const HEIGHT = 900;
 
-    canvas.width =
-      GRAPH_SIZE;
-
-    canvas.height =
-      GRAPH_SIZE;
-
-    let frame;
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
 
     const centerX =
-      GRAPH_SIZE / 2;
+      WIDTH / 2;
 
     const centerY =
-      GRAPH_SIZE / 2;
+      HEIGHT / 2;
 
-    const radius = 300;
+    const networkRadius = 300;
 
     // =========================
-    // 📍 NODE POSITION
+    // 🌐 POSITIONING
     // =========================
     const getNodePosition = (
-      n,
+      validator,
       index,
       total
     ) => {
 
       const angle =
-        (index / total) *
-        Math.PI *
-        2;
+        (index / total)
+        * Math.PI * 2;
 
-      const driftOffset =
-        (n.drift || 0) * 0.5;
+      const drift =
+        validator.drift || 0;
+
+      const pressure =
+        validator.consensus_pressure || 0;
+
+      const instability =
+        drift * 1.8
+        + pressure * 3;
+
+      const trust =
+        validator.trust || 0;
+
+      const resilience =
+        validator.resilience_score || 0;
+
+      const coherence =
+        trust / 100;
+
+      const breathing =
+        Math.sin(
+          performance.now()
+          * 0.0008
+          + index
+        ) * 10;
+
+      const radius =
+        networkRadius
+        + instability
+        - (coherence * 18)
+        - (resilience * 0.08)
+        + breathing;
 
       return {
 
         x:
-          centerX +
-          (radius + driftOffset)
-            * Math.cos(angle),
+          centerX
+          + radius
+          * Math.cos(angle),
 
         y:
-          centerY +
-          (radius + driftOffset)
-            * Math.sin(angle),
+          centerY
+          + radius
+          * Math.sin(angle),
       };
     };
 
     // =========================
-    // 🌊 BUILD CONSENSUS
+    // 🌊 AUTH EVENT
     // =========================
     if (
       authTrigger &&
       authData
     ) {
 
-      consensusRef.current = [];
-      orbitalRef.current = [];
+      shockwaveRef.current.push({
 
-      const confidence =
-        authData.confidence || 0;
+        radius: 50,
 
-      nodes.forEach((n, i) => {
+        alpha: 1,
 
-        const trust =
-          n.trust || 0;
+        color:
+          authData.status ===
+          "recovering"
+            ? "255,180,0"
+            : "0,255,255",
+      });
 
-        const drift =
-          n.drift || 0;
+      nodes.forEach((n) => {
 
-        let strength =
-          (trust / 100)
-          * confidence
-          - drift * 0.2;
-
-        strength =
-          Math.max(
-            0.05,
-            Math.min(1, strength)
-          );
-
-        consensusRef.current.push({
+        pulseFieldRef.current.push({
 
           id: n.id,
 
-          delay:
-            i * 30,
-
-          strength,
+          radius: 25,
 
           alpha: 1,
-
-          active: false,
-
-          start:
-            performance.now(),
         });
+      });
+    }
 
-        // 🔥 ORBITALS
-        orbitalRef.current.push({
+    // =========================
+    // 🪐 ORBITALS
+    // =========================
+    if (
+      orbitalRef.current.length
+      !== nodes.length
+    ) {
+
+      orbitalRef.current =
+        nodes.map((n) => ({
 
           id: n.id,
 
@@ -142,149 +167,392 @@ export default function FluxlockVisualizer({
             * Math.PI * 2,
 
           speed:
-            0.004
+            0.002
             + Math.random()
-            * 0.01,
+            * 0.008,
 
-          radius:
-            30
+          orbit:
+            35
             + Math.random()
-            * 40,
+            * 50,
 
           size:
-            2
+            1
             + Math.random()
             * 4,
-        });
-      });
+        }));
     }
 
     // =========================
-    // 🧠 STATUS VISUALS
+    // 🎨 COLORS
     // =========================
-    const getLifecycleVisuals =
-      (status) => {
+    const getNodeColor =
+      (validator) => {
 
-      switch (status) {
+      const trust =
+        validator.trust || 0;
 
-        case "emerging":
+      const drift =
+        validator.drift || 0;
 
-          return {
-            scale: 1,
-            glow: 10,
-            pulse: 1,
-          };
+      if (
+        validator.status ===
+        "quarantined"
+      ) {
 
-        case "maturing":
+        return {
+          core:
+            "255,40,40",
 
-          return {
-            scale: 1.4,
-            glow: 18,
-            pulse: 1.5,
-          };
+          glow:
+            "255,0,0",
+        };
+      }
 
-        case "established":
+      if (
+        validator.status ===
+        "immune"
+      ) {
 
-          return {
-            scale: 1.8,
-            glow: 28,
-            pulse: 2,
-          };
+        return {
+          core:
+            "120,255,255",
 
-        case "sovereign":
+          glow:
+            "0,255,255",
+        };
+      }
 
-          return {
-            scale: 2.5,
-            glow: 40,
-            pulse: 3,
-          };
+      if (
+        trust < 60 ||
+        drift > 20
+      ) {
 
-        case "recovering":
+        return {
+          core:
+            "255,180,0",
 
-          return {
-            scale: 1.2,
-            glow: 12,
-            pulse: 0.6,
-          };
+          glow:
+            "255,180,0",
+        };
+      }
 
-        default:
+      return {
+        core:
+          "0,255,220",
 
-          return {
-            scale: 1,
-            glow: 8,
-            pulse: 1,
-          };
+        glow:
+          "0,255,255",
+      };
+    };
+
+    // =========================
+    // 🌌 BACKGROUND
+    // =========================
+    const drawBackgroundField =
+      () => {
+
+      const gradient =
+        ctx.createRadialGradient(
+          centerX,
+          centerY,
+          80,
+          centerX,
+          centerY,
+          600
+        );
+
+      gradient.addColorStop(
+        0,
+        "rgba(0,255,255,0.04)"
+      );
+
+      gradient.addColorStop(
+        1,
+        "rgba(0,0,0,0)"
+      );
+
+      ctx.fillStyle =
+        gradient;
+
+      ctx.fillRect(
+        0,
+        0,
+        WIDTH,
+        HEIGHT
+      );
+    };
+
+    // =========================
+    // 🌊 COHERENCE FIELD
+    // =========================
+    const drawCoherenceField =
+      () => {
+
+      const avgTrust =
+        nodes.reduce(
+          (a, n) =>
+            a + (n.trust || 0),
+          0
+        ) / nodes.length;
+
+      const avgDrift =
+        nodes.reduce(
+          (a, n) =>
+            a + (n.drift || 0),
+          0
+        ) / nodes.length;
+
+      const avgResilience =
+        nodes.reduce(
+          (a, n) =>
+            a + (
+              n.resilience_score
+              || 0
+            ),
+          0
+        ) / nodes.length;
+
+      const base =
+        80
+        + avgTrust
+        - avgDrift
+        + avgResilience * 0.2;
+
+      for (
+        let i = 0;
+        i < 5;
+        i++
+      ) {
+
+        ctx.beginPath();
+
+        ctx.arc(
+          centerX,
+          centerY,
+          base + i * 55,
+          0,
+          Math.PI * 2
+        );
+
+        ctx.strokeStyle =
+          `rgba(
+            0,
+            255,
+            255,
+            ${0.14 - i * 0.02}
+          )`;
+
+        ctx.lineWidth =
+          3 - i * 0.4;
+
+        ctx.stroke();
       }
     };
 
     // =========================
-    // 🌊 FIELD
+    // 🌐 LINKS
     // =========================
-    const drawField = (
-      n,
-      index
+    const drawLinks = () => {
+
+      nodes.forEach((a, i) => {
+
+        const posA =
+          getNodePosition(
+            a,
+            i,
+            nodes.length
+          );
+
+        nodes.forEach((b, j) => {
+
+          if (i >= j)
+            return;
+
+          const posB =
+            getNodePosition(
+              b,
+              j,
+              nodes.length
+            );
+
+          const avgTrust =
+            (
+              (a.trust || 0)
+              + (b.trust || 0)
+            ) / 2;
+
+          const avgScar =
+            (
+              (a.scar_level || 0)
+              + (b.scar_level || 0)
+            ) / 2;
+
+          let alpha =
+            0.05
+            + (avgTrust / 100)
+            * 0.25;
+
+          alpha -=
+            avgScar * 0.03;
+
+          alpha =
+            Math.max(
+              0.015,
+              alpha
+            );
+
+          ctx.beginPath();
+
+          ctx.moveTo(
+            posA.x,
+            posA.y
+          );
+
+          ctx.lineTo(
+            posB.x,
+            posB.y
+          );
+
+          ctx.strokeStyle =
+            `rgba(
+              0,
+              255,
+              255,
+              ${alpha}
+            )`;
+
+          ctx.lineWidth =
+            0.5
+            + (avgTrust / 100)
+            * 2;
+
+          ctx.stroke();
+        });
+      });
+    };
+
+    // =========================
+    // 🔥 SCARS
+    // =========================
+    const drawScars = (
+      x,
+      y,
+      scarLevel
     ) => {
+
+      if (scarLevel < 0.2)
+        return;
+
+      const count =
+        Math.min(
+          10,
+          Math.floor(
+            scarLevel * 2
+          )
+        );
+
+      for (
+        let i = 0;
+        i < count;
+        i++
+      ) {
+
+        const angle =
+          (
+            Math.PI * 2
+          )
+          * (i / count);
+
+        const length =
+          25
+          + scarLevel * 6;
+
+        ctx.beginPath();
+
+        ctx.moveTo(x, y);
+
+        ctx.lineTo(
+          x
+          + Math.cos(angle)
+          * length,
+
+          y
+          + Math.sin(angle)
+          * length
+        );
+
+        ctx.strokeStyle =
+          `rgba(
+            255,
+            60,
+            60,
+            ${0.12 + scarLevel * 0.05}
+          )`;
+
+        ctx.stroke();
+      }
+    };
+
+    // =========================
+    // 🔵 NODE
+    // =========================
+    const drawNode =
+      (
+        validator,
+        index
+      ) => {
 
       const {
         x,
         y,
       } =
         getNodePosition(
-          n,
+          validator,
           index,
           nodes.length
         );
 
       const isSelected =
         node &&
-        n.id === node.id;
+        validator.id
+        === node.id;
 
-      const lifecycle =
-        getLifecycleVisuals(
-          authData?.status
+      const {
+        core,
+        glow,
+      } =
+        getNodeColor(
+          validator
         );
 
       const trust =
-        n.trust || 0;
+        validator.trust || 0;
 
       const drift =
-        n.drift || 0;
+        validator.drift || 0;
+
+      const resilience =
+        validator.resilience_score || 0;
+
+      const scar =
+        validator.scar_level || 0;
+
+      const coherence =
+        trust / 100;
 
       const pulse =
         Math.sin(
           performance.now()
-          * 0.002
-          * lifecycle.pulse
+          * 0.003
+          + index
         ) * 6;
 
-      let color =
-        "0,255,220";
-
-      if (
-        authData?.status
-        === "recovering"
-      ) {
-
-        color =
-          "255,180,0";
-      }
-
-      ctx.shadowColor =
-        `rgba(${color},0.9)`;
-
-      ctx.shadowBlur =
-        lifecycle.glow;
-
-      const base =
-        isSelected
-          ? 55
-          : 20;
-
-      // 🔥 MAIN FIELD
+      // 🌊 OUTER RINGS
       for (
-        let i = 0;
-        i < 4;
-        i++
+        let r = 0;
+        r < 5;
+        r++
       ) {
 
         ctx.beginPath();
@@ -292,40 +560,84 @@ export default function FluxlockVisualizer({
         ctx.arc(
           x,
           y,
-          base
-          + i * 35
+          35
+          + r * 28
           + pulse
-          + trust * 0.08
-          + drift,
+          + drift * 0.4
+          - resilience * 0.05,
           0,
           Math.PI * 2
         );
 
         ctx.strokeStyle =
-          `rgba(${color},
-          ${0.12 - i * 0.02})`;
+          `rgba(
+            ${core},
+            ${0.10 - r * 0.015}
+          )`;
 
         ctx.lineWidth =
-          2 - i * 0.3;
+          2.5 - r * 0.3;
 
         ctx.stroke();
       }
 
-      // 🔥 CORE
+      // 🛡 IMMUNE HALO
+      if (
+        validator.status ===
+        "immune"
+      ) {
+
+        ctx.beginPath();
+
+        ctx.arc(
+          x,
+          y,
+          120
+          + pulse,
+          0,
+          Math.PI * 2
+        );
+
+        ctx.strokeStyle =
+          "rgba(120,255,255,0.2)";
+
+        ctx.lineWidth = 6;
+
+        ctx.stroke();
+      }
+
+      // 🔥 SCARS
+      drawScars(
+        x,
+        y,
+        scar
+      );
+
+      // 🌟 GLOW
+      ctx.shadowColor =
+        `rgba(${glow},1)`;
+
+      ctx.shadowBlur =
+        15
+        + coherence * 22
+        + resilience * 0.05;
+
+      // 🔵 CORE
       ctx.beginPath();
 
       ctx.arc(
         x,
         y,
         isSelected
-          ? 16
-          : 10,
+          ? 18
+          : 12
+          + coherence * 5,
         0,
         Math.PI * 2
       );
 
       ctx.fillStyle =
-        `rgba(${color},1)`;
+        `rgba(${core},1)`;
 
       ctx.fill();
 
@@ -333,7 +645,7 @@ export default function FluxlockVisualizer({
     };
 
     // =========================
-    // 🔗 ORBITALS
+    // 🪐 ORBITALS
     // =========================
     const drawOrbitals =
       () => {
@@ -341,17 +653,17 @@ export default function FluxlockVisualizer({
       orbitalRef.current
         .forEach((o) => {
 
-        const n =
+        const validator =
           nodes.find(
             n => n.id === o.id
           );
 
-        if (!n)
+        if (!validator)
           return;
 
         const index =
           nodes.findIndex(
-            n2 => n2.id === o.id
+            n => n.id === o.id
           );
 
         const {
@@ -359,22 +671,68 @@ export default function FluxlockVisualizer({
           y,
         } =
           getNodePosition(
-            n,
+            validator,
             index,
             nodes.length
           );
 
-        o.angle += o.speed;
+        const drift =
+          validator.drift || 0;
+
+        const resilience =
+          validator.resilience_score || 0;
+
+        const instability =
+          drift * 0.03;
+
+        o.angle +=
+          o.speed
+          + instability;
+
+        const orbitRadius =
+          o.orbit
+          + drift * 0.5
+          - resilience * 0.03;
 
         const ox =
           x
           + Math.cos(o.angle)
-          * o.radius;
+          * orbitRadius;
 
         const oy =
           y
           + Math.sin(o.angle)
-          * o.radius;
+          * orbitRadius;
+
+        let color =
+          "0,255,255";
+
+        if (
+          validator.status ===
+          "immune"
+        ) {
+
+          color =
+            "120,255,255";
+        }
+
+        if (
+          validator.status ===
+          "recovering"
+        ) {
+
+          color =
+            "255,180,0";
+        }
+
+        if (
+          validator.status ===
+          "quarantined"
+        ) {
+
+          color =
+            "255,60,60";
+        }
 
         ctx.beginPath();
 
@@ -387,11 +745,13 @@ export default function FluxlockVisualizer({
         );
 
         ctx.fillStyle =
-          "rgba(0,255,255,0.9)";
+          `rgba(
+            ${color},
+            0.9
+          )`;
 
         ctx.fill();
 
-        // 🔥 ORBIT TRAIL
         ctx.beginPath();
 
         ctx.moveTo(x, y);
@@ -399,35 +759,35 @@ export default function FluxlockVisualizer({
         ctx.lineTo(ox, oy);
 
         ctx.strokeStyle =
-          "rgba(0,255,255,0.08)";
+          `rgba(
+            ${color},
+            0.08
+          )`;
 
         ctx.stroke();
       });
     };
 
     // =========================
-    // ⚡ CONSENSUS
+    // 🌊 PULSES
     // =========================
-    const drawConsensus =
+    const drawPulses =
       () => {
 
-      const now =
-        performance.now();
+      pulseFieldRef.current
+        .forEach((p) => {
 
-      consensusRef.current
-        .forEach((c) => {
-
-        const n =
+        const validator =
           nodes.find(
-            n => n.id === c.id
+            n => n.id === p.id
           );
 
-        if (!n)
+        if (!validator)
           return;
 
         const index =
           nodes.findIndex(
-            n2 => n2.id === c.id
+            n => n.id === p.id
           );
 
         const {
@@ -435,32 +795,17 @@ export default function FluxlockVisualizer({
           y,
         } =
           getNodePosition(
-            n,
+            validator,
             index,
             nodes.length
           );
-
-        if (
-          now - c.start
-          > c.delay
-        ) {
-
-          c.active = true;
-        }
-
-        if (!c.active)
-          return;
-
-        const radius =
-          25
-          + c.strength * 28;
 
         ctx.beginPath();
 
         ctx.arc(
           x,
           y,
-          radius,
+          p.radius,
           0,
           Math.PI * 2
         );
@@ -470,46 +815,92 @@ export default function FluxlockVisualizer({
             0,
             255,
             255,
-            ${0.5 * c.alpha}
+            ${p.alpha}
           )`;
 
-        ctx.lineWidth =
-          3;
+        ctx.lineWidth = 2;
 
         ctx.stroke();
 
-        c.alpha *= 0.992;
+        p.radius += 3;
+        p.alpha *= 0.968;
       });
 
-      consensusRef.current =
-        consensusRef.current
-          .filter(
-            c => c.alpha > 0.05
-          );
+      pulseFieldRef.current =
+        pulseFieldRef.current.filter(
+          p => p.alpha > 0.03
+        );
     };
 
     // =========================
-    // 🎬 MAIN LOOP
+    // 🌊 SHOCKWAVES
+    // =========================
+    const drawShockwaves =
+      () => {
+
+      shockwaveRef.current
+        .forEach((s) => {
+
+        ctx.beginPath();
+
+        ctx.arc(
+          centerX,
+          centerY,
+          s.radius,
+          0,
+          Math.PI * 2
+        );
+
+        ctx.strokeStyle =
+          `rgba(
+            ${s.color},
+            ${s.alpha}
+          )`;
+
+        ctx.lineWidth = 4;
+
+        ctx.stroke();
+
+        s.radius += 12;
+        s.alpha *= 0.965;
+      });
+
+      shockwaveRef.current =
+        shockwaveRef.current.filter(
+          s => s.alpha > 0.03
+        );
+    };
+
+    // =========================
+    // 🎬 LOOP
     // =========================
     const draw = () => {
 
       ctx.clearRect(
         0,
         0,
-        canvas.width,
-        canvas.height
+        WIDTH,
+        HEIGHT
       );
+
+      drawBackgroundField();
+
+      drawCoherenceField();
+
+      drawLinks();
 
       nodes.forEach(
         (n, i) =>
-          drawField(n, i)
+          drawNode(n, i)
       );
 
       drawOrbitals();
 
-      drawConsensus();
+      drawPulses();
 
-      frame =
+      drawShockwaves();
+
+      frameRef.current =
         requestAnimationFrame(
           draw
         );
@@ -517,10 +908,17 @@ export default function FluxlockVisualizer({
 
     draw();
 
-    return () =>
-      cancelAnimationFrame(
-        frame
-      );
+    return () => {
+
+      if (
+        frameRef.current
+      ) {
+
+        cancelAnimationFrame(
+          frameRef.current
+        );
+      }
+    };
 
   }, [
     node,
@@ -536,8 +934,8 @@ export default function FluxlockVisualizer({
         position: "absolute",
         left: 0,
         top: 0,
-        width: 800,
-        height: 800,
+        width: 900,
+        height: 900,
         pointerEvents: "none",
         zIndex: 0,
       }}
