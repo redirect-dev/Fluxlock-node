@@ -2,6 +2,9 @@
 resolver = "2"
 
 members = [
+
+    "fluxlock-api",
+
     "crates/fluxlock-core",
     "crates/fluxlock-engine",
     "crates/fluxlock-network",
@@ -11,8 +14,10 @@ members = [
     "crates/fluxlock-node-lib",
     "crates/fluxlock-testnet",
     "crates/fluxlock-metrics",
+    "crates/fluxlock-pq",
+
+    "crates/fluxlock-storage",
+
     "bin/fluxlock-replay",
     "bin/fluxlock-node",
-    "crates/fluxlock-pq",
 ]
-

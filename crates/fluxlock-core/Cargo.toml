@@ -7,3 +7,4 @@ edition = "2021"
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
+md5 = "0.7"
