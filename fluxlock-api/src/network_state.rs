@@ -7,12 +7,20 @@ use fluxlock_core::types::{
     Validator,
     IdentityLink,
     IdentityRegistry,
+    PeerNode,
+    PeerAnnouncement,
 };
+
+use crate::peer_state::PeerState;
 
 use crate::engine::identity_validator::{
     generate_identity,
     rotate_identity,
     verify_lineage,
+};
+
+use crate::engine::consensus::{
+    evaluate_consensus,
 };
 
 // 🔥 STORAGE
@@ -43,6 +51,9 @@ pub struct NetworkState {
 
     pub identities:
         IdentityRegistry,
+
+    pub peer_state:
+        PeerState,
 
     pub global_epoch: u64,
 }
@@ -141,6 +152,16 @@ impl NetworkState {
 
                     last_epoch_transition: 0,
 
+                    quorum_score: 100.0,
+
+                    peer_agreement_ratio: 1.0,
+
+                    malicious_reports: 0,
+
+                    consensus_failures: 0,
+
+                    last_quorum_epoch: 0,
+
                     status:
                         "healthy".into(),
                 }
@@ -153,6 +174,9 @@ impl NetworkState {
 
             identities:
                 IdentityRegistry::new(),
+
+            peer_state:
+                PeerState::new(),
 
             global_epoch: 0,
         }
@@ -167,6 +191,61 @@ impl NetworkState {
 
         self.global_epoch += 1;
 
+        // =========================
+        // 🌐 PEER HEALTH
+        // =========================
+        self.peer_state
+            .detect_stale_peers(
+                self.global_epoch
+            );
+
+        // =========================
+        // 📡 GOSSIP EMISSION
+        // =========================
+        for validator in
+            &self.validators
+        {
+
+            let continuity_hash =
+                format!(
+                    "{:x}",
+                    md5::compute(
+                        format!(
+                            "{}:{}:{}",
+                            validator.id,
+                            validator.trust,
+                            validator.identity_chain.len()
+                        )
+                    )
+                );
+
+            self.peer_state
+                .push_announcement(
+
+                    PeerAnnouncement {
+
+                        peer_id:
+                            self.peer_state
+                                .local_peer_id
+                                .clone(),
+
+                        validator_id:
+                            validator.id,
+
+                        epoch:
+                            self.global_epoch,
+
+                        trust:
+                            validator.trust,
+
+                        continuity_hash,
+                    }
+                );
+        }
+
+        // =========================
+        // 🔁 ROTATION CYCLE
+        // =========================
         if self.global_epoch % 1200 == 0 {
 
             let validator_ids:
@@ -184,6 +263,9 @@ impl NetworkState {
             }
         }
 
+        // =========================
+        // 🌐 VALIDATOR LOOP
+        // =========================
         for validator in
             &mut self.validators
         {
@@ -203,6 +285,75 @@ impl NetworkState {
                     validator.id,
                 );
 
+            // =========================
+            // 🌐 DISTRIBUTED CONSENSUS
+            // =========================
+            let consensus =
+                evaluate_consensus(
+                    validator,
+                    &self
+                        .peer_state
+                        .gossip
+                        .announcements,
+                );
+
+            validator.network_accepted =
+                consensus.accepted;
+
+            validator.peer_votes_valid =
+                consensus.valid_votes;
+
+            validator.peer_votes_invalid =
+                consensus.invalid_votes;
+
+            validator.confidence +=
+                consensus.confidence_delta;
+
+            validator.trust +=
+                consensus.trust_delta;
+
+            validator.consensus_pressure +=
+                consensus.pressure_delta;
+
+            validator.peer_agreement_ratio =
+                if (
+                    consensus.valid_votes
+                    + consensus.invalid_votes
+                ) > 0 {
+
+                    consensus.valid_votes
+                        as f64
+                    /
+                    (
+                        consensus.valid_votes
+                        + consensus.invalid_votes
+                    ) as f64
+
+                } else {
+
+                    0.0
+                };
+
+            validator.quorum_score =
+                validator.peer_agreement_ratio
+                    * validator.trust;
+
+            if !consensus.accepted {
+
+                validator.consensus_failures += 1;
+
+                validator.status =
+                    "network-rejected".into();
+
+            } else {
+
+                validator.last_quorum_epoch =
+                    self.global_epoch;
+            }
+
+            // =========================
+            // 🌐 HEALTH EVALUATION
+            // =========================
             if validator.drift > 25.0 {
 
                 validator.status =
@@ -214,8 +365,11 @@ impl NetworkState {
 
             } else {
 
-                validator.status =
-                    "healthy".into();
+                if validator.network_accepted {
+
+                    validator.status =
+                        "healthy".into();
+                }
 
                 validator.confidence +=
                     0.0004;
@@ -234,9 +388,7 @@ impl NetworkState {
                     .trust
                     .clamp(0.0, 100.0);
 
-            // =========================
-            // 💾 PERSIST VALIDATOR
-            // =========================
+            // 💾 PERSIST
             let _ =
                 save_validator(
                     validator
@@ -249,6 +401,9 @@ impl NetworkState {
                 );
         }
 
+        // =========================
+        // 🧠 IDENTITY LOOP
+        // =========================
         for identity in
             self.identities
                 .identities
@@ -282,9 +437,7 @@ impl NetworkState {
                     "maturing".into();
             }
 
-            // =========================
-            // 💾 PERSIST IDENTITY
-            // =========================
+            // 💾 PERSIST
             let _ =
                 save_identity(
                     identity
@@ -293,7 +446,53 @@ impl NetworkState {
     }
 
     // =========================
-    // 🌐 EPOCH ROTATION
+    // 🌐 REGISTER PEER
+    // =========================
+    pub fn register_peer(
+        &mut self,
+        peer_id: String,
+        address: String,
+        validator_id: u32,
+    ) {
+
+        self.peer_state
+            .register_peer(
+
+                PeerNode {
+
+                    peer_id,
+
+                    address,
+
+                    validator_id,
+
+                    last_seen_epoch:
+                        self.global_epoch,
+
+                    trust_score: 100.0,
+
+                    active: true,
+                }
+            );
+    }
+
+    // =========================
+    // 💓 HEARTBEAT
+    // =========================
+    pub fn peer_heartbeat(
+        &mut self,
+        peer_id: &str,
+    ) {
+
+        self.peer_state
+            .heartbeat(
+                peer_id,
+                self.global_epoch,
+            );
+    }
+
+    // =========================
+    // 🔁 EPOCH ROTATION
     // =========================
     pub fn perform_epoch_rotation(
         &mut self,
@@ -363,14 +562,16 @@ impl NetworkState {
                 validator.id,
             );
 
+        validator.epoch_rotations += 1;
+
+        validator.last_epoch_transition =
+            self.global_epoch;
+
         if validator.identity_chain.len() > 64 {
 
             validator.identity_chain.remove(0);
         }
 
-        // =========================
-        // 💾 PERSIST EVOLVED LINEAGE
-        // =========================
         let _ =
             save_validator(
                 validator
@@ -402,6 +603,8 @@ impl NetworkState {
             v.trust *= 0.94;
 
             v.attack_history += 1;
+
+            v.consensus_pressure += 2.0;
 
             v.status =
                 "recovering".into();
@@ -436,6 +639,8 @@ impl NetworkState {
 
             v.global_valid = false;
 
+            v.consensus_failures += 1;
+
             v.status =
                 "quarantined".into();
         }
@@ -457,6 +662,8 @@ impl NetworkState {
             v.trust *= 0.97;
 
             v.attack_history += 1;
+
+            v.consensus_pressure += 0.8;
         }
     }
 
@@ -493,6 +700,8 @@ impl NetworkState {
                 v.trust *= 0.99;
 
                 v.drift += 1.0;
+
+                v.consensus_pressure += 0.5;
             }
 
             v.confidence =

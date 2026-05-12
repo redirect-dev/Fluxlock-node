@@ -6,6 +6,67 @@ use serde::{
 use std::collections::HashMap;
 
 // =========================
+// 🌐 PEER NODE
+// =========================
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
+pub struct PeerNode {
+
+    pub peer_id: String,
+
+    pub address: String,
+
+    pub validator_id: u32,
+
+    pub last_seen_epoch: u64,
+
+    pub trust_score: f64,
+
+    pub active: bool,
+}
+
+// =========================
+// 📡 PEER ANNOUNCEMENT
+// =========================
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
+pub struct PeerAnnouncement {
+
+    pub peer_id: String,
+
+    pub validator_id: u32,
+
+    pub epoch: u64,
+
+    pub trust: f64,
+
+    pub continuity_hash: String,
+}
+
+// =========================
+// 🌊 GOSSIP STATE
+// =========================
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
+pub struct GossipState {
+
+    pub announcements:
+        Vec<PeerAnnouncement>,
+}
+
+// =========================
 // 🔗 IDENTITY LINK
 // =========================
 #[derive(
@@ -159,6 +220,17 @@ pub struct Validator {
     pub rebirth_count: u64,
 
     pub last_epoch_transition: u64,
+
+    // 🌐 CONSENSUS
+    pub quorum_score: f64,
+
+    pub peer_agreement_ratio: f64,
+
+    pub malicious_reports: u64,
+
+    pub consensus_failures: u64,
+
+    pub last_quorum_epoch: u64,
 
     pub status: String,
 }

@@ -1,5 +1,6 @@
 mod state;
 mod network_state;
+mod peer_state;
 mod identity;
 mod engine;
 mod routes;
@@ -20,6 +21,21 @@ use routes::access::access;
 use routes::auth::auth_flow;
 use routes::identity_create::create_identity;
 
+use routes::peer_register::register_peer;
+
+use routes::peer_gossip::{
+    receive_gossip,
+    propagate_gossip,
+};
+
+use routes::peer_state::{
+    export_peer_state,
+};
+
+use engine::peer_sync::{
+    synchronize_peers,
+};
+
 use network_state::NetworkState;
 
 // 🌐 CORS
@@ -33,9 +49,6 @@ use fluxlock_storage::schema::init_schema;
 #[tokio::main]
 async fn main() {
 
-    // =========================
-    // 🧠 INIT STORAGE
-    // =========================
     init_db();
 
     init_schema();
@@ -44,9 +57,6 @@ async fn main() {
         "🧠 Fluxlock persistence initialized"
     );
 
-    // =========================
-    // 🌐 GLOBAL NETWORK STATE
-    // =========================
     let state = Arc::new(
         Mutex::new(
             NetworkState::new()
@@ -78,8 +88,71 @@ async fn main() {
     });
 
     // =========================
-    // 🌐 CORS CONFIG
+    // 🌐 GOSSIP PROPAGATION
     // =========================
+    let propagation_state =
+        state.clone();
+
+    tokio::spawn(async move {
+
+        loop {
+
+            let (
+                peers,
+                announcements,
+            ) = {
+
+                let s =
+                    propagation_state
+                        .lock()
+                        .unwrap();
+
+                (
+                    s.peer_state
+                        .peers
+                        .values()
+                        .cloned()
+                        .collect::<Vec<_>>(),
+
+                    s.peer_state
+                        .gossip
+                        .announcements
+                        .clone(),
+                )
+            };
+
+            for peer in peers {
+
+                if peer.active {
+
+                    propagate_gossip(
+                        peer.address.clone(),
+                        announcements.clone(),
+                    )
+                    .await;
+                }
+            }
+
+            tokio::time::sleep(
+                std::time::Duration::from_secs(5)
+            ).await;
+        }
+    });
+
+    // =========================
+    // 🌐 PEER SYNCHRONIZATION
+    // =========================
+    let sync_state =
+        state.clone();
+
+    tokio::spawn(async move {
+
+        synchronize_peers(
+            sync_state
+        )
+        .await;
+    });
+
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods([
@@ -88,20 +161,29 @@ async fn main() {
         ])
         .allow_headers(Any);
 
-    // =========================
-    // 🚀 ROUTER
-    // =========================
     let app = Router::new()
 
-        // 🔐 CRYPTO
         .route("/sign", post(sign))
         .route("/verify", post(verify))
-
-        // 🧠 VALIDATION
         .route("/validate", post(validate_identity))
 
-        // 🌊 NETWORK STATE
         .route("/state", get(get_state))
+
+        // 🌐 PEER NETWORK
+        .route(
+            "/peer/register",
+            post(register_peer)
+        )
+
+        .route(
+            "/peer/gossip",
+            post(receive_gossip)
+        )
+
+        .route(
+            "/peer/state",
+            get(export_peer_state)
+        )
 
         // 🔥 IDENTITY
         .route(
@@ -114,7 +196,7 @@ async fn main() {
         .route("/access", post(access))
         .route("/auth/flow", post(auth_flow))
 
-        // ⚔ ATTACK SIMULATION
+        // ⚔ ATTACKS
         .route("/attack/spike", post(spike))
         .route("/attack/breach", post(breach))
         .route("/attack/network", post(network))
@@ -123,9 +205,6 @@ async fn main() {
 
         .with_state(state.clone());
 
-    // =========================
-    // 🌐 SERVER START
-    // =========================
     let listener =
         tokio::net::TcpListener::bind(
             "127.0.0.1:3001"
@@ -138,11 +217,7 @@ async fn main() {
     );
 
     println!(
-        "🧠 Persistent Flux Identities enabled"
-    );
-
-    println!(
-        "🆕 Identity Genesis endpoint enabled"
+        "🌐 Distributed peer synchronization enabled"
     );
 
     axum::serve(listener, app)

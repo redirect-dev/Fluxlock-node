@@ -27,6 +27,8 @@ rand = "0.8"
 
 md5 = "0.7"
 
+reqwest = { version = "0.12", features = ["json"] }
+
 # 🔥 WORKSPACE CRATES
 fluxlock-core = { path = "../crates/fluxlock-core" }
 

@@ -7,5 +7,9 @@ pub mod evaluate;
 pub mod access;
 pub mod auth;
 
-// 🔥 NEW
 pub mod identity_create;
+
+// 🌐 NETWORK
+pub mod peer_register;
+pub mod peer_gossip;
+pub mod peer_state;
