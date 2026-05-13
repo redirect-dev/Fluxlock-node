@@ -6,67 +6,6 @@ use serde::{
 use std::collections::HashMap;
 
 // =========================
-// 🌐 PEER NODE
-// =========================
-#[derive(
-    Clone,
-    Debug,
-    Serialize,
-    Deserialize,
-)]
-pub struct PeerNode {
-
-    pub peer_id: String,
-
-    pub address: String,
-
-    pub validator_id: u32,
-
-    pub last_seen_epoch: u64,
-
-    pub trust_score: f64,
-
-    pub active: bool,
-}
-
-// =========================
-// 📡 PEER ANNOUNCEMENT
-// =========================
-#[derive(
-    Clone,
-    Debug,
-    Serialize,
-    Deserialize,
-)]
-pub struct PeerAnnouncement {
-
-    pub peer_id: String,
-
-    pub validator_id: u32,
-
-    pub epoch: u64,
-
-    pub trust: f64,
-
-    pub continuity_hash: String,
-}
-
-// =========================
-// 🌊 GOSSIP STATE
-// =========================
-#[derive(
-    Clone,
-    Debug,
-    Serialize,
-    Deserialize,
-)]
-pub struct GossipState {
-
-    pub announcements:
-        Vec<PeerAnnouncement>,
-}
-
-// =========================
 // 🔗 IDENTITY LINK
 // =========================
 #[derive(
@@ -77,73 +16,29 @@ pub struct GossipState {
 )]
 pub struct IdentityLink {
 
-    pub public_key: Vec<u8>,
+    pub public_key:
+        Vec<u8>,
 
-    pub signature: Option<Vec<u8>>,
-}
+    pub signature:
+        Option<Vec<u8>>,
 
-// =========================
-// 🧠 IDENTITY PROOF
-// =========================
-#[derive(
-    Clone,
-    Debug,
-    Serialize,
-    Deserialize,
-)]
-pub struct IdentityProof {
+    pub continuity_hash:
+        String,
 
-    pub epoch: u64,
+    pub parent_hash:
+        String,
 
-    pub validator_id: u32,
+    pub epoch:
+        u64,
 
-    pub trust: f64,
+    pub validator_id:
+        u32,
 
-    pub continuity: f64,
+    pub governance_weight:
+        f64,
 
-    pub previous_hash: String,
-
-    pub proof_hash: String,
-}
-
-// =========================
-// 🌊 FLUX IDENTITY
-// =========================
-#[derive(
-    Clone,
-    Debug,
-    Serialize,
-    Deserialize,
-)]
-pub struct FluxIdentity {
-
-    pub identity_id: String,
-
-    pub created_epoch: u64,
-
-    pub last_active_epoch: u64,
-
-    pub session_count: u64,
-
-    pub trust_score: f64,
-
-    pub continuity_score: f64,
-
-    pub bound_validator: u32,
-
-    pub successful_auths: u64,
-
-    pub failed_auths: u64,
-
-    pub recovery_events: u64,
-
-    pub drift_score: f64,
-
-    pub status: String,
-
-    pub credential_depth: u64,
-
-    pub proofs: Vec<IdentityProof>,
+    pub entropy_score:
+        f64,
 }
 
 // =========================
@@ -185,7 +80,8 @@ pub struct Validator {
 
     pub global_valid: bool,
 
-    pub identity_chain: Vec<IdentityLink>,
+    pub identity_chain:
+        Vec<IdentityLink>,
 
     pub attack_history: u64,
 
@@ -221,7 +117,6 @@ pub struct Validator {
 
     pub last_epoch_transition: u64,
 
-    // 🌐 CONSENSUS
     pub quorum_score: f64,
 
     pub peer_agreement_ratio: f64,
@@ -232,11 +127,108 @@ pub struct Validator {
 
     pub last_quorum_epoch: u64,
 
+    pub governance_weight: f64,
+
+    pub quarantine_level: f64,
+
+    pub peer_reputation: f64,
+
+    pub leadership_score: f64,
+
+    pub recovery_votes_received: u32,
+
+    pub recovery_votes_given: u32,
+
+    pub governance_participation: f64,
+
+    pub autonomous_trust_bias: f64,
+
+    pub validator_stability_index: f64,
+
+    pub network_influence_score: f64,
+
+    pub isolation_events: u64,
+
     pub status: String,
 }
 
 // =========================
-// 🧠 IDENTITY REGISTRY
+// 🧠 IDENTITY PROOF
+// =========================
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
+pub struct IdentityProof {
+
+    pub proof_hash:
+        String,
+
+    pub validator_id:
+        u32,
+
+    pub epoch:
+        u64,
+}
+
+// =========================
+// 🌐 FLUX IDENTITY
+// =========================
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
+pub struct FluxIdentity {
+
+    pub identity_id:
+        String,
+
+    pub created_epoch:
+        u64,
+
+    pub last_active_epoch:
+        u64,
+
+    pub session_count:
+        u64,
+
+    pub trust_score:
+        f64,
+
+    pub continuity_score:
+        f64,
+
+    pub bound_validator:
+        u32,
+
+    pub successful_auths:
+        u64,
+
+    pub failed_auths:
+        u64,
+
+    pub recovery_events:
+        u64,
+
+    pub drift_score:
+        f64,
+
+    pub status:
+        String,
+
+    pub credential_depth:
+        u64,
+
+    pub proofs:
+        Vec<IdentityProof>,
+}
+
+// =========================
+// 🌐 IDENTITY REGISTRY
 // =========================
 #[derive(
     Clone,
@@ -253,9 +245,6 @@ pub struct IdentityRegistry {
         >,
 }
 
-// =========================
-// 🧠 REGISTRY IMPL
-// =========================
 impl IdentityRegistry {
 
     pub fn new() -> Self {
@@ -268,278 +257,88 @@ impl IdentityRegistry {
     }
 
     // =========================
-    // 🔐 HASH GENERATOR
-    // =========================
-    fn build_hash(
-        epoch: u64,
-        validator_id: u32,
-        trust: f64,
-        continuity: f64,
-        previous_hash: &str,
-    ) -> String {
-
-        format!(
-            "{:x}",
-            md5::compute(
-                format!(
-                    "{}:{}:{}:{}:{}",
-                    epoch,
-                    validator_id,
-                    trust,
-                    continuity,
-                    previous_hash
-                )
-            )
-        )
-    }
-
-    // =========================
-    // 🆕 CREATE IDENTITY
+    // 🧠 CREATE IDENTITY
     // =========================
     pub fn create_identity(
         &mut self,
-        identity_id: String,
-        validator_id: u32,
-        current_epoch: u64,
-    ) -> FluxIdentity {
-
-        let genesis_hash =
-            Self::build_hash(
-                current_epoch,
-                validator_id,
-                50.0,
-                50.0,
-                "GENESIS",
-            );
-
-        let genesis_proof =
-            IdentityProof {
-
-                epoch:
-                    current_epoch,
-
-                validator_id,
-
-                trust: 50.0,
-
-                continuity: 50.0,
-
-                previous_hash:
-                    "GENESIS".into(),
-
-                proof_hash:
-                    genesis_hash,
-            };
-
-        let identity = FluxIdentity {
-
-            identity_id:
-                identity_id.clone(),
-
-            created_epoch:
-                current_epoch,
-
-            last_active_epoch:
-                current_epoch,
-
-            session_count: 0,
-
-            trust_score: 50.0,
-
-            continuity_score: 50.0,
-
-            bound_validator:
-                validator_id,
-
-            successful_auths: 0,
-
-            failed_auths: 0,
-
-            recovery_events: 0,
-
-            drift_score: 0.0,
-
-            status:
-                "genesis".into(),
-
-            credential_depth: 1,
-
-            proofs:
-                vec![genesis_proof],
-        };
+        identity: FluxIdentity,
+    ) {
 
         self.identities.insert(
-            identity_id,
-            identity.clone(),
-        );
-
-        identity
-    }
-
-    // =========================
-    // 🔍 GET OR CREATE
-    // =========================
-    pub fn get_or_create(
-        &mut self,
-        identity_id: String,
-        validator_id: u32,
-        current_epoch: u64,
-    ) -> FluxIdentity {
-
-        if let Some(identity) =
-            self.identities.get(&identity_id)
-        {
-
-            return identity.clone();
-        }
-
-        self.create_identity(
-            identity_id,
-            validator_id,
-            current_epoch,
-        )
-    }
-
-    // =========================
-    // 🔗 APPEND LINEAGE
-    // =========================
-    fn append_lineage(
-        identity: &mut FluxIdentity,
-        epoch: u64,
-    ) {
-
-        let previous_hash =
-            identity
-                .proofs
-                .last()
-                .map(|p|
-                    p.proof_hash.clone()
-                )
-                .unwrap_or(
-                    "GENESIS".into()
-                );
-
-        let proof_hash =
-            Self::build_hash(
-                epoch,
-                identity.bound_validator,
-                identity.trust_score,
-                identity.continuity_score,
-                &previous_hash,
-            );
-
-        identity.proofs.push(
-
-            IdentityProof {
-
-                epoch,
-
-                validator_id:
-                    identity.bound_validator,
-
-                trust:
-                    identity.trust_score,
-
-                continuity:
-                    identity.continuity_score,
-
-                previous_hash,
-
-                proof_hash,
-            }
+            identity.identity_id.clone(),
+            identity,
         );
     }
+}
 
-    // =========================
-    // ✅ SUCCESS
-    // =========================
-    pub fn successful_auth(
-        &mut self,
-        identity_id: &str,
-        current_epoch: u64,
-        confidence: f64,
-    ) {
+// =========================
+// 🌐 PEER NODE
+// =========================
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
+pub struct PeerNode {
 
-        if let Some(identity) =
-            self.identities
-                .get_mut(identity_id)
-        {
+    pub peer_id:
+        String,
 
-            identity.last_active_epoch =
-                current_epoch;
+    pub address:
+        String,
 
-            identity.session_count += 1;
+    pub validator_id:
+        u32,
 
-            identity.successful_auths += 1;
+    pub last_seen_epoch:
+        u64,
 
-            identity.trust_score +=
-                1.5 * confidence;
+    pub trust_score:
+        f64,
 
-            identity.continuity_score +=
-                0.8 * confidence;
+    pub active:
+        bool,
+}
 
-            identity.drift_score *= 0.92;
+// =========================
+// 📡 PEER ANNOUNCEMENT
+// =========================
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
+pub struct PeerAnnouncement {
 
-            identity.credential_depth += 1;
+    pub peer_id:
+        String,
 
-            identity.trust_score =
-                identity
-                    .trust_score
-                    .clamp(0.0, 100.0);
+    pub validator_id:
+        u32,
 
-            identity.continuity_score =
-                identity
-                    .continuity_score
-                    .clamp(0.0, 100.0);
+    pub epoch:
+        u64,
 
-            Self::append_lineage(
-                identity,
-                current_epoch,
-            );
-        }
-    }
+    pub trust:
+        f64,
 
-    // =========================
-    // ❌ FAILURE
-    // =========================
-    pub fn failed_auth(
-        &mut self,
-        identity_id: &str,
-        current_epoch: u64,
-    ) {
+    pub continuity_hash:
+        String,
+}
 
-        if let Some(identity) =
-            self.identities
-                .get_mut(identity_id)
-        {
+// =========================
+// 🌐 GOSSIP STATE
+// =========================
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
+pub struct GossipState {
 
-            identity.last_active_epoch =
-                current_epoch;
-
-            identity.failed_auths += 1;
-
-            identity.trust_score *= 0.90;
-
-            identity.continuity_score *= 0.95;
-
-            identity.drift_score += 5.0;
-
-            identity.recovery_events += 1;
-
-            identity.trust_score =
-                identity
-                    .trust_score
-                    .clamp(0.0, 100.0);
-
-            identity.continuity_score =
-                identity
-                    .continuity_score
-                    .clamp(0.0, 100.0);
-
-            Self::append_lineage(
-                identity,
-                current_epoch,
-            );
-        }
-    }
+    pub announcements:
+        Vec<PeerAnnouncement>,
 }

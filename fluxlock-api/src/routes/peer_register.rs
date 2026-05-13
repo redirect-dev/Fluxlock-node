@@ -15,6 +15,10 @@ use std::sync::{
 
 use crate::network_state::NetworkState;
 
+use fluxlock_core::types::{
+    PeerNode,
+};
+
 // =========================
 // 🌐 REGISTER REQUEST
 // =========================
@@ -63,11 +67,32 @@ pub async fn register_peer(
     let mut state =
         state.lock().unwrap();
 
-    state.register_peer(
-        payload.peer_id,
-        payload.address,
-        payload.validator_id,
-    );
+    let current_epoch =
+        state.global_epoch;
+
+    state
+        .peer_state
+        .register_peer(
+
+            PeerNode {
+
+                peer_id:
+                    payload.peer_id,
+
+                address:
+                    payload.address,
+
+                validator_id:
+                    payload.validator_id,
+
+                last_seen_epoch:
+                    current_epoch,
+
+                trust_score: 100.0,
+
+                active: true,
+            }
+        );
 
     Json(
         RegisterPeerResponse {

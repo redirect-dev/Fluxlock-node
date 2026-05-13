@@ -1,80 +1,93 @@
 use rusqlite::{
     params,
-    Result,
+    Connection,
 };
-
-use crate::db::DB;
 
 use fluxlock_core::types::{
     IdentityLink,
-    IdentityProof,
 };
 
 // =========================
-// 💾 SAVE VALIDATOR LINEAGE
+// 💾 SAVE IDENTITY CHAIN
 // =========================
 pub fn save_identity_chain(
+
     validator_id: u32,
+
     chain: &Vec<IdentityLink>,
-) -> Result<()> {
+
+) -> rusqlite::Result<()> {
 
     let conn =
-        DB.lock().unwrap();
+        Connection::open(
+            "fluxlock.db"
+        )?;
 
-    // =========================
-    // 🧹 CLEAR OLD CHAIN
-    // =========================
-    conn.execute(
-        "
-        DELETE FROM identity_links
-        WHERE validator_id = ?1
-        ",
-        params![
-            validator_id
-        ]
+    create_lineage_table(
+        &conn
     )?;
 
-    // =========================
-    // 🔗 STORE CHAIN
-    // =========================
-    for (index, link)
-        in chain.iter().enumerate()
+    conn.execute(
+
+        "
+        DELETE FROM lineage
+        WHERE validator_id = ?1
+        ",
+
+        params![
+            validator_id
+        ],
+    )?;
+
+    for (index, link) in
+        chain.iter().enumerate()
     {
 
         conn.execute(
+
             "
-            INSERT INTO identity_links (
+            INSERT INTO lineage (
 
                 validator_id,
+                link_index,
 
-                chain_index,
+                continuity_hash,
+                parent_hash,
 
-                public_key,
+                epoch,
 
-                signature
+                governance_weight,
+                entropy_score
 
             )
             VALUES (
 
                 ?1,
-
                 ?2,
-
                 ?3,
-
-                ?4
+                ?4,
+                ?5,
+                ?6,
+                ?7
             )
             ",
+
             params![
 
                 validator_id,
 
-                index as u32,
+                index as u64,
 
-                link.public_key,
+                link.continuity_hash,
 
-                link.signature
-            ]
+                link.parent_hash,
+
+                link.epoch,
+
+                link.governance_weight,
+
+                link.entropy_score,
+            ],
         )?;
     }
 
@@ -82,88 +95,37 @@ pub fn save_identity_chain(
 }
 
 // =========================
-// 💾 SAVE IDENTITY PROOFS
+// 💾 CREATE TABLE
 // =========================
-pub fn save_identity_proofs(
-    identity_id: &str,
-    proofs: &Vec<IdentityProof>,
-) -> Result<()> {
+fn create_lineage_table(
 
-    let conn =
-        DB.lock().unwrap();
+    conn: &Connection
 
-    // =========================
-    // 🧹 CLEAR OLD PROOFS
-    // =========================
+) -> rusqlite::Result<()> {
+
     conn.execute(
+
         "
-        DELETE FROM identity_proofs
-        WHERE identity_id = ?1
+        CREATE TABLE IF NOT EXISTS lineage (
+
+            validator_id INTEGER,
+
+            link_index INTEGER,
+
+            continuity_hash TEXT,
+
+            parent_hash TEXT,
+
+            epoch INTEGER,
+
+            governance_weight REAL,
+
+            entropy_score REAL
+        )
         ",
-        params![
-            identity_id
-        ]
+
+        [],
     )?;
-
-    // =========================
-    // 🔗 STORE PROOFS
-    // =========================
-    for proof in proofs {
-
-        conn.execute(
-            "
-            INSERT INTO identity_proofs (
-
-                identity_id,
-
-                epoch,
-
-                validator_id,
-
-                trust,
-
-                continuity,
-
-                previous_hash,
-
-                proof_hash
-
-            )
-            VALUES (
-
-                ?1,
-
-                ?2,
-
-                ?3,
-
-                ?4,
-
-                ?5,
-
-                ?6,
-
-                ?7
-            )
-            ",
-            params![
-
-                identity_id,
-
-                proof.epoch,
-
-                proof.validator_id,
-
-                proof.trust,
-
-                proof.continuity,
-
-                proof.previous_hash,
-
-                proof.proof_hash
-            ]
-        )?;
-    }
 
     Ok(())
 }

@@ -61,7 +61,9 @@ pub struct AuthResponse {
     pub authenticated: bool,
 
     pub signature_valid: bool,
+
     pub identity_valid: bool,
+
     pub allowed: bool,
 
     pub confidence: f64,
@@ -69,17 +71,21 @@ pub struct AuthResponse {
     pub reason: String,
 
     pub epoch_age: u64,
+
     pub trust: f64,
+
     pub drift: f64,
+
     pub status: String,
 
     pub identity_id: String,
 
     pub continuity_score: f64,
+
     pub session_count: u64,
+
     pub credential_depth: u64,
 
-    // 🔥 NEW
     pub lineage_depth: usize,
 }
 
@@ -243,6 +249,9 @@ pub async fn auth_flow(
         payload.validator_id,
     );
 
+    // =========================
+    // 🔍 VALIDATOR SNAPSHOT
+    // =========================
     let validator =
         match state.validators
             .iter()
@@ -264,11 +273,8 @@ pub async fn auth_flow(
     // =========================
     // 🔗 VALIDATION
     // =========================
-    let identity_valid =
-        validator.chain_valid
-        && validator.epoch_age >= 120;
-
     let mut allowed = false;
+
     let mut confidence = 0.0;
 
     let reason: String;
@@ -298,7 +304,8 @@ pub async fn auth_flow(
         allowed = true;
 
         confidence =
-            validator.confidence.clamp(0.0, 1.0);
+            validator.confidence
+                .clamp(0.0, 1.0);
 
         reason =
             "authenticated (fluxlock verified identity)"
@@ -315,16 +322,14 @@ pub async fn auth_flow(
     );
 
     // =========================
-    // 🔗 LIVE IDENTITY EVOLUTION
+    // 🔗 EVOLUTION
     // =========================
     if allowed {
 
         state.identity_success(
-            &payload.identity_id,
-            confidence,
+        &payload.identity_id,
         );
 
-        // 🔥 EVOLVE CRYPTOGRAPHIC LINEAGE
         state.evolve_identity(
             payload.validator_id,
         );
@@ -334,6 +339,28 @@ pub async fn auth_flow(
         state.identity_failure(
             &payload.identity_id,
         );
+    }
+
+    // =========================
+    // 🔄 FORCE RE-VERIFY
+    // =========================
+    if let Some(v) =
+        state.validators
+            .iter_mut()
+            .find(
+                |v|
+                    v.id
+                    == payload.validator_id
+            )
+    {
+
+        v.chain_valid =
+            crate::engine
+                ::identity_validator
+                ::verify_lineage(
+                    &v.identity_chain,
+                    v.id,
+                );
     }
 
     // =========================
@@ -349,6 +376,13 @@ pub async fn auth_flow(
             )
             .unwrap()
             .clone();
+
+    println!(
+        "🔗 CHAIN DEPTH: {}",
+        evolved_validator
+            .identity_chain
+            .len()
+    );
 
     let identity =
         state.identities
@@ -366,7 +400,9 @@ pub async fn auth_flow(
 
         signature_valid: true,
 
-        identity_valid,
+        identity_valid:
+            evolved_validator
+                .chain_valid,
 
         allowed,
 

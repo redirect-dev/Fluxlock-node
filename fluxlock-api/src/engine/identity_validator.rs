@@ -10,7 +10,6 @@ use std::sync::Mutex;
 
 use once_cell::sync::Lazy;
 
-// 🔥 SHARED TYPES
 use fluxlock_core::types::{
     IdentityLink,
 };
@@ -56,34 +55,104 @@ pub fn generate_identity(
 // =========================
 pub fn rotate_identity(
     id: u32,
-    new_message: &[u8]
-) -> Vec<u8> {
+    chain_depth: usize,
+) -> IdentityLink {
 
     let mut store =
         KEY_STORE.lock().unwrap();
 
-    let (_old_pk, old_sk) =
-        store.get(&id)
+    let (_, old_sk) =
+        store
+            .get(&id)
             .unwrap()
             .clone();
 
-    let signature =
-        dilithium2::detached_sign(
-            new_message,
-            &old_sk
-        );
-
+    // =========================
+    // 🔑 NEW KEYPAIR
+    // =========================
     let (new_pk, new_sk) =
         dilithium2::keypair();
 
+    // =========================
+    // 🔗 SIGN SUCCESSOR
+    // =========================
+    let message =
+        format!(
+            "validator:{}:depth:{}",
+            id,
+            chain_depth
+        );
+
+    let signature =
+        dilithium2::detached_sign(
+            message.as_bytes(),
+            &old_sk
+        );
+
+    // =========================
+    // 🔁 STORE NEW KEYS
+    // =========================
     store.insert(
         id,
-        (new_pk.clone(), new_sk)
+        (
+            new_pk.clone(),
+            new_sk
+        )
     );
 
-    signature
-        .as_bytes()
-        .to_vec()
+    // =========================
+    // 🧬 CONTINUITY HASH
+    // =========================
+    let continuity_hash =
+        format!(
+            "{:x}",
+            md5::compute(
+                format!(
+                    "{}:{}",
+                    id,
+                    chain_depth
+                )
+            )
+        );
+
+    // =========================
+    // 🔗 RETURN LINK
+    // =========================
+    IdentityLink {
+
+        public_key:
+            new_pk
+                .as_bytes()
+                .to_vec(),
+
+        signature:
+            Some(
+                signature
+                    .as_bytes()
+                    .to_vec()
+            ),
+
+        continuity_hash:
+            continuity_hash,
+
+        parent_hash:
+            format!(
+                "parent:{}",
+                chain_depth
+            ),
+
+        epoch:
+            chain_depth as u64,
+
+        validator_id:
+            id,
+
+        governance_weight:
+            1.0,
+
+        entropy_score:
+            100.0,
+    }
 }
 
 // =========================
@@ -91,7 +160,7 @@ pub fn rotate_identity(
 // =========================
 pub fn verify_link(
     old_pk_bytes: &[u8],
-    new_message: &[u8],
+    message: &[u8],
     sig_bytes: &[u8],
 ) -> bool {
 
@@ -114,7 +183,7 @@ pub fn verify_link(
     dilithium2
         ::verify_detached_signature(
             &sig,
-            new_message,
+            message,
             &pk
         )
         .is_ok()
@@ -129,14 +198,21 @@ pub fn verify_lineage(
 ) -> bool {
 
     if chain.is_empty() {
+
         return false;
     }
 
-    // genesis always valid
+    // =========================
+    // 🟢 GENESIS VALID
+    // =========================
     if chain.len() == 1 {
+
         return true;
     }
 
+    // =========================
+    // 🔗 VERIFY SUCCESSION
+    // =========================
     for i in 1..chain.len() {
 
         let previous =
@@ -144,6 +220,16 @@ pub fn verify_lineage(
 
         let current =
             &chain[i];
+
+        // =========================
+        // 🔗 HASH CONTINUITY
+        // =========================
+        if current.parent_hash
+            != previous.continuity_hash
+        {
+
+            return false;
+        }
 
         let signature =
             match &current.signature {
@@ -155,7 +241,7 @@ pub fn verify_lineage(
 
         let message =
             format!(
-                "validator:{}:rotation:{}",
+                "validator:{}:depth:{}",
                 validator_id,
                 i
             );
@@ -198,7 +284,6 @@ pub fn validate_identity_logic(
     network_accepted: bool,
 ) -> ValidationResult {
 
-    // 🔴 HARD FAIL
     if compromised {
 
         return ValidationResult {
@@ -211,7 +296,6 @@ pub fn validate_identity_logic(
         };
     }
 
-    // 🔴 BROKEN LINEAGE
     if !epoch_valid {
 
         return ValidationResult {
@@ -224,7 +308,6 @@ pub fn validate_identity_logic(
         };
     }
 
-    // 🔥 MATURITY GATE
     if epoch_age < 120 {
 
         return ValidationResult {
@@ -237,7 +320,6 @@ pub fn validate_identity_logic(
         };
     }
 
-    // 🌐 NETWORK REQUIRED
     if !network_accepted {
 
         return ValidationResult {
@@ -250,7 +332,6 @@ pub fn validate_identity_logic(
         };
     }
 
-    // 🔴 INSTABILITY
     if drift > 80.0 {
 
         return ValidationResult {
@@ -263,7 +344,6 @@ pub fn validate_identity_logic(
         };
     }
 
-    // 🟡 RECOVERY
     if trust < 60.0 {
 
         return ValidationResult {
@@ -276,7 +356,6 @@ pub fn validate_identity_logic(
         };
     }
 
-    // 🟢 HEALTHY
     ValidationResult {
 
         valid: true,

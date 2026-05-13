@@ -20,6 +20,10 @@ pub struct ConsensusResult {
     pub valid_votes: u32,
 
     pub invalid_votes: u32,
+
+    pub quarantine_delta: f64,
+
+    pub governance_delta: f64,
 }
 
 // =========================
@@ -37,9 +41,6 @@ pub fn evaluate_consensus(
 
     let mut invalid_votes = 0;
 
-    // =========================
-    // 🌐 GOSSIP ANALYSIS
-    // =========================
     for announcement in announcements {
 
         if announcement.validator_id
@@ -48,9 +49,6 @@ pub fn evaluate_consensus(
             continue;
         }
 
-        // =========================
-        // 🟢 HEALTHY ANNOUNCEMENT
-        // =========================
         if announcement.trust >= 60.0 {
 
             valid_votes += 1;
@@ -64,14 +62,12 @@ pub fn evaluate_consensus(
     let total_votes =
         valid_votes + invalid_votes;
 
-    // =========================
-    // 🌐 NO CONSENSUS
-    // =========================
     if total_votes == 0 {
 
         return ConsensusResult {
 
-            accepted: validator.network_accepted,
+            accepted:
+                validator.network_accepted,
 
             confidence_delta: -0.001,
 
@@ -82,6 +78,10 @@ pub fn evaluate_consensus(
             valid_votes,
 
             invalid_votes,
+
+            quarantine_delta: 0.01,
+
+            governance_delta: -0.01,
         };
     }
 
@@ -90,7 +90,7 @@ pub fn evaluate_consensus(
         / total_votes as f64;
 
     // =========================
-    // 🟢 ACCEPTED
+    // 🟢 HEALTHY CONSENSUS
     // =========================
     if ratio >= 0.66 {
 
@@ -98,33 +98,41 @@ pub fn evaluate_consensus(
 
             accepted: true,
 
-            confidence_delta: 0.003,
+            confidence_delta: 0.004,
 
-            trust_delta: 0.08,
+            trust_delta: 0.10,
 
-            pressure_delta: -0.4,
+            pressure_delta: -0.5,
 
             valid_votes,
 
             invalid_votes,
+
+            quarantine_delta: -0.03,
+
+            governance_delta: 0.02,
         };
     }
 
     // =========================
-    // 🔴 REJECTED
+    // 🔴 QUARANTINE PRESSURE
     // =========================
     ConsensusResult {
 
         accepted: false,
 
-        confidence_delta: -0.01,
+        confidence_delta: -0.015,
 
-        trust_delta: -0.35,
+        trust_delta: -0.40,
 
-        pressure_delta: 1.5,
+        pressure_delta: 2.0,
 
         valid_votes,
 
         invalid_votes,
+
+        quarantine_delta: 0.08,
+
+        governance_delta: -0.03,
     }
 }
