@@ -15,11 +15,24 @@ use std::sync::{Arc, Mutex};
 use routes::sign::sign;
 use routes::verify::verify;
 use routes::validate::validate_identity;
-use routes::attack::{spike, breach, network};
+
+use routes::attack::{
+    spike,
+    breach,
+    network,
+};
+
 use routes::evaluate::evaluate;
+
 use routes::access::access;
+
 use routes::auth::auth_flow;
+
 use routes::identity_create::create_identity;
+
+use routes::continuity::{
+    export_continuity_proof,
+};
 
 use routes::peer_register::register_peer;
 
@@ -39,16 +52,24 @@ use engine::peer_sync::{
 use network_state::NetworkState;
 
 // 🌐 CORS
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{
+    Any,
+    CorsLayer,
+};
+
 use axum::http::Method;
 
 // 🔥 STORAGE
 use fluxlock_storage::db::init_db;
+
 use fluxlock_storage::schema::init_schema;
 
 #[tokio::main]
 async fn main() {
 
+    // =========================
+    // 🧠 STORAGE INIT
+    // =========================
     init_db();
 
     init_schema();
@@ -57,6 +78,9 @@ async fn main() {
         "🧠 Fluxlock persistence initialized"
     );
 
+    // =========================
+    // 🌐 GLOBAL STATE
+    // =========================
     let state = Arc::new(
         Mutex::new(
             NetworkState::new()
@@ -66,7 +90,8 @@ async fn main() {
     // =========================
     // 🔁 ENGINE LOOP
     // =========================
-    let state_clone = state.clone();
+    let state_clone =
+        state.clone();
 
     tokio::spawn(async move {
 
@@ -83,12 +108,13 @@ async fn main() {
 
             tokio::time::sleep(
                 std::time::Duration::from_millis(300)
-            ).await;
+            )
+            .await;
         }
     });
 
     // =========================
-    // 🌐 GOSSIP PROPAGATION
+    // 📡 GOSSIP PROPAGATION
     // =========================
     let propagation_state =
         state.clone();
@@ -135,12 +161,13 @@ async fn main() {
 
             tokio::time::sleep(
                 std::time::Duration::from_secs(5)
-            ).await;
+            )
+            .await;
         }
     });
 
     // =========================
-    // 🌐 PEER SYNCHRONIZATION
+    // 🌐 PEER SYNC
     // =========================
     let sync_state =
         state.clone();
@@ -153,21 +180,47 @@ async fn main() {
         .await;
     });
 
+    // =========================
+    // 🌐 CORS
+    // =========================
     let cors = CorsLayer::new()
+
         .allow_origin(Any)
+
         .allow_methods([
             Method::GET,
             Method::POST,
         ])
+
         .allow_headers(Any);
 
+    // =========================
+    // 🚀 ROUTER
+    // =========================
     let app = Router::new()
 
-        .route("/sign", post(sign))
-        .route("/verify", post(verify))
-        .route("/validate", post(validate_identity))
+        // 🔐 CRYPTO
+        .route(
+            "/sign",
+            post(sign)
+        )
 
-        .route("/state", get(get_state))
+        .route(
+            "/verify",
+            post(verify)
+        )
+
+        // 🧠 VALIDATION
+        .route(
+            "/validate",
+            post(validate_identity)
+        )
+
+        // 🌐 NETWORK STATE
+        .route(
+            "/state",
+            get(get_state)
+        )
 
         // 🌐 PEER NETWORK
         .route(
@@ -185,6 +238,12 @@ async fn main() {
             get(export_peer_state)
         )
 
+        // 🧬 CONTINUITY
+        .route(
+            "/continuity/:validator_id",
+            get(export_continuity_proof)
+        )
+
         // 🔥 IDENTITY
         .route(
             "/identity/create",
@@ -192,19 +251,46 @@ async fn main() {
         )
 
         // 🔥 CORE PRODUCT
-        .route("/evaluate", post(evaluate))
-        .route("/access", post(access))
-        .route("/auth/flow", post(auth_flow))
+        .route(
+            "/evaluate",
+            post(evaluate)
+        )
+
+        .route(
+            "/access",
+            post(access)
+        )
+
+        .route(
+            "/auth/flow",
+            post(auth_flow)
+        )
 
         // ⚔ ATTACKS
-        .route("/attack/spike", post(spike))
-        .route("/attack/breach", post(breach))
-        .route("/attack/network", post(network))
+        .route(
+            "/attack/spike",
+            post(spike)
+        )
+
+        .route(
+            "/attack/breach",
+            post(breach)
+        )
+
+        .route(
+            "/attack/network",
+            post(network)
+        )
 
         .layer(cors)
 
-        .with_state(state.clone());
+        .with_state(
+            state.clone()
+        );
 
+    // =========================
+    // 🌐 SERVER START
+    // =========================
     let listener =
         tokio::net::TcpListener::bind(
             "127.0.0.1:3001"
@@ -220,9 +306,16 @@ async fn main() {
         "🌐 Distributed peer synchronization enabled"
     );
 
-    axum::serve(listener, app)
-        .await
-        .unwrap();
+    println!(
+        "🧬 Continuity proof export enabled"
+    );
+
+    axum::serve(
+        listener,
+        app
+    )
+    .await
+    .unwrap();
 }
 
 // =========================
@@ -234,16 +327,21 @@ use axum::{
 };
 
 async fn get_state(
+
     State(state):
         State<
             Arc<
                 Mutex<NetworkState>
             >
         >,
+
 ) -> Json<NetworkState> {
 
     let state =
-        state.lock().unwrap();
+        state.lock()
+            .unwrap();
 
-    Json(state.clone())
+    Json(
+        state.clone()
+    )
 }

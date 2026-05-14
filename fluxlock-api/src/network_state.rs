@@ -3,6 +3,8 @@ use serde::{
     Deserialize,
 };
 
+use std::fs;
+
 use fluxlock_core::types::{
     Validator,
     IdentityLink,
@@ -34,7 +36,49 @@ use fluxlock_storage::identity_store::{
 
 use fluxlock_storage::lineage_store::{
     save_identity_chain,
+    load_identity_chain,
 };
+
+// =========================
+// 💾 GLOBAL EPOCH STORAGE
+// =========================
+const EPOCH_FILE: &str =
+    "fluxlock_epoch.dat";
+
+// =========================
+// 📥 LOAD EPOCH
+// =========================
+fn load_epoch() -> u64 {
+
+    match fs::read_to_string(
+        EPOCH_FILE
+    ) {
+
+        Ok(contents) => {
+
+            contents
+                .trim()
+                .parse::<u64>()
+                .unwrap_or(1)
+        }
+
+        Err(_) => 1,
+    }
+}
+
+// =========================
+// 💾 SAVE EPOCH
+// =========================
+fn save_epoch(
+    epoch: u64
+) {
+
+    let _ =
+        fs::write(
+            EPOCH_FILE,
+            epoch.to_string()
+        );
+}
 
 // =========================
 // 🌐 NETWORK STATE
@@ -65,48 +109,85 @@ impl NetworkState {
     // =========================
     pub fn new() -> Self {
 
+        let restored_epoch =
+            load_epoch();
+
+        println!(
+            "♻ RESTORED GLOBAL EPOCH {}",
+            restored_epoch
+        );
+
         let mut validators =
             Vec::new();
 
         for i in 0..12 {
 
-            let genesis_key =
-                generate_identity(i);
+            // =========================
+            // 🔄 LOAD STORED CHAIN
+            // =========================
+            let stored_chain =
+                load_identity_chain(i)
+                    .unwrap_or_default();
 
-            let genesis_hash =
-                format!(
-                    "{:x}",
-                    md5::compute(
+            let identity_chain =
+                if !stored_chain.is_empty() {
+
+                    println!(
+                        "♻ RESTORED VALIDATOR {} CHAIN DEPTH {}",
+                        i,
+                        stored_chain.len()
+                    );
+
+                    stored_chain
+
+                } else {
+
+                    // =========================
+                    // 🌱 GENESIS CREATION
+                    // =========================
+                    let genesis_key =
+                        generate_identity(i);
+
+                    let genesis_hash =
                         format!(
-                            "genesis:{}",
-                            i
-                        )
-                    )
-                );
+                            "{:x}",
+                            md5::compute(
+                                format!(
+                                    "genesis:{}",
+                                    i
+                                )
+                            )
+                        );
 
-            let genesis_link =
-                IdentityLink {
+                    let genesis_link =
+                        IdentityLink {
 
-                    public_key:
-                        genesis_key,
+                            public_key:
+                                genesis_key,
 
-                    signature:
-                        None,
+                            signature:
+                                None,
 
-                    continuity_hash:
-                        genesis_hash,
+                            continuity_hash:
+                                genesis_hash,
 
-                    parent_hash:
-                        "GENESIS".into(),
+                            parent_hash:
+                                "GENESIS".into(),
 
-                    epoch: 0,
+                            epoch: 0,
 
-                    validator_id: i,
+                            validator_id: i,
 
-                    governance_weight: 1.0,
+                            governance_weight: 1.0,
 
-                    entropy_score: 100.0,
+                            entropy_score: 100.0,
+                        };
+
+                    vec![genesis_link]
                 };
+
+            let chain_depth =
+                identity_chain.len();
 
             validators.push(
 
@@ -120,9 +201,14 @@ impl NetworkState {
 
                     drift: 2.0,
 
-                    epoch_age: 180,
+                    epoch_age:
+                        restored_epoch,
 
-                    chain_valid: true,
+                    chain_valid:
+                        verify_lineage(
+                            &identity_chain,
+                            i,
+                        ),
 
                     network_accepted: true,
 
@@ -140,8 +226,7 @@ impl NetworkState {
 
                     global_valid: true,
 
-                    identity_chain:
-                        vec![genesis_link],
+                    identity_chain,
 
                     attack_history: 0,
 
@@ -165,17 +250,20 @@ impl NetworkState {
 
                     continuity_anchor_strength: 100.0,
 
-                    current_epoch: 0,
+                    current_epoch:
+                        restored_epoch,
 
                     inherited_trust: 96.0,
 
                     lineage_stability: 100.0,
 
-                    epoch_rotations: 0,
+                    epoch_rotations:
+                        chain_depth as u64,
 
                     rebirth_count: 0,
 
-                    last_epoch_transition: 0,
+                    last_epoch_transition:
+                        restored_epoch,
 
                     quorum_score: 100.0,
 
@@ -185,7 +273,8 @@ impl NetworkState {
 
                     consensus_failures: 0,
 
-                    last_quorum_epoch: 0,
+                    last_quorum_epoch:
+                        restored_epoch,
 
                     governance_weight: 1.0,
 
@@ -225,7 +314,8 @@ impl NetworkState {
             peer_state:
                 PeerState::new(),
 
-            global_epoch: 0,
+            global_epoch:
+                restored_epoch,
         }
     }
 
@@ -237,6 +327,10 @@ impl NetworkState {
     ) {
 
         self.global_epoch += 1;
+
+        save_epoch(
+            self.global_epoch
+        );
 
         self.peer_state
             .detect_stale_peers(
@@ -284,7 +378,17 @@ impl NetworkState {
                 );
         }
 
-        if self.global_epoch % 1200 == 0 {
+        // =========================
+        // 🔁 ROTATION SCHEDULE
+        // =========================
+        if self.global_epoch > 1
+            && self.global_epoch % 1200 == 0
+        {
+
+            println!(
+                "🌐 GLOBAL ROTATION EPOCH {}",
+                self.global_epoch
+            );
 
             let validator_ids:
                 Vec<u32> =

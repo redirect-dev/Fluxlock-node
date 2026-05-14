@@ -3,7 +3,10 @@ use serde::{
     Deserialize,
 };
 
-use std::collections::HashMap;
+use std::collections::{
+    HashMap,
+    HashSet,
+};
 
 use fluxlock_core::types::{
     PeerNode,
@@ -32,6 +35,21 @@ pub struct PeerState {
 
     pub gossip:
         GossipState,
+
+    // =========================
+    // 🧠 GOSSIP MEMORY
+    // =========================
+    pub seen_announcements:
+        HashSet<String>,
+
+    // =========================
+    // 🔗 PEER CONTINUITY
+    // =========================
+    pub peer_continuity:
+        HashMap<
+            u32,
+            String
+        >,
 }
 
 impl PeerState {
@@ -58,6 +76,12 @@ impl PeerState {
                     announcements:
                         Vec::new(),
                 },
+
+            seen_announcements:
+                HashSet::new(),
+
+            peer_continuity:
+                HashMap::new(),
         }
     }
 
@@ -129,12 +153,51 @@ impl PeerState {
             PeerAnnouncement,
     ) {
 
+        let fingerprint =
+            format!(
+                "{}-{}-{}",
+                announcement.validator_id,
+                announcement.epoch,
+                announcement.continuity_hash
+            );
+
+        // =========================
+        // 🚫 DUPLICATE FILTER
+        // =========================
+        if self
+            .seen_announcements
+            .contains(
+                &fingerprint
+            )
+        {
+            return;
+        }
+
+        self
+            .seen_announcements
+            .insert(
+                fingerprint
+            );
+
+        // =========================
+        // 🔗 TRACK CONTINUITY
+        // =========================
+        self.peer_continuity.insert(
+            announcement.validator_id,
+            announcement
+                .continuity_hash
+                .clone(),
+        );
+
         self.gossip
             .announcements
             .push(
                 announcement
             );
 
+        // =========================
+        // 🧹 MEMORY LIMIT
+        // =========================
         if self.gossip
             .announcements
             .len() > 512
@@ -144,5 +207,27 @@ impl PeerState {
                 .announcements
                 .remove(0);
         }
+    }
+
+    // =========================
+    // 🔍 CONTINUITY CHECK
+    // =========================
+    pub fn continuity_conflict(
+        &self,
+        validator_id: u32,
+        continuity_hash: &str,
+    ) -> bool {
+
+        if let Some(existing) =
+            self.peer_continuity.get(
+                &validator_id
+            )
+        {
+
+            return existing
+                != continuity_hash;
+        }
+
+        false
     }
 }

@@ -9,6 +9,9 @@ pub mod auth;
 
 pub mod identity_create;
 
+
+pub mod continuity;
+
 // 🌐 NETWORK
 pub mod peer_register;
 pub mod peer_gossip;

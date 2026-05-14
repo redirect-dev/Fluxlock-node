@@ -57,7 +57,9 @@ pub fn save_identity_chain(
                 epoch,
 
                 governance_weight,
-                entropy_score
+                entropy_score,
+
+                public_key
 
             )
             VALUES (
@@ -68,7 +70,8 @@ pub fn save_identity_chain(
                 ?4,
                 ?5,
                 ?6,
-                ?7
+                ?7,
+                ?8
             )
             ",
 
@@ -87,11 +90,104 @@ pub fn save_identity_chain(
                 link.governance_weight,
 
                 link.entropy_score,
+
+                link.public_key,
             ],
         )?;
     }
 
     Ok(())
+}
+
+// =========================
+// 📥 LOAD IDENTITY CHAIN
+// =========================
+pub fn load_identity_chain(
+
+    validator_id: u32,
+
+) -> rusqlite::Result<Vec<IdentityLink>> {
+
+    let conn =
+        Connection::open(
+            "fluxlock.db"
+        )?;
+
+    create_lineage_table(
+        &conn
+    )?;
+
+    let mut stmt =
+        conn.prepare(
+
+            "
+            SELECT
+
+                continuity_hash,
+                parent_hash,
+                epoch,
+                governance_weight,
+                entropy_score,
+                public_key
+
+            FROM lineage
+
+            WHERE validator_id = ?1
+
+            ORDER BY link_index ASC
+            "
+        )?;
+
+    let rows =
+        stmt.query_map(
+
+            params![
+                validator_id
+            ],
+
+            |row| {
+
+                Ok(
+                    IdentityLink {
+
+                        public_key:
+                            row.get(5)?,
+
+                        signature:
+                            None,
+
+                        continuity_hash:
+                            row.get(0)?,
+
+                        parent_hash:
+                            row.get(1)?,
+
+                        epoch:
+                            row.get(2)?,
+
+                        validator_id,
+
+                        governance_weight:
+                            row.get(3)?,
+
+                        entropy_score:
+                            row.get(4)?,
+                    }
+                )
+            }
+        )?;
+
+    let mut chain =
+        Vec::new();
+
+    for row in rows {
+
+        chain.push(
+            row?
+        );
+    }
+
+    Ok(chain)
 }
 
 // =========================
@@ -120,7 +216,9 @@ fn create_lineage_table(
 
             governance_weight REAL,
 
-            entropy_score REAL
+            entropy_score REAL,
+
+            public_key BLOB
         )
         ",
 

@@ -48,6 +48,8 @@ pub struct GossipResponse {
     pub received: usize,
 
     pub total_gossip: usize,
+
+    pub conflicts: usize,
 }
 
 // =========================
@@ -70,9 +72,33 @@ pub async fn receive_gossip(
     let mut state =
         state.lock().unwrap();
 
+    let mut conflicts = 0;
+
     for announcement in
         payload.announcements.clone()
     {
+
+        // =========================
+        // 🔍 CONFLICT DETECTION
+        // =========================
+        let conflict =
+            state
+                .peer_state
+                .continuity_conflict(
+                    announcement.validator_id,
+                    &announcement.continuity_hash,
+                );
+
+        if conflict {
+
+            conflicts += 1;
+
+            println!(
+                "⚠ CONTINUITY CONFLICT validator={} hash={}",
+                announcement.validator_id,
+                announcement.continuity_hash
+            );
+        }
 
         state
             .peer_state
@@ -97,6 +123,8 @@ pub async fn receive_gossip(
                     .gossip
                     .announcements
                     .len(),
+
+            conflicts,
         }
     )
 }
@@ -126,10 +154,18 @@ pub async fn propagate_gossip(
             peer_address
         );
 
-    let _ =
+    let result =
         client
             .post(endpoint)
             .json(&payload)
             .send()
             .await;
+
+    if result.is_err() {
+
+        println!(
+            "⚠ GOSSIP PROPAGATION FAILED {}",
+            peer_address
+        );
+    }
 }
