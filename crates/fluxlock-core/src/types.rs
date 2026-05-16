@@ -16,29 +16,98 @@ use std::collections::HashMap;
 )]
 pub struct IdentityLink {
 
+    // =========================
+    // 🔐 CRYPTOGRAPHIC STATE
+    // =========================
     pub public_key:
         Vec<u8>,
 
     pub signature:
         Option<Vec<u8>>,
 
+    // =========================
+    // 🔗 CONTINUITY
+    // =========================
     pub continuity_hash:
         String,
 
     pub parent_hash:
         String,
 
+    pub state_hash:
+        String,
+
+    pub lineage_signature:
+        Option<Vec<u8>>,
+
+    pub transition_signature:
+        Option<Vec<u8>>,
+
+    // =========================
+    // 🌐 EPOCH STATE
+    // =========================
     pub epoch:
+        u64,
+
+    pub continuity_epoch:
         u64,
 
     pub validator_id:
         u32,
 
+    // =========================
+    // 🧠 GOVERNANCE
+    // =========================
     pub governance_weight:
         f64,
 
+    pub governance_score:
+        f64,
+
+    pub governance_votes:
+        u32,
+
+    // =========================
+    // 🌐 CONSENSUS
+    // =========================
+    pub network_alignment:
+        f64,
+
+    pub continuity_confidence:
+        f64,
+
+    pub peer_agreement_ratio:
+        f64,
+
+    // =========================
+    // 🧬 STABILITY
+    // =========================
     pub entropy_score:
         f64,
+
+    pub lineage_stability:
+        f64,
+
+    pub fracture_severity:
+        f64,
+
+    pub rehabilitation_factor:
+        f64,
+
+    // =========================
+    // ⚠ SECURITY
+    // =========================
+    pub quarantine_level:
+        f64,
+
+    pub malicious_reports:
+        u64,
+
+    pub fork_conflicts:
+        u64,
+
+    pub continuity_verified:
+        bool,
 }
 
 // =========================

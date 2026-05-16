@@ -147,31 +147,118 @@ pub fn load_identity_chain(
 
             |row| {
 
+                let continuity_hash:
+                    String =
+                    row.get(0)?;
+
+                let parent_hash:
+                    String =
+                    row.get(1)?;
+
+                let epoch:
+                    u64 =
+                    row.get(2)?;
+
+                let governance_weight:
+                    f64 =
+                    row.get(3)?;
+
+                let entropy_score:
+                    f64 =
+                    row.get(4)?;
+
+                let public_key:
+                    Vec<u8> =
+                    row.get(5)?;
+
                 Ok(
                     IdentityLink {
 
-                        public_key:
-                            row.get(5)?,
+                        // =========================
+                        // 🔐 CRYPTO
+                        // =========================
+                        public_key,
 
                         signature:
                             None,
 
+                        // =========================
+                        // 🔗 CONTINUITY
+                        // =========================
                         continuity_hash:
-                            row.get(0)?,
+                            continuity_hash
+                                .clone(),
 
-                        parent_hash:
-                            row.get(1)?,
+                        parent_hash,
 
-                        epoch:
-                            row.get(2)?,
+                        state_hash:
+                            continuity_hash
+                                .clone(),
+
+                        lineage_signature:
+                            None,
+
+                        transition_signature:
+                            None,
+
+                        // =========================
+                        // 🌐 EPOCH
+                        // =========================
+                        epoch,
+
+                        continuity_epoch:
+                            epoch,
 
                         validator_id,
 
-                        governance_weight:
-                            row.get(3)?,
+                        // =========================
+                        // 🧠 GOVERNANCE
+                        // =========================
+                        governance_weight,
 
-                        entropy_score:
-                            row.get(4)?,
+                        governance_score:
+                            governance_weight
+                                * 100.0,
+
+                        governance_votes: 0,
+
+                        // =========================
+                        // 🌐 CONSENSUS
+                        // =========================
+                        network_alignment: 1.0,
+
+                        continuity_confidence:
+                            100.0,
+
+                        peer_agreement_ratio:
+                            1.0,
+
+                        // =========================
+                        // 🧬 STABILITY
+                        // =========================
+                        entropy_score,
+
+                        lineage_stability:
+                            100.0,
+
+                        fracture_severity:
+                            0.0,
+
+                        rehabilitation_factor:
+                            1.0,
+
+                        // =========================
+                        // ⚠ SECURITY
+                        // =========================
+                        quarantine_level:
+                            0.0,
+
+                        malicious_reports: 0,
+
+                        fork_conflicts: 0,
+
+                        continuity_verified:
+                            true,
                     }
                 )
             }

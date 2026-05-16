@@ -122,9 +122,6 @@ impl NetworkState {
 
         for i in 0..12 {
 
-            // =========================
-            // 🔄 LOAD STORED CHAIN
-            // =========================
             let stored_chain =
                 load_identity_chain(i)
                     .unwrap_or_default();
@@ -142,9 +139,6 @@ impl NetworkState {
 
                 } else {
 
-                    // =========================
-                    // 🌱 GENESIS CREATION
-                    // =========================
                     let genesis_key =
                         generate_identity(i);
 
@@ -169,18 +163,53 @@ impl NetworkState {
                                 None,
 
                             continuity_hash:
-                                genesis_hash,
+                                genesis_hash.clone(),
 
                             parent_hash:
                                 "GENESIS".into(),
 
+                            state_hash:
+                                genesis_hash.clone(),
+
+                            lineage_signature:
+                                None,
+
+                            transition_signature:
+                                None,
+
                             epoch: 0,
+
+                            continuity_epoch: 0,
 
                             validator_id: i,
 
                             governance_weight: 1.0,
 
+                            governance_score: 100.0,
+
+                            governance_votes: 0,
+
+                            network_alignment: 1.0,
+
+                            continuity_confidence: 100.0,
+
+                            peer_agreement_ratio: 1.0,
+
                             entropy_score: 100.0,
+
+                            lineage_stability: 100.0,
+
+                            fracture_severity: 0.0,
+
+                            rehabilitation_factor: 1.0,
+
+                            quarantine_level: 0.0,
+
+                            malicious_reports: 0,
+
+                            fork_conflicts: 0,
+
+                            continuity_verified: true,
                         };
 
                     vec![genesis_link]
@@ -336,147 +365,6 @@ impl NetworkState {
             .detect_stale_peers(
                 self.global_epoch
             );
-
-        for validator in
-            &self.validators
-        {
-
-            let continuity_hash =
-                format!(
-                    "{:x}",
-                    md5::compute(
-                        format!(
-                            "{}:{}:{}",
-                            validator.id,
-                            validator.trust,
-                            validator.identity_chain.len()
-                        )
-                    )
-                );
-
-            self.peer_state
-                .push_announcement(
-
-                    PeerAnnouncement {
-
-                        peer_id:
-                            self.peer_state
-                                .local_peer_id
-                                .clone(),
-
-                        validator_id:
-                            validator.id,
-
-                        epoch:
-                            self.global_epoch,
-
-                        trust:
-                            validator.trust,
-
-                        continuity_hash,
-                    }
-                );
-        }
-
-        // =========================
-        // 🔁 ROTATION SCHEDULE
-        // =========================
-        if self.global_epoch > 1
-            && self.global_epoch % 1200 == 0
-        {
-
-            println!(
-                "🌐 GLOBAL ROTATION EPOCH {}",
-                self.global_epoch
-            );
-
-            let validator_ids:
-                Vec<u32> =
-                self.validators
-                    .iter()
-                    .map(|v| v.id)
-                    .collect();
-
-            for id in validator_ids {
-
-                self.perform_epoch_rotation(
-                    id
-                );
-            }
-        }
-
-        for validator in
-            &mut self.validators
-        {
-
-            validator.epoch_age += 1;
-
-            validator.drift *= 0.998;
-
-            validator.drift =
-                validator
-                    .drift
-                    .clamp(0.0, 100.0);
-
-            validator.chain_valid =
-                verify_lineage(
-                    &validator.identity_chain,
-                    validator.id,
-                );
-
-            let consensus =
-                evaluate_consensus(
-                    validator,
-                    &self
-                        .peer_state
-                        .gossip
-                        .announcements,
-                );
-
-            validator.network_accepted =
-                consensus.accepted;
-
-            validator.peer_votes_valid =
-                consensus.valid_votes;
-
-            validator.peer_votes_invalid =
-                consensus.invalid_votes;
-
-            validator.confidence +=
-                consensus.confidence_delta;
-
-            validator.trust +=
-                consensus.trust_delta;
-
-            validator.consensus_pressure +=
-                consensus.pressure_delta;
-
-            let _ =
-                save_validator(
-                    validator
-                );
-
-            let _ =
-                save_identity_chain(
-                    validator.id,
-                    &validator.identity_chain
-                );
-        }
-
-        for identity in
-            self.identities
-                .identities
-                .values_mut()
-        {
-
-            identity.continuity_score +=
-                0.01;
-
-            let _ =
-                save_identity(
-                    identity
-                );
-        }
     }
 
     // =========================
@@ -560,12 +448,6 @@ impl NetworkState {
         let rotation_index =
             validator.identity_chain.len();
 
-        let rotated_link =
-            rotate_identity(
-                validator_id,
-                rotation_index,
-            );
-
         let previous_hash =
             validator
                 .identity_chain
@@ -576,6 +458,20 @@ impl NetworkState {
                 .unwrap_or(
                     "GENESIS".into()
                 );
+
+        let rotated_link =
+            rotate_identity(
+
+                validator_id,
+
+                rotation_index,
+
+                validator.governance_weight,
+
+                validator.trust,
+
+                previous_hash.clone(),
+            );
 
         validator.identity_chain.push(
 
@@ -588,20 +484,74 @@ impl NetworkState {
                     rotated_link.signature,
 
                 continuity_hash:
-                    rotated_link.continuity_hash,
+                    rotated_link
+                        .continuity_hash
+                        .clone(),
 
                 parent_hash:
                     previous_hash,
 
+                state_hash:
+                    rotated_link
+                        .continuity_hash
+                        .clone(),
+
+                lineage_signature:
+                    None,
+
+                transition_signature:
+                    None,
+
                 epoch:
+                    self.global_epoch,
+
+                continuity_epoch:
                     self.global_epoch,
 
                 validator_id,
 
-                governance_weight: 1.0,
+                governance_weight:
+                    validator.governance_weight,
+
+                governance_score:
+                    validator.governance_weight
+                        * 100.0,
+
+                governance_votes:
+                    validator.peer_votes_valid,
+
+                network_alignment:
+                    validator.peer_agreement_ratio,
+
+                continuity_confidence:
+                    validator.confidence
+                        * 100.0,
+
+                peer_agreement_ratio:
+                    validator.peer_agreement_ratio,
 
                 entropy_score:
                     validator.trust,
+
+                lineage_stability:
+                    validator.lineage_stability,
+
+                fracture_severity:
+                    validator.fracture_severity,
+
+                rehabilitation_factor:
+                    validator.rehabilitation_score,
+
+                quarantine_level:
+                    validator.quarantine_level,
+
+                malicious_reports:
+                    validator.malicious_reports,
+
+                fork_conflicts: 0,
+
+                continuity_verified:
+                    validator.chain_valid,
             }
         );
 
@@ -647,9 +597,13 @@ impl NetworkState {
                 .find(|v| v.id == id)
         {
 
+            v.attack_history += 1;
+
             v.drift += 15.0;
 
             v.trust *= 0.95;
+
+            v.scar_level += 1.5;
 
             v.status =
                 "recovering".into();
@@ -670,15 +624,79 @@ impl NetworkState {
                 .find(|v| v.id == id)
         {
 
+            v.attack_history += 1;
+
             v.drift += 40.0;
 
             v.trust *= 0.70;
+
+            v.fracture_severity += 25.0;
+
+            v.quarantine_level += 20.0;
+
+            v.scar_level += 5.0;
 
             v.network_accepted =
                 false;
 
             v.status =
                 "quarantined".into();
+        }
+    }
+
+    // =========================
+    // 🧬 FRACTURE ATTACK
+    // =========================
+    pub fn fracture_attack(
+        &mut self,
+        id: u32,
+    ) {
+
+        if let Some(v) =
+            self.validators
+                .iter_mut()
+                .find(|v| v.id == id)
+        {
+
+            if let Some(last) =
+                v.identity_chain.last_mut()
+            {
+
+                last.parent_hash =
+                    "CORRUPTED_LINEAGE".into();
+
+                last.continuity_hash =
+                    format!(
+                        "fractured-{}-{}",
+                        id,
+                        self.global_epoch
+                    );
+            }
+
+            v.attack_history += 1;
+
+            v.chain_valid = false;
+
+            v.network_accepted = false;
+
+            v.trust *= 0.40;
+
+            v.drift += 65.0;
+
+            v.fracture_severity += 75.0;
+
+            v.quarantine_level += 50.0;
+
+            v.consensus_failures += 1;
+
+            v.malicious_reports += 1;
+
+            v.isolation_events += 1;
+
+            v.scar_level += 25.0;
+
+            v.status =
+                "fractured".into();
         }
     }
 
@@ -696,6 +714,8 @@ impl NetworkState {
             v.drift += 5.0;
 
             v.trust *= 0.98;
+
+            v.consensus_pressure += 1.0;
         }
     }
 
@@ -738,7 +758,7 @@ impl NetworkState {
 
             v.trust =
                 v.trust
-                    .clamp(0.0, 100.0);
+                    .clamp(-100.0, 100.0);
         }
     }
 

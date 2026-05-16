@@ -24,6 +24,17 @@ pub struct ConsensusResult {
     pub quarantine_delta: f64,
 
     pub governance_delta: f64,
+
+    pub rehabilitation_delta: f64,
+
+    pub scar_delta: f64,
+
+    pub exile: bool,
+
+    // 🌐 NEW
+    pub weighted_confidence: f64,
+
+    pub network_alignment: f64,
 }
 
 // =========================
@@ -41,6 +52,15 @@ pub fn evaluate_consensus(
 
     let mut invalid_votes = 0;
 
+    // =========================
+    // 🌐 WEIGHTED CONSENSUS
+    // =========================
+    let mut weighted_valid = 0.0;
+
+    let mut weighted_invalid = 0.0;
+
+    let mut total_weight = 0.0;
+
     for announcement in announcements {
 
         if announcement.validator_id
@@ -49,19 +69,62 @@ pub fn evaluate_consensus(
             continue;
         }
 
+        // =========================
+        // 🧠 DYNAMIC WEIGHT
+        // =========================
+        let mut weight =
+            announcement.trust / 100.0;
+
+        // =========================
+        // 🔗 CONTINUITY BONUS
+        // =========================
+        if announcement.continuity_hash.len() > 12 {
+
+            weight += 0.15;
+        }
+
+        // =========================
+        // 🌐 GOVERNANCE BONUS
+        // =========================
+        weight +=
+            validator.governance_weight
+            * 0.05;
+
+        // =========================
+        // 🧠 REPUTATION BONUS
+        // =========================
+        weight +=
+            validator.peer_reputation
+            * 0.002;
+
+        weight =
+            weight.clamp(0.05, 5.0);
+
+        total_weight += weight;
+
+        // =========================
+        // 🟢 VALID
+        // =========================
         if announcement.trust >= 60.0 {
 
             valid_votes += 1;
 
+            weighted_valid += weight;
+
         } else {
 
             invalid_votes += 1;
+
+            weighted_invalid += weight;
         }
     }
 
     let total_votes =
         valid_votes + invalid_votes;
 
+    // =========================
+    // 🌑 NO CONSENSUS
+    // =========================
     if total_votes == 0 {
 
         return ConsensusResult {
@@ -82,25 +145,88 @@ pub fn evaluate_consensus(
             quarantine_delta: 0.01,
 
             governance_delta: -0.01,
+
+            rehabilitation_delta: -0.10,
+
+            scar_delta: 0.05,
+
+            exile: false,
+
+            weighted_confidence: 0.0,
+
+            network_alignment: 0.0,
         };
     }
 
-    let ratio =
-        valid_votes as f64
-        / total_votes as f64;
+    // =========================
+    // 🌐 WEIGHTED RATIO
+    // =========================
+    let weighted_ratio =
+        weighted_valid
+        / (weighted_valid + weighted_invalid)
+            .max(0.0001);
 
     // =========================
-    // 🟢 HEALTHY CONSENSUS
+    // 🌐 ALIGNMENT SCORE
     // =========================
-    if ratio >= 0.66 {
+    let network_alignment =
+        (
+            validator.peer_agreement_ratio
+            + weighted_ratio
+        ) / 2.0;
+
+    // =========================
+    // 🟢 STRONG CONSENSUS
+    // =========================
+    if weighted_ratio >= 0.85 {
 
         return ConsensusResult {
 
             accepted: true,
 
-            confidence_delta: 0.004,
+            confidence_delta:
+                0.015 * network_alignment,
 
-            trust_delta: 0.10,
+            trust_delta:
+                0.40 * network_alignment,
+
+            pressure_delta: -1.5,
+
+            valid_votes,
+
+            invalid_votes,
+
+            quarantine_delta: -0.15,
+
+            governance_delta: 0.08,
+
+            rehabilitation_delta: 2.0,
+
+            scar_delta: -0.15,
+
+            exile: false,
+
+            weighted_confidence:
+                weighted_ratio,
+
+            network_alignment,
+        };
+    }
+
+    // =========================
+    // 🟢 HEALTHY CONSENSUS
+    // =========================
+    if weighted_ratio >= 0.66 {
+
+        return ConsensusResult {
+
+            accepted: true,
+
+            confidence_delta:
+                0.006 * network_alignment,
+
+            trust_delta:
+                0.15 * network_alignment,
 
             pressure_delta: -0.5,
 
@@ -108,31 +234,94 @@ pub fn evaluate_consensus(
 
             invalid_votes,
 
-            quarantine_delta: -0.03,
+            quarantine_delta: -0.05,
 
-            governance_delta: 0.02,
+            governance_delta: 0.03,
+
+            rehabilitation_delta: 0.8,
+
+            scar_delta: -0.05,
+
+            exile: false,
+
+            weighted_confidence:
+                weighted_ratio,
+
+            network_alignment,
         };
     }
 
     // =========================
-    // 🔴 QUARANTINE PRESSURE
+    // 🟠 DEGRADED CONSENSUS
     // =========================
+    if weighted_ratio >= 0.40 {
+
+        return ConsensusResult {
+
+            accepted: false,
+
+            confidence_delta: -0.015,
+
+            trust_delta: -0.35,
+
+            pressure_delta: 1.5,
+
+            valid_votes,
+
+            invalid_votes,
+
+            quarantine_delta: 0.08,
+
+            governance_delta: -0.04,
+
+            rehabilitation_delta: -0.6,
+
+            scar_delta: 0.20,
+
+            exile: false,
+
+            weighted_confidence:
+                weighted_ratio,
+
+            network_alignment,
+        };
+    }
+
+    // =========================
+    // 🔴 FRACTURED CONSENSUS
+    // =========================
+    let exile =
+        validator.fracture_severity > 150.0
+        || validator.consensus_failures > 8
+        || validator.quarantine_level > 120.0;
+
     ConsensusResult {
 
         accepted: false,
 
-        confidence_delta: -0.015,
+        confidence_delta: -0.030,
 
-        trust_delta: -0.40,
+        trust_delta: -1.0,
 
-        pressure_delta: 2.0,
+        pressure_delta: 5.0,
 
         valid_votes,
 
         invalid_votes,
 
-        quarantine_delta: 0.08,
+        quarantine_delta: 0.30,
 
-        governance_delta: -0.03,
+        governance_delta: -0.10,
+
+        rehabilitation_delta: -3.0,
+
+        scar_delta: 0.75,
+
+        exile,
+
+        weighted_confidence:
+            weighted_ratio,
+
+        network_alignment,
     }
 }

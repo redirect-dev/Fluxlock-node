@@ -30,6 +30,25 @@ pub static KEY_STORE: Lazy<
 > = Lazy::new(|| Mutex::new(HashMap::new()));
 
 // =========================
+// 🔐 GOVERNANCE ENTROPY
+// =========================
+fn governance_entropy(
+    validator_id: u32,
+    chain_depth: usize,
+    governance_weight: f64,
+    entropy_score: f64,
+) -> String {
+
+    format!(
+        "{}:{}:{:.4}:{:.4}",
+        validator_id,
+        chain_depth,
+        governance_weight,
+        entropy_score
+    )
+}
+
+// =========================
 // 🔑 CREATE IDENTITY
 // =========================
 pub fn generate_identity(
@@ -54,8 +73,17 @@ pub fn generate_identity(
 // 🔁 ROTATE IDENTITY
 // =========================
 pub fn rotate_identity(
-    id: u32,
+
+    validator_id: u32,
+
     chain_depth: usize,
+
+    governance_weight: f64,
+
+    entropy_score: f64,
+
+    previous_hash: String,
+
 ) -> IdentityLink {
 
     let mut store =
@@ -63,7 +91,7 @@ pub fn rotate_identity(
 
     let (_, old_sk) =
         store
-            .get(&id)
+            .get(&validator_id)
             .unwrap()
             .clone();
 
@@ -73,27 +101,52 @@ pub fn rotate_identity(
     let (new_pk, new_sk) =
         dilithium2::keypair();
 
+    let public_key =
+        new_pk.as_bytes().to_vec();
+
     // =========================
-    // 🔗 SIGN SUCCESSOR
+    // 🧠 ENTROPY PAYLOAD
+    // =========================
+    let entropy_payload =
+        governance_entropy(
+            validator_id,
+            chain_depth,
+            governance_weight,
+            entropy_score,
+        );
+
+    // =========================
+    // 🔗 SUCCESSION MESSAGE
     // =========================
     let message =
         format!(
-            "validator:{}:depth:{}",
-            id,
-            chain_depth
+            "{}:{}:{}",
+            validator_id,
+            chain_depth,
+            previous_hash
         );
 
-    let signature =
+    // =========================
+    // 🔐 SIGN SUCCESSOR
+    // =========================
+    let detached =
         dilithium2::detached_sign(
             message.as_bytes(),
             &old_sk
+        );
+
+    let signature =
+        Some(
+            detached
+                .as_bytes()
+                .to_vec()
         );
 
     // =========================
     // 🔁 STORE NEW KEYS
     // =========================
     store.insert(
-        id,
+        validator_id,
         (
             new_pk.clone(),
             new_sk
@@ -108,9 +161,11 @@ pub fn rotate_identity(
             "{:x}",
             md5::compute(
                 format!(
-                    "{}:{}",
-                    id,
-                    chain_depth
+                    "{}:{}:{}:{}",
+                    validator_id,
+                    chain_depth,
+                    previous_hash,
+                    entropy_payload
                 )
             )
         );
@@ -120,38 +175,90 @@ pub fn rotate_identity(
     // =========================
     IdentityLink {
 
-        public_key:
-            new_pk
-                .as_bytes()
-                .to_vec(),
+        // =========================
+        // 🔐 CRYPTO
+        // =========================
+        public_key,
 
-        signature:
-            Some(
-                signature
-                    .as_bytes()
-                    .to_vec()
-            ),
+        signature,
 
+        // =========================
+        // 🔗 CONTINUITY
+        // =========================
         continuity_hash:
-            continuity_hash,
+            continuity_hash.clone(),
 
         parent_hash:
-            format!(
-                "parent:{}",
-                chain_depth
-            ),
+            previous_hash,
 
+        state_hash:
+            continuity_hash.clone(),
+
+        lineage_signature:
+            None,
+
+        transition_signature:
+            None,
+
+        // =========================
+        // 🌐 EPOCH
+        // =========================
         epoch:
             chain_depth as u64,
 
-        validator_id:
-            id,
+        continuity_epoch:
+            chain_depth as u64,
 
-        governance_weight:
+        validator_id,
+
+        // =========================
+        // 🧠 GOVERNANCE
+        // =========================
+        governance_weight,
+
+        governance_score:
+            governance_weight * 100.0,
+
+        governance_votes: 0,
+
+        // =========================
+        // 🌐 CONSENSUS
+        // =========================
+        network_alignment:
             1.0,
 
-        entropy_score:
+        continuity_confidence:
             100.0,
+
+        peer_agreement_ratio:
+            1.0,
+
+        // =========================
+        // 🧬 STABILITY
+        // =========================
+        entropy_score,
+
+        lineage_stability:
+            100.0,
+
+        fracture_severity:
+            0.0,
+
+        rehabilitation_factor:
+            1.0,
+
+        // =========================
+        // ⚠ SECURITY
+        // =========================
+        quarantine_level:
+            0.0,
+
+        malicious_reports: 0,
+
+        fork_conflicts: 0,
+
+        continuity_verified:
+            true,
     }
 }
 
@@ -159,9 +266,13 @@ pub fn rotate_identity(
 // ✅ VERIFY LINK
 // =========================
 pub fn verify_link(
+
     old_pk_bytes: &[u8],
+
     message: &[u8],
+
     sig_bytes: &[u8],
+
 ) -> bool {
 
     let pk =
@@ -193,8 +304,11 @@ pub fn verify_link(
 // 🔗 VERIFY ENTIRE LINEAGE
 // =========================
 pub fn verify_lineage(
+
     chain: &Vec<IdentityLink>,
+
     validator_id: u32,
+
 ) -> bool {
 
     if chain.is_empty() {
@@ -231,6 +345,9 @@ pub fn verify_lineage(
             return false;
         }
 
+        // =========================
+        // 🔐 SIGNATURE REQUIRED
+        // =========================
         let signature =
             match &current.signature {
 
@@ -239,13 +356,20 @@ pub fn verify_lineage(
                 None => return false,
             };
 
+        // =========================
+        // 🔐 REBUILD MESSAGE
+        // =========================
         let message =
             format!(
-                "validator:{}:depth:{}",
+                "{}:{}:{}",
                 validator_id,
-                i
+                i,
+                previous.continuity_hash
             );
 
+        // =========================
+        // 🔐 VERIFY SUCCESSION
+        // =========================
         let valid =
             verify_link(
                 &previous.public_key,
@@ -254,6 +378,22 @@ pub fn verify_lineage(
             );
 
         if !valid {
+
+            return false;
+        }
+
+        // =========================
+        // 🧠 ENTROPY FLOOR
+        // =========================
+        if current.entropy_score < 0.0 {
+
+            return false;
+        }
+
+        // =========================
+        // 🌐 GOVERNANCE FLOOR
+        // =========================
+        if current.governance_weight < 0.0 {
 
             return false;
         }
@@ -276,12 +416,23 @@ pub struct ValidationResult {
 // 🧠 VALIDATION LOGIC
 // =========================
 pub fn validate_identity_logic(
+
     trust: f64,
+
     drift: f64,
+
     epoch_age: u64,
+
     epoch_valid: bool,
+
     compromised: bool,
+
     network_accepted: bool,
+
+    governance_weight: f64,
+
+    continuity_score: f64,
+
 ) -> ValidationResult {
 
     if compromised {
@@ -340,6 +491,30 @@ pub fn validate_identity_logic(
 
             reason:
                 "identity unstable"
+                    .into(),
+        };
+    }
+
+    if governance_weight <= 0.0 {
+
+        return ValidationResult {
+
+            valid: false,
+
+            reason:
+                "governance collapse"
+                    .into(),
+        };
+    }
+
+    if continuity_score < 25.0 {
+
+        return ValidationResult {
+
+            valid: false,
+
+            reason:
+                "continuity collapse"
                     .into(),
         };
     }

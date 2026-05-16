@@ -20,6 +20,7 @@ use routes::attack::{
     spike,
     breach,
     network,
+    fracture,
 };
 
 use routes::evaluate::evaluate;
@@ -282,6 +283,11 @@ async fn main() {
             post(network)
         )
 
+        .route(
+            "/attack/fracture",
+            post(fracture)
+        )
+
         .layer(cors)
 
         .with_state(
@@ -308,6 +314,10 @@ async fn main() {
 
     println!(
         "🧬 Continuity proof export enabled"
+    );
+
+    println!(
+        "☠ Continuity fracture simulation enabled"
     );
 
     axum::serve(

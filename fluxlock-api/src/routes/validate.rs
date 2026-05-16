@@ -24,13 +24,25 @@ pub async fn validate_identity(
 ) -> Json<ValidationResult> {
 
     let result = validate_identity_logic(
-        payload.trust,
-        payload.drift,
-        payload.epoch_age,
-        payload.epoch_valid,
-        payload.compromised,
-        payload.network_accepted, // 🔥 PASS IT
-    );
+
+    payload.trust,
+
+    payload.drift,
+
+    payload.epoch_age,
+
+    payload.epoch_valid,
+
+    payload.compromised,
+
+    payload.network_accepted,
+
+    // governance_weight
+    payload.trust,
+
+    // continuity_score
+    payload.trust,
+);
 
     Json(ValidationResult {
         valid: result.valid,
