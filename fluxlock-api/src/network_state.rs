@@ -39,6 +39,10 @@ use fluxlock_storage::lineage_store::{
     load_identity_chain,
 };
 
+use crate::engine::governance::{
+    evaluate_governance,
+};
+
 // =========================
 // 💾 GLOBAL EPOCH STORAGE
 // =========================
@@ -265,6 +269,8 @@ impl NetworkState {
 
                     scar_level: 0.0,
 
+                    scar_severity: 0.0,
+
                     immune_response: 1.0,
 
                     consensus_pressure: 0.0,
@@ -365,6 +371,118 @@ impl NetworkState {
             .detect_stale_peers(
                 self.global_epoch
             );
+            // =========================
+// 🧬 REHABILITATION ENGINE
+// =========================
+for validator in
+    self.validators.iter_mut()
+{
+
+    let governance =
+        evaluate_governance(
+            validator
+        );
+
+    // =========================
+    // 🛡 STABILIZATION
+    // =========================
+    validator.drift -=
+        governance
+            .stabilization_delta;
+
+    validator.drift =
+        validator.drift.max(0.0);
+
+    // =========================
+    // 🔒 QUARANTINE RECOVERY
+    // =========================
+    validator.quarantine_level -=
+        governance
+            .quarantine_reduction;
+
+    validator.quarantine_level =
+        validator
+            .quarantine_level
+            .max(0.0);
+
+    // =========================
+    // ❤️ TRUST RECOVERY
+    // =========================
+    validator.trust +=
+        governance
+            .trust_bonus;
+
+    validator.trust =
+        validator.trust
+            .clamp(0.0, 100.0);
+
+    // =========================
+    // 🧬 REHABILITATION
+    // =========================
+    validator.rehabilitation_score +=
+        governance
+            .rehabilitation_boost;
+
+    validator.rehabilitation_score =
+        validator
+            .rehabilitation_score
+            .clamp(0.0, 1000.0);
+
+    // =========================
+    // 🔥 SCAR STABILIZATION
+    // =========================
+    validator.scar_severity -=
+        governance
+            .scar_reduction;
+
+    validator.scar_severity =
+        validator
+            .scar_severity
+            .max(0.0);
+
+    // =========================
+    // 🛡 IMMUNE RESPONSE
+    // =========================
+    validator.immune_response +=
+        governance
+            .immune_response_boost;
+
+    validator.immune_response =
+        validator
+            .immune_response
+            .clamp(0.0, 100.0);
+
+    // =========================
+    // 🌐 NETWORK REENTRY
+    // =========================
+    if governance
+        .network_reacceptance
+        && validator.trust > 70.0
+        && validator.drift < 25.0
+    {
+        validator.network_accepted =
+            true;
+    }
+
+    // =========================
+    // 🟡 RECOVERY STATUS
+    // =========================
+    if validator.quarantine_level > 20.0 {
+
+        validator.status =
+            "quarantined".into();
+
+    } else if validator.drift > 25.0 {
+
+        validator.status =
+            "recovering".into();
+
+    } else {
+
+        validator.status =
+            "healthy".into();
+    }
+}
     }
 
     // =========================

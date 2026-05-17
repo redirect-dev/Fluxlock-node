@@ -172,6 +172,8 @@ pub struct Validator {
 
     pub fracture_severity: f64,
 
+    pub scar_severity: f64,
+
     pub continuity_anchor_strength: f64,
 
     pub current_epoch: u64,
