@@ -10,8 +10,8 @@ use fluxlock_core::types::{
     IdentityLink,
     IdentityRegistry,
     PeerNode,
-    PeerAnnouncement,
     FluxIdentity,
+    ContinuityEvent,
 };
 
 use crate::peer_state::PeerState;
@@ -22,25 +22,21 @@ use crate::engine::identity_validator::{
     verify_lineage,
 };
 
-use crate::engine::consensus::{
-    evaluate_consensus,
+use crate::engine::governance::{
+    evaluate_governance,
+};
+
+use crate::engine::peer_governance::{
+    propagate_peer_governance,
 };
 
 use fluxlock_storage::validator_store::{
     save_validator,
 };
 
-use fluxlock_storage::identity_store::{
-    save_identity,
-};
-
 use fluxlock_storage::lineage_store::{
     save_identity_chain,
     load_identity_chain,
-};
-
-use crate::engine::governance::{
-    evaluate_governance,
 };
 
 // =========================
@@ -261,6 +257,34 @@ impl NetworkState {
 
                     identity_chain,
 
+                    // =========================
+                    // 🧠 CONTINUITY MEMORY
+                    // =========================
+                    continuity_events:
+                        Vec::<ContinuityEvent>::new(),
+
+                    continuity_memory_score: 100.0,
+
+                    historical_consensus_accuracy: 1.0,
+
+                    recovery_consistency: 1.0,
+
+                    adaptive_reputation: 100.0,
+
+                    continuity_survival_score: 100.0,
+
+                    fracture_history: 0,
+
+                    recovery_history: 0,
+
+                    governance_history: 0,
+
+                    continuity_age:
+                        restored_epoch,
+
+                    // =========================
+                    // 🌐 RESILIENCE
+                    // =========================
                     attack_history: 0,
 
                     successful_recoveries: 0,
@@ -333,6 +357,26 @@ impl NetworkState {
 
                     validator_stability_index: 100.0,
 
+                    // =========================
+                    // 🌐 ECOLOGY
+                    // =========================
+                    influence_radius: 25.0,
+
+                    entropy_output: 0.0,
+
+                    immune_strength: 10.0,
+
+                    healing_wave: 5.0,
+
+                    topology_cluster:
+                        (i % 4) as u32,
+
+                    resonance_score: 50.0,
+
+                    regional_pressure: 0.0,
+
+                    trust_gravity: 25.0,
+
                     status:
                         "healthy".into(),
                 }
@@ -371,118 +415,81 @@ impl NetworkState {
             .detect_stale_peers(
                 self.global_epoch
             );
-            // =========================
-// 🧬 REHABILITATION ENGINE
-// =========================
-for validator in
-    self.validators.iter_mut()
-{
 
-    let governance =
-        evaluate_governance(
-            validator
+        propagate_peer_governance(
+            &mut self.validators
         );
 
-    // =========================
-    // 🛡 STABILIZATION
-    // =========================
-    validator.drift -=
-        governance
-            .stabilization_delta;
+        for validator in
+            self.validators.iter_mut()
+        {
 
-    validator.drift =
-        validator.drift.max(0.0);
+            let governance =
+                evaluate_governance(
+                    validator
+                );
 
-    // =========================
-    // 🔒 QUARANTINE RECOVERY
-    // =========================
-    validator.quarantine_level -=
-        governance
-            .quarantine_reduction;
+            validator.drift -=
+                governance
+                    .stabilization_delta;
 
-    validator.quarantine_level =
-        validator
-            .quarantine_level
-            .max(0.0);
+            validator.drift =
+                validator.drift.max(0.0);
 
-    // =========================
-    // ❤️ TRUST RECOVERY
-    // =========================
-    validator.trust +=
-        governance
-            .trust_bonus;
+            validator.quarantine_level -=
+                governance
+                    .quarantine_reduction;
 
-    validator.trust =
-        validator.trust
-            .clamp(0.0, 100.0);
+            validator.quarantine_level =
+                validator
+                    .quarantine_level
+                    .max(0.0);
 
-    // =========================
-    // 🧬 REHABILITATION
-    // =========================
-    validator.rehabilitation_score +=
-        governance
-            .rehabilitation_boost;
+            validator.trust +=
+                governance
+                    .trust_bonus;
 
-    validator.rehabilitation_score =
-        validator
-            .rehabilitation_score
-            .clamp(0.0, 1000.0);
+            validator.trust =
+                validator.trust
+                    .clamp(0.0, 100.0);
 
-    // =========================
-    // 🔥 SCAR STABILIZATION
-    // =========================
-    validator.scar_severity -=
-        governance
-            .scar_reduction;
+            validator.rehabilitation_score +=
+                governance
+                    .rehabilitation_boost;
 
-    validator.scar_severity =
-        validator
-            .scar_severity
-            .max(0.0);
+            validator.rehabilitation_score =
+                validator
+                    .rehabilitation_score
+                    .clamp(0.0, 1000.0);
 
-    // =========================
-    // 🛡 IMMUNE RESPONSE
-    // =========================
-    validator.immune_response +=
-        governance
-            .immune_response_boost;
+            validator.scar_severity -=
+                governance
+                    .scar_reduction;
 
-    validator.immune_response =
-        validator
-            .immune_response
-            .clamp(0.0, 100.0);
+            validator.scar_severity =
+                validator
+                    .scar_severity
+                    .max(0.0);
 
-    // =========================
-    // 🌐 NETWORK REENTRY
-    // =========================
-    if governance
-        .network_reacceptance
-        && validator.trust > 70.0
-        && validator.drift < 25.0
-    {
-        validator.network_accepted =
-            true;
-    }
+            validator.immune_response +=
+                governance
+                    .immune_response_boost;
 
-    // =========================
-    // 🟡 RECOVERY STATUS
-    // =========================
-    if validator.quarantine_level > 20.0 {
+            validator.immune_response =
+                validator
+                    .immune_response
+                    .clamp(0.0, 100.0);
 
-        validator.status =
-            "quarantined".into();
+            validator.epoch_age += 1;
 
-    } else if validator.drift > 25.0 {
+            validator.continuity_age += 1;
 
-        validator.status =
-            "recovering".into();
+            validator.governance_history += 1;
 
-    } else {
+            validator.continuity_memory_score += 0.01;
 
-        validator.status =
-            "healthy".into();
-    }
-}
+            validator.adaptive_reputation += 0.01;
+        }
     }
 
     // =========================
@@ -684,10 +691,9 @@ for validator in
         validator.last_epoch_transition =
             self.global_epoch;
 
-        println!(
-            "🧬 EVOLVED CHAIN => {}",
-            validator.identity_chain.len()
-        );
+        validator.continuity_memory_score += 0.5;
+
+        validator.continuity_survival_score += 0.25;
 
         let _ =
             save_validator(
@@ -723,6 +729,10 @@ for validator in
 
             v.scar_level += 1.5;
 
+            v.scar_severity += 0.5;
+
+            v.fracture_history += 1;
+
             v.status =
                 "recovering".into();
         }
@@ -753,6 +763,10 @@ for validator in
             v.quarantine_level += 20.0;
 
             v.scar_level += 5.0;
+
+            v.scar_severity += 5.0;
+
+            v.fracture_history += 1;
 
             v.network_accepted =
                 false;
@@ -813,6 +827,10 @@ for validator in
 
             v.scar_level += 25.0;
 
+            v.scar_severity += 20.0;
+
+            v.fracture_history += 1;
+
             v.status =
                 "fractured".into();
         }
@@ -834,6 +852,8 @@ for validator in
             v.trust *= 0.98;
 
             v.consensus_pressure += 1.0;
+
+            v.instability_radius += 0.25;
         }
     }
 
@@ -861,6 +881,8 @@ for validator in
                 v.trust +=
                     0.10;
 
+                v.recovery_history += 1;
+
             } else {
 
                 v.confidence *= 0.98;
@@ -881,7 +903,7 @@ for validator in
     }
 
     // =========================
-    // 🧠 IDENTITY SESSION
+    // 🔐 GET OR CREATE IDENTITY
     // =========================
     pub fn get_or_create_identity(
         &mut self,
@@ -889,7 +911,8 @@ for validator in
         validator_id: u32,
     ) {
 
-        if !self.identities
+        if !self
+            .identities
             .identities
             .contains_key(
                 &identity_id
@@ -897,51 +920,16 @@ for validator in
         {
 
             self.identities
-                .identities
-                .insert(
-
-                    identity_id.clone(),
-
-                    FluxIdentity {
-
-                        identity_id,
-
-                        created_epoch:
-                            self.global_epoch,
-
-                        last_active_epoch:
-                            self.global_epoch,
-
-                        session_count: 0,
-
-                        trust_score: 100.0,
-
-                        continuity_score: 100.0,
-
-                        bound_validator:
-                            validator_id,
-
-                        successful_auths: 0,
-
-                        failed_auths: 0,
-
-                        recovery_events: 0,
-
-                        drift_score: 0.0,
-
-                        status:
-                            "healthy".into(),
-
-                        credential_depth: 1,
-
-                        proofs: Vec::new(),
-                    }
+                .create_identity(
+                    identity_id,
+                    validator_id,
+                    self.global_epoch,
                 );
         }
     }
 
     // =========================
-    // ✅ AUTH SUCCESS
+    // ✅ IDENTITY SUCCESS
     // =========================
     pub fn identity_success(
         &mut self,
@@ -954,22 +942,34 @@ for validator in
                 .get_mut(identity_id)
         {
 
-            identity.session_count += 1;
-
             identity.successful_auths += 1;
+
+            identity.session_count += 1;
 
             identity.last_active_epoch =
                 self.global_epoch;
 
-            identity.continuity_score +=
-                0.5;
+            identity.trust_score += 1.0;
 
-            identity.credential_depth += 1;
+            identity.continuity_score += 0.5;
+
+            identity.trust_score =
+                identity
+                    .trust_score
+                    .clamp(0.0, 1000.0);
+
+            identity.continuity_score =
+                identity
+                    .continuity_score
+                    .clamp(0.0, 1000.0);
+
+            identity.status =
+                "healthy".into();
         }
     }
 
     // =========================
-    // ❌ AUTH FAILURE
+    // ❌ IDENTITY FAILURE
     // =========================
     pub fn identity_failure(
         &mut self,
@@ -984,9 +984,11 @@ for validator in
 
             identity.failed_auths += 1;
 
-            identity.drift_score += 2.0;
+            identity.drift_score += 5.0;
 
-            identity.trust_score *= 0.98;
+            identity.trust_score *= 0.97;
+
+            identity.continuity_score *= 0.98;
 
             identity.status =
                 "recovering".into();

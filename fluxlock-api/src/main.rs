@@ -2,6 +2,7 @@ mod state;
 mod network_state;
 mod peer_state;
 mod identity;
+mod continuity_proof;
 mod engine;
 mod routes;
 
@@ -33,6 +34,11 @@ use routes::identity_create::create_identity;
 
 use routes::continuity::{
     export_continuity_proof,
+};
+
+use routes::proof::{
+    get_proof,
+    get_all_proofs,
 };
 
 use routes::peer_register::register_peer;
@@ -245,6 +251,17 @@ async fn main() {
             get(export_continuity_proof)
         )
 
+        // 🧬 CONTINUITY PROOFS
+        .route(
+           "/proof/:id",
+           get(get_proof)
+        )
+
+         .route(
+         "/proof/network",
+          get(get_all_proofs)
+        )
+
         // 🔥 IDENTITY
         .route(
             "/identity/create",
@@ -318,6 +335,10 @@ async fn main() {
 
     println!(
         "☠ Continuity fracture simulation enabled"
+    );
+
+    println!(
+        "🌐 Network continuity proof system enabled"
     );
 
     axum::serve(

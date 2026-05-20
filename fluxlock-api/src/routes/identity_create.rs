@@ -20,10 +20,6 @@ use std::time::{
 
 use crate::network_state::NetworkState;
 
-use fluxlock_core::types::{
-    FluxIdentity,
-};
-
 // =========================
 // 📥 REQUEST
 // =========================
@@ -102,50 +98,26 @@ pub async fn create_identity(
         state.global_epoch;
 
     // =========================
-    // 🌐 CREATE IDENTITY
+    // 🌐 CREATE REGISTRY ENTRY
     // =========================
-    let identity =
-        FluxIdentity {
-
-            identity_id:
-                identity_id.clone(),
-
-            created_epoch:
-                current_epoch,
-
-            last_active_epoch:
-                current_epoch,
-
-            session_count: 0,
-
-            trust_score: 100.0,
-
-            continuity_score: 100.0,
-
-            bound_validator:
-                payload.validator_id,
-
-            successful_auths: 0,
-
-            failed_auths: 0,
-
-            recovery_events: 0,
-
-            drift_score: 0.0,
-
-            status:
-                "healthy".into(),
-
-            credential_depth: 1,
-
-            proofs: Vec::new(),
-        };
-
     state
         .identities
         .create_identity(
-            identity.clone()
+            identity_id.clone(),
+            payload.validator_id,
+            current_epoch,
         );
+
+    // =========================
+    // 📦 FETCH CREATED IDENTITY
+    // =========================
+    let identity =
+        state
+            .identities
+            .identities
+            .get(&identity_id)
+            .unwrap()
+            .clone();
 
     // =========================
     // 💾 RESPONSE

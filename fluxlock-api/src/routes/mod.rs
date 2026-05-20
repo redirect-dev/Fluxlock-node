@@ -16,3 +16,4 @@ pub mod continuity;
 pub mod peer_register;
 pub mod peer_gossip;
 pub mod peer_state;
+pub mod proof;
