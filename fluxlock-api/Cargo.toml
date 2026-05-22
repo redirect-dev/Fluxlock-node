@@ -35,3 +35,5 @@ reqwest = { version = "0.12", features = ["json"] }
 fluxlock-core = { path = "../crates/fluxlock-core" }
 
 fluxlock-storage = { path = "../crates/fluxlock-storage" }
+
+fluxlock-network = { path = "../crates/fluxlock-network" }

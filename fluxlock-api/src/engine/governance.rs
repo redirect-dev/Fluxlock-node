@@ -15,7 +15,7 @@ pub struct GovernanceResult {
 
     pub trust_bonus: f64,
 
-    // 🧬 NEW
+    // 🧬 REHABILITATION
     pub rehabilitation_boost: f64,
 
     pub scar_reduction: f64,
@@ -23,6 +23,17 @@ pub struct GovernanceResult {
     pub immune_response_boost: f64,
 
     pub network_reacceptance: bool,
+
+    // 🌐 TEMPORAL MEMORY
+    pub adaptive_reputation_delta: f64,
+
+    pub continuity_memory_delta: f64,
+
+    pub historical_stability_bonus: f64,
+
+    pub maturity_bonus: f64,
+
+    pub fracture_penalty: f64,
 }
 
 // =========================
@@ -33,13 +44,56 @@ pub fn evaluate_governance(
 ) -> GovernanceResult {
 
     // =========================
-    // 🔒 STABILIZATION WINDOW
+    // ⏳ ROTATION WINDOW
     // =========================
     let epochs_since_rotation =
         validator.current_epoch
         .saturating_sub(
             validator.last_epoch_transition
         );
+
+    // =========================
+    // 🧠 TEMPORAL MEMORY
+    // =========================
+    let maturity_factor =
+        (
+            validator.continuity_age
+            as f64
+            / 1000.0
+        )
+        .min(5.0);
+
+    let recovery_strength =
+        (
+            validator.recovery_history
+            as f64
+            * 0.03
+        )
+        .min(3.0);
+
+    let fracture_penalty =
+        (
+            validator.fracture_history
+            as f64
+            * 0.05
+        )
+        .min(4.0);
+
+    let governance_memory =
+        (
+            validator.governance_history
+            as f64
+            * 0.01
+        )
+        .min(2.5);
+
+    let stability_memory =
+        (
+            validator
+                .historical_consensus_accuracy
+            * 0.05
+        )
+        .min(2.0);
 
     // =========================
     // 🔴 FRACTURED STATE
@@ -50,24 +104,42 @@ pub fn evaluate_governance(
 
             allow_rotation: false,
 
-            stabilization_delta: 0.50,
+            stabilization_delta:
+                0.50
+                + fracture_penalty,
 
             quarantine_reduction: 0.0,
 
-            trust_bonus: -0.10,
+            trust_bonus:
+                -0.10
+                - fracture_penalty,
 
-            rehabilitation_boost: -1.0,
+            rehabilitation_boost:
+                -1.0,
 
             scar_reduction: 0.0,
 
             immune_response_boost: 0.0,
 
             network_reacceptance: false,
+
+            adaptive_reputation_delta:
+                -0.50,
+
+            continuity_memory_delta:
+                -0.25,
+
+            historical_stability_bonus:
+                0.0,
+
+            maturity_bonus: 0.0,
+
+            fracture_penalty,
         };
     }
 
     // =========================
-    // 🟠 QUARANTINE RECOVERY
+    // 🟠 QUARANTINED
     // =========================
     if validator.quarantine_level > 25.0 {
 
@@ -75,24 +147,48 @@ pub fn evaluate_governance(
 
             allow_rotation: false,
 
-            stabilization_delta: 0.35,
+            stabilization_delta:
+                0.35
+                + fracture_penalty,
 
-            quarantine_reduction: 0.40,
+            quarantine_reduction:
+                0.40
+                + recovery_strength,
 
-            trust_bonus: 0.03,
+            trust_bonus:
+                0.03
+                + governance_memory,
 
-            rehabilitation_boost: 1.2,
+            rehabilitation_boost:
+                1.2
+                + recovery_strength,
 
-            scar_reduction: 0.02,
+            scar_reduction:
+                0.02,
 
-            immune_response_boost: 0.05,
+            immune_response_boost:
+                0.05,
 
             network_reacceptance: false,
+
+            adaptive_reputation_delta:
+                0.05,
+
+            continuity_memory_delta:
+                0.04,
+
+            historical_stability_bonus:
+                stability_memory,
+
+            maturity_bonus:
+                maturity_factor,
+
+            fracture_penalty,
         };
     }
 
     // =========================
-    // 🟡 RECOVERING STATE
+    // 🟡 RECOVERING
     // =========================
     if validator.status == "recovering" {
 
@@ -100,19 +196,42 @@ pub fn evaluate_governance(
 
             allow_rotation: false,
 
-            stabilization_delta: 0.18,
+            stabilization_delta:
+                0.18,
 
-            quarantine_reduction: 0.25,
+            quarantine_reduction:
+                0.25
+                + recovery_strength,
 
-            trust_bonus: 0.05,
+            trust_bonus:
+                0.05
+                + governance_memory,
 
-            rehabilitation_boost: 1.8,
+            rehabilitation_boost:
+                1.8
+                + recovery_strength,
 
-            scar_reduction: 0.04,
+            scar_reduction:
+                0.04,
 
-            immune_response_boost: 0.10,
+            immune_response_boost:
+                0.10,
 
             network_reacceptance: true,
+
+            adaptive_reputation_delta:
+                0.10,
+
+            continuity_memory_delta:
+                0.08,
+
+            historical_stability_bonus:
+                stability_memory,
+
+            maturity_bonus:
+                maturity_factor,
+
+            fracture_penalty,
         };
     }
 
@@ -125,19 +244,40 @@ pub fn evaluate_governance(
 
             allow_rotation: false,
 
-            stabilization_delta: 0.10,
+            stabilization_delta:
+                0.10,
 
-            quarantine_reduction: 0.05,
+            quarantine_reduction:
+                0.05,
 
-            trust_bonus: 0.02,
+            trust_bonus:
+                0.02
+                + governance_memory,
 
-            rehabilitation_boost: 0.4,
+            rehabilitation_boost:
+                0.4,
 
-            scar_reduction: 0.01,
+            scar_reduction:
+                0.01,
 
-            immune_response_boost: 0.03,
+            immune_response_boost:
+                0.03,
 
             network_reacceptance: true,
+
+            adaptive_reputation_delta:
+                0.03,
+
+            continuity_memory_delta:
+                0.02,
+
+            historical_stability_bonus:
+                stability_memory,
+
+            maturity_bonus:
+                maturity_factor,
+
+            fracture_penalty,
         };
     }
 
@@ -148,18 +288,54 @@ pub fn evaluate_governance(
 
         allow_rotation: true,
 
-        stabilization_delta: 0.04,
+        stabilization_delta:
+            (
+                0.04
+                - (
+                    maturity_factor
+                    * 0.002
+                )
+            )
+            .max(0.01),
 
-        quarantine_reduction: 0.10,
+        quarantine_reduction:
+            0.10
+            + recovery_strength,
 
-        trust_bonus: 0.08,
+        trust_bonus:
+            0.08
+            + governance_memory
+            + stability_memory,
 
-        rehabilitation_boost: 2.5,
+        rehabilitation_boost:
+            2.5
+            + recovery_strength,
 
-        scar_reduction: 0.08,
+        scar_reduction:
+            0.08,
 
-        immune_response_boost: 0.15,
+        immune_response_boost:
+            0.15
+            + maturity_factor
+            * 0.02,
 
         network_reacceptance: true,
+
+        adaptive_reputation_delta:
+            0.20
+            + maturity_factor
+            * 0.05,
+
+        continuity_memory_delta:
+            0.15
+            + governance_memory,
+
+        historical_stability_bonus:
+            stability_memory,
+
+        maturity_bonus:
+            maturity_factor,
+
+        fracture_penalty,
     }
 }

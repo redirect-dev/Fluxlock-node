@@ -1,191 +1,371 @@
-import React, { useEffect, useRef } from "react";
+import React, {
+  useEffect,
+  useRef,
+} from "react";
+
 import * as d3 from "d3";
 
-const IdentityGraph = ({ validators, onSelectNode }) => {
-  const svgRef = useRef();
+const IdentityGraph = ({
+  validators,
+  onSelectNode,
+}) => {
+
+  const svgRef =
+    useRef();
 
   useEffect(() => {
-    if (!validators || validators.length === 0) return;
 
-    const width = 800;
-    const height = 800;
+    if (
+      !validators
+      || validators.length === 0
+    ) return;
 
-    const svg = d3.select(svgRef.current);
+    const width = 900;
+    const height = 900;
+
+    const svg =
+      d3.select(svgRef.current);
+
     svg.selectAll("*").remove();
 
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const radius = 300;
+    const centerX =
+      width / 2;
 
-    // ================= BUILD NODE POSITIONS =================
-    const nodes = validators.map((v, i) => {
-      const angle = (i / validators.length) * 2 * Math.PI;
+    const centerY =
+      height / 2;
 
-      // 🔥 DRIFT DISTORTION (instability visualization)
-      const instabilityOffset = (v.drift || 0) * 0.5;
+    // =========================
+    // 🌐 TOPOLOGY CLUSTERS
+    // =========================
+    const clusterCenters = [
 
-      return {
-        ...v,
-        x: centerX + (radius + instabilityOffset) * Math.cos(angle),
-        y: centerY + (radius + instabilityOffset) * Math.sin(angle),
-      };
-    });
+      { x: 250, y: 250 },
+      { x: 650, y: 250 },
+      { x: 250, y: 650 },
+      { x: 650, y: 650 },
+    ];
 
-    // ================= LINKS (INFLUENCE) =================
-    const linkGroup = svg.append("g");
+    const nodes =
+      validators.map((v, i) => {
+
+        const cluster =
+          v.topology_cluster || 0;
+
+        const center =
+          clusterCenters[
+            cluster % clusterCenters.length
+          ];
+
+        const angle =
+          (i / validators.length)
+          * Math.PI * 2;
+
+        const instability =
+          (v.drift || 0)
+          + (v.regional_pressure || 0);
+
+        const radius =
+          60
+          + instability * 1.5;
+
+        return {
+
+          ...v,
+
+          x:
+            center.x
+            + Math.cos(angle)
+            * radius,
+
+          y:
+            center.y
+            + Math.sin(angle)
+            * radius,
+        };
+      });
+
+    // =========================
+    // 🌊 LINKS
+    // =========================
+    const linkGroup =
+      svg.append("g");
 
     nodes.forEach((source, i) => {
-      nodes.slice(i + 1).forEach((target) => {
 
-        // 🔥 TRUST-BASED STRENGTH
-        const strength = ((source.trust || 0) + (target.trust || 0)) / 200;
+      nodes.slice(i + 1)
+        .forEach((target) => {
 
-        linkGroup.append("line")
+        const strength =
+          (
+            (source.trust || 0)
+            + (target.trust || 0)
+          ) / 200;
+
+        const entropy =
+          (
+            (source.entropy_output || 0)
+            + (target.entropy_output || 0)
+          ) / 2;
+
+        const healing =
+          (
+            (source.healing_wave || 0)
+            + (target.healing_wave || 0)
+          ) / 2;
+
+        let color =
+          "#00ffff";
+
+        if (entropy > healing) {
+          color = "#ff4444";
+        }
+
+        if (healing > entropy) {
+          color = "#66ffee";
+        }
+
+        linkGroup
+          .append("line")
+
           .attr("x1", source.x)
           .attr("y1", source.y)
+
           .attr("x2", target.x)
           .attr("y2", target.y)
-          .attr("stroke", "#00ffff")
-          .attr("stroke-opacity", 0.05 + strength * 0.25)
-          .attr("stroke-width", 0.5 + strength * 1.5);
+
+          .attr("stroke", color)
+
+          .attr(
+            "stroke-opacity",
+            0.05 + strength * 0.3
+          )
+
+          .attr(
+            "stroke-width",
+            0.5 + strength * 2
+          );
       });
     });
 
-    // ================= NODE GROUP =================
-    const nodeGroup = svg.append("g");
+    // =========================
+    // 🌐 NODE GROUP
+    // =========================
+    const nodeGroup =
+      svg.append("g");
 
-    const nodeEnter = nodeGroup
-      .selectAll("g.node")
-      .data(nodes)
-      .enter()
-      .append("g")
-      .attr("class", "node")
-      .attr("transform", d => `translate(${d.x}, ${d.y})`)
-      .style("cursor", "pointer")
-      .on("click", (event, d) => {
-        if (onSelectNode) {
-          onSelectNode(d.id);
-        }
-      });
+    const nodeEnter =
+      nodeGroup
+        .selectAll("g.node")
 
-    // ================= NODE CIRCLE =================
-    nodeEnter.append("circle")
-      .attr("r", 12)
-      .attr("fill", d => getNodeColor(d))
-      .attr("stroke", "#ffffff22")
-      .attr("stroke-width", 1)
-      .style("filter", d => getGlow(d));
+        .data(nodes)
 
-    // ================= RECOVERY PULSE =================
-    nodeEnter.each(function (d) {
-      if (d.recovery_timer > 0) {
-        const circle = d3.select(this).select("circle");
+        .enter()
 
-        function pulse() {
-          circle
-            .transition()
-            .duration(800)
-            .attr("r", 16)
-            .transition()
-            .duration(800)
-            .attr("r", 12)
-            .on("end", pulse);
-        }
+        .append("g")
 
-        pulse();
-      }
-    });
+        .attr(
+          "class",
+          "node"
+        )
 
-    // ================= ATTACK / REJECT FLICKER =================
-    nodeEnter.each(function (d) {
-      if (d.decision === "REJECT" || d.status === "attacked") {
-        const circle = d3.select(this).select("circle");
+        .attr(
+          "transform",
+          d =>
+            `translate(${d.x}, ${d.y})`
+        )
 
-        function flicker() {
-          circle
-            .transition()
-            .duration(100)
-            .style("opacity", 0.3)
-            .transition()
-            .duration(100)
-            .style("opacity", 1)
-            .on("end", flicker);
-        }
+        .style(
+          "cursor",
+          "pointer"
+        )
 
-        flicker();
-      }
-    });
+        .on(
+          "click",
+          (event, d) => {
 
-    // ================= HOVER EFFECT =================
+          if (onSelectNode) {
+            onSelectNode(d.id);
+          }
+        });
+
+    // =========================
+    // 🌊 INFLUENCE RADIUS
+    // =========================
     nodeEnter
-      .on("mouseover", function () {
-        d3.select(this).select("circle")
-          .transition()
-          .duration(150)
-          .attr("r", 18);
-      })
-      .on("mouseout", function () {
-        d3.select(this).select("circle")
-          .transition()
-          .duration(150)
-          .attr("r", 12);
-      });
+      .append("circle")
 
-    // ================= LABELS =================
-    nodeEnter.append("text")
-      .attr("text-anchor", "middle")
+      .attr(
+        "r",
+        d =>
+          30
+          + (
+            d.influence_radius
+            || 0
+          )
+      )
+
+      .attr(
+        "fill",
+        "none"
+      )
+
+      .attr(
+        "stroke",
+        d => {
+
+        if (
+          d.status === "fractured"
+        ) {
+          return "#ff4444";
+        }
+
+        if (
+          d.status === "immune"
+        ) {
+          return "#66ffff";
+        }
+
+        return "#00ffff";
+      })
+
+      .attr(
+        "stroke-opacity",
+        0.12
+      )
+
+      .attr(
+        "stroke-width",
+        2
+      );
+
+    // =========================
+    // 🔵 CORE NODE
+    // =========================
+    nodeEnter
+      .append("circle")
+
+      .attr("r", 12)
+
+      .attr(
+        "fill",
+        d => getNodeColor(d)
+      )
+
+      .attr(
+        "stroke",
+        "#ffffff22"
+      )
+
+      .attr(
+        "stroke-width",
+        1
+      )
+
+      .style(
+        "filter",
+        d => getGlow(d)
+      );
+
+    // =========================
+    // 🧬 LABELS
+    // =========================
+    nodeEnter
+      .append("text")
+
+      .attr(
+        "text-anchor",
+        "middle"
+      )
+
       .attr("dy", "0.35em")
+
       .attr("fill", "white")
-      .attr("font-size", "10px")
-      .attr("font-weight", "bold")
+
+      .attr(
+        "font-size",
+        "10px"
+      )
+
+      .attr(
+        "font-weight",
+        "bold"
+      )
+
       .text(d => d.id);
 
-  }, [validators, onSelectNode]);
-
-  // ================= FALLBACK =================
-  if (!validators || validators.length === 0) {
-    return (
-      <div style={{ color: "white", padding: 20 }}>
-        No validators loaded
-      </div>
-    );
-  }
+  }, [
+    validators,
+    onSelectNode,
+  ]);
 
   return (
-   <svg
-       id="identity-graph"
-       ref={svgRef}
-      width={800}
-      height={800}
-      style={{ background: "#020c1b" }}
+    <svg
+      ref={svgRef}
+      width={900}
+      height={900}
+      style={{
+        background: "#020c1b",
+      }}
     />
   );
 };
 
 export default IdentityGraph;
 
-// ================= HELPERS =================
-
+// =========================
+// 🌈 COLORS
+// =========================
 function getNodeColor(d) {
-  if (d.decision === "REJECT") return "#ff4d4d";
-  if (d.decision === "WEIGHTED") return "#ffaa00";
-  if (d.decision === "ACCEPT") return "#00ff88";
 
-  if (d.status === "attacked") return "#ff4d4d";
-  if (d.status === "warning") return "#ffaa00";
-  if (d.status === "healthy") return "#00ff88";
+  if (
+    d.status === "fractured"
+  ) {
+    return "#ff4444";
+  }
 
-  return "#3399ff";
+  if (
+    d.status === "quarantined"
+  ) {
+    return "#ff8800";
+  }
+
+  if (
+    d.status === "immune"
+  ) {
+    return "#66ffff";
+  }
+
+  if (
+    d.status === "recovering"
+  ) {
+    return "#ffee66";
+  }
+
+  return "#00ff88";
 }
 
+// =========================
+// ✨ GLOW
+// =========================
 function getGlow(d) {
-  if (d.decision === "ACCEPT") return "drop-shadow(0 0 8px #00ff88)";
-  if (d.decision === "WEIGHTED") return "drop-shadow(0 0 8px #ffaa00)";
-  if (d.decision === "REJECT") return "drop-shadow(0 0 8px #ff4d4d)";
 
-  if (d.status === "attacked") return "drop-shadow(0 0 6px #ff4d4d)";
-  if (d.status === "warning") return "drop-shadow(0 0 6px #ffaa00)";
-  if (d.status === "healthy") return "drop-shadow(0 0 6px #00ff88)";
+  if (
+    d.status === "fractured"
+  ) {
+    return "drop-shadow(0 0 10px #ff4444)";
+  }
 
-  return "none";
+  if (
+    d.status === "immune"
+  ) {
+    return "drop-shadow(0 0 10px #66ffff)";
+  }
+
+  if (
+    d.status === "recovering"
+  ) {
+    return "drop-shadow(0 0 10px #ffaa00)";
+  }
+
+  return "drop-shadow(0 0 10px #00ff88)";
 }

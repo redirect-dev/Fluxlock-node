@@ -399,6 +399,7 @@ dependencies = [
  "axum",
  "base64",
  "fluxlock-core",
+ "fluxlock-network",
  "fluxlock-storage",
  "md5",
  "once_cell",
@@ -408,6 +409,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
  "tower-http 0.5.2",
 ]
@@ -440,6 +442,10 @@ version = "0.1.0"
 [[package]]
 name = "fluxlock-network"
 version = "0.1.0"
+dependencies = [
+ "fluxlock-core",
+ "serde",
+]
 
 [[package]]
 name = "fluxlock-node"

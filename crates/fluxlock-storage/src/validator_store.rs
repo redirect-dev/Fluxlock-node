@@ -45,11 +45,23 @@ pub fn save_validator(
             local_valid,
             global_valid,
 
+            continuity_memory_score,
+            historical_consensus_accuracy,
+            recovery_consistency,
+            adaptive_reputation,
+            continuity_survival_score,
+
+            fracture_history,
+            recovery_history,
+            governance_history,
+            continuity_age,
+
             attack_history,
             successful_recoveries,
 
             resilience_score,
             scar_level,
+            scar_severity,
             immune_response,
 
             consensus_pressure,
@@ -71,6 +83,42 @@ pub fn save_validator(
             rebirth_count,
 
             last_epoch_transition,
+
+            quorum_score,
+            peer_agreement_ratio,
+
+            malicious_reports,
+            consensus_failures,
+
+            last_quorum_epoch,
+
+            governance_weight,
+            governance_participation,
+            autonomous_trust_bias,
+
+            quarantine_level,
+
+            peer_reputation,
+            leadership_score,
+
+            recovery_votes_received,
+            recovery_votes_given,
+
+            network_influence_score,
+            isolation_events,
+
+            validator_stability_index,
+
+            influence_radius,
+            entropy_output,
+            immune_strength,
+            healing_wave,
+
+            topology_cluster,
+
+            resonance_score,
+            regional_pressure,
+            trust_gravity,
 
             status
 
@@ -101,32 +149,72 @@ pub fn save_validator(
 
             ?15,
             ?16,
-
             ?17,
             ?18,
             ?19,
 
             ?20,
             ?21,
-
             ?22,
             ?23,
 
             ?24,
-
             ?25,
 
             ?26,
-
             ?27,
             ?28,
-
             ?29,
-            ?30,
 
+            ?30,
             ?31,
 
-            ?32
+            ?32,
+            ?33,
+
+            ?34,
+
+            ?35,
+
+            ?36,
+
+            ?37,
+            ?38,
+
+            ?39,
+            ?40,
+
+            ?41,
+
+            ?42,
+            ?43,
+            ?44,
+
+            ?45,
+
+            ?46,
+            ?47,
+
+            ?48,
+            ?49,
+
+            ?50,
+            ?51,
+
+            ?52,
+
+            ?53,
+            ?54,
+            ?55,
+            ?56,
+
+            ?57,
+
+            ?58,
+            ?59,
+            ?60,
+
+            ?61
         )
         ",
         params![
@@ -153,11 +241,23 @@ pub fn save_validator(
             validator.local_valid,
             validator.global_valid,
 
+            validator.continuity_memory_score,
+            validator.historical_consensus_accuracy,
+            validator.recovery_consistency,
+            validator.adaptive_reputation,
+            validator.continuity_survival_score,
+
+            validator.fracture_history,
+            validator.recovery_history,
+            validator.governance_history,
+            validator.continuity_age,
+
             validator.attack_history,
             validator.successful_recoveries,
 
             validator.resilience_score,
             validator.scar_level,
+            validator.scar_severity,
             validator.immune_response,
 
             validator.consensus_pressure,
@@ -180,6 +280,42 @@ pub fn save_validator(
 
             validator.last_epoch_transition,
 
+            validator.quorum_score,
+            validator.peer_agreement_ratio,
+
+            validator.malicious_reports,
+            validator.consensus_failures,
+
+            validator.last_quorum_epoch,
+
+            validator.governance_weight,
+            validator.governance_participation,
+            validator.autonomous_trust_bias,
+
+            validator.quarantine_level,
+
+            validator.peer_reputation,
+            validator.leadership_score,
+
+            validator.recovery_votes_received,
+            validator.recovery_votes_given,
+
+            validator.network_influence_score,
+            validator.isolation_events,
+
+            validator.validator_stability_index,
+
+            validator.influence_radius,
+            validator.entropy_output,
+            validator.immune_strength,
+            validator.healing_wave,
+
+            validator.topology_cluster,
+
+            validator.resonance_score,
+            validator.regional_pressure,
+            validator.trust_gravity,
+
             validator.status
         ]
     )?;
@@ -188,7 +324,7 @@ pub fn save_validator(
 }
 
 // =========================
-// 📦 LOAD VALIDATORS
+// 📦 VALIDATOR COUNT
 // =========================
 pub fn validator_count() -> usize {
 

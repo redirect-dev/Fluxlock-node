@@ -30,6 +30,16 @@ use crate::engine::peer_governance::{
     propagate_peer_governance,
 };
 
+use fluxlock_network::memory::{
+    MemoryStore,
+    create_memory,
+    update_memory_score,
+};
+
+use fluxlock_network::memory::memory_pressure::{
+    apply_memory_pressure,
+};
+
 use fluxlock_storage::validator_store::{
     save_validator,
 };
@@ -99,6 +109,9 @@ pub struct NetworkState {
     pub peer_state:
         PeerState,
 
+    pub memory_store:
+        MemoryStore,
+
     pub global_epoch: u64,
 }
 
@@ -119,6 +132,9 @@ impl NetworkState {
 
         let mut validators =
             Vec::new();
+
+        let mut memory_store =
+            MemoryStore::new();
 
         for i in 0..12 {
 
@@ -257,9 +273,6 @@ impl NetworkState {
 
                     identity_chain,
 
-                    // =========================
-                    // 🧠 CONTINUITY MEMORY
-                    // =========================
                     continuity_events:
                         Vec::<ContinuityEvent>::new(),
 
@@ -282,9 +295,6 @@ impl NetworkState {
                     continuity_age:
                         restored_epoch,
 
-                    // =========================
-                    // 🌐 RESILIENCE
-                    // =========================
                     attack_history: 0,
 
                     successful_recoveries: 0,
@@ -357,9 +367,6 @@ impl NetworkState {
 
                     validator_stability_index: 100.0,
 
-                    // =========================
-                    // 🌐 ECOLOGY
-                    // =========================
                     influence_radius: 25.0,
 
                     entropy_output: 0.0,
@@ -381,6 +388,11 @@ impl NetworkState {
                         "healthy".into(),
                 }
             );
+
+            memory_store.insert(
+                 i as u64,
+                      create_memory(i as u64),
+            );
         }
 
         Self {
@@ -392,6 +404,8 @@ impl NetworkState {
 
             peer_state:
                 PeerState::new(),
+
+            memory_store,
 
             global_epoch:
                 restored_epoch,
@@ -423,6 +437,64 @@ impl NetworkState {
         for validator in
             self.validators.iter_mut()
         {
+
+            // =========================
+            // 🧠 MEMORY EVOLUTION
+            // =========================
+            if let Some(memory) =
+                self.memory_store
+                    .get_mut(&(validator.id as u64))
+            {
+
+                memory.stable_epochs += 1;
+
+                memory.lineage_depth =
+                    validator
+                        .identity_chain
+                        .len() as u64;
+
+                memory.inherited_trust =
+                    validator.inherited_trust;
+
+                memory.historical_stability =
+                    validator.lineage_stability;
+
+                memory.peer_observations += 1;
+
+                if validator.network_accepted {
+
+                    memory.network_acceptances += 1;
+
+                } else {
+
+                    memory.network_rejections += 1;
+                }
+
+                if validator.status
+                    == "fractured"
+                {
+
+                    memory.fracture_events += 1;
+                }
+
+                if validator.status
+                    == "recovering"
+                {
+
+                    memory.recovery_events += 1;
+                }
+
+                update_memory_score(
+                    memory
+                );
+
+                validator.continuity_memory_score =
+                    memory.continuity_memory_score;
+
+                apply_memory_pressure(
+                    validator
+                );
+            }
 
             let governance =
                 evaluate_governance(
@@ -694,6 +766,23 @@ impl NetworkState {
         validator.continuity_memory_score += 0.5;
 
         validator.continuity_survival_score += 0.25;
+
+        if let Some(memory) =
+            self.memory_store
+                .get_mut(&(validator.id as u64))
+        {
+
+            memory.stable_epochs += 1;
+
+            memory.lineage_depth =
+                validator.identity_chain.len() as u64;
+
+            memory.successful_rehabilitations += 1;
+
+            update_memory_score(
+                memory
+            );
+        }
 
         let _ =
             save_validator(
