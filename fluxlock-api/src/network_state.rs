@@ -40,6 +40,22 @@ use fluxlock_network::memory::memory_pressure::{
     apply_memory_pressure,
 };
 
+use fluxlock_network::sync::continuity_mesh::{
+    propagate_continuity_mesh,
+};
+
+use fluxlock_network::sync::fracture_wave::{
+    propagate_fracture_wave,
+};
+
+use fluxlock_network::sync::stabilization_field::{
+    apply_stabilization_field,
+};
+
+use fluxlock_network::sync::topology_pressure::{
+    apply_topology_pressure,
+};
+
 use fluxlock_storage::validator_store::{
     save_validator,
 };
@@ -390,8 +406,8 @@ impl NetworkState {
             );
 
             memory_store.insert(
-                 i as u64,
-                      create_memory(i as u64),
+                i as u64,
+                create_memory(i as u64),
             );
         }
 
@@ -434,13 +450,29 @@ impl NetworkState {
             &mut self.validators
         );
 
+        // =========================
+        // 🌐 DISTRIBUTED MESH
+        // =========================
+        propagate_continuity_mesh(
+            &mut self.validators
+        );
+
+        propagate_fracture_wave(
+            &mut self.validators
+        );
+
+        apply_stabilization_field(
+            &mut self.validators
+        );
+
+        apply_topology_pressure(
+            &mut self.validators
+        );
+
         for validator in
             self.validators.iter_mut()
         {
 
-            // =========================
-            // 🧠 MEMORY EVOLUTION
-            // =========================
             if let Some(memory) =
                 self.memory_store
                     .get_mut(&(validator.id as u64))
@@ -763,27 +795,6 @@ impl NetworkState {
         validator.last_epoch_transition =
             self.global_epoch;
 
-        validator.continuity_memory_score += 0.5;
-
-        validator.continuity_survival_score += 0.25;
-
-        if let Some(memory) =
-            self.memory_store
-                .get_mut(&(validator.id as u64))
-        {
-
-            memory.stable_epochs += 1;
-
-            memory.lineage_depth =
-                validator.identity_chain.len() as u64;
-
-            memory.successful_rehabilitations += 1;
-
-            update_memory_score(
-                memory
-            );
-        }
-
         let _ =
             save_validator(
                 validator
@@ -816,12 +827,6 @@ impl NetworkState {
 
             v.trust *= 0.95;
 
-            v.scar_level += 1.5;
-
-            v.scar_severity += 0.5;
-
-            v.fracture_history += 1;
-
             v.status =
                 "recovering".into();
         }
@@ -849,14 +854,6 @@ impl NetworkState {
 
             v.fracture_severity += 25.0;
 
-            v.quarantine_level += 20.0;
-
-            v.scar_level += 5.0;
-
-            v.scar_severity += 5.0;
-
-            v.fracture_history += 1;
-
             v.network_accepted =
                 false;
 
@@ -879,23 +876,6 @@ impl NetworkState {
                 .find(|v| v.id == id)
         {
 
-            if let Some(last) =
-                v.identity_chain.last_mut()
-            {
-
-                last.parent_hash =
-                    "CORRUPTED_LINEAGE".into();
-
-                last.continuity_hash =
-                    format!(
-                        "fractured-{}-{}",
-                        id,
-                        self.global_epoch
-                    );
-            }
-
-            v.attack_history += 1;
-
             v.chain_valid = false;
 
             v.network_accepted = false;
@@ -905,20 +885,6 @@ impl NetworkState {
             v.drift += 65.0;
 
             v.fracture_severity += 75.0;
-
-            v.quarantine_level += 50.0;
-
-            v.consensus_failures += 1;
-
-            v.malicious_reports += 1;
-
-            v.isolation_events += 1;
-
-            v.scar_level += 25.0;
-
-            v.scar_severity += 20.0;
-
-            v.fracture_history += 1;
 
             v.status =
                 "fractured".into();
@@ -939,10 +905,6 @@ impl NetworkState {
             v.drift += 5.0;
 
             v.trust *= 0.98;
-
-            v.consensus_pressure += 1.0;
-
-            v.instability_radius += 0.25;
         }
     }
 
@@ -970,8 +932,6 @@ impl NetworkState {
                 v.trust +=
                     0.10;
 
-                v.recovery_history += 1;
-
             } else {
 
                 v.confidence *= 0.98;
@@ -992,30 +952,33 @@ impl NetworkState {
     }
 
     // =========================
-    // 🔐 GET OR CREATE IDENTITY
-    // =========================
-    pub fn get_or_create_identity(
-        &mut self,
-        identity_id: String,
-        validator_id: u32,
-    ) {
+// 🔐 GET OR CREATE IDENTITY
+// =========================
+pub fn get_or_create_identity(
+    &mut self,
+    identity_id: String,
+    validator_id: u32,
+) {
 
-        if !self
-            .identities
-            .identities
-            .contains_key(
-                &identity_id
-            )
-        {
+    if !self
+        .identities
+        .identities
+        .contains_key(
+            &identity_id
+        )
+    {
 
-            self.identities
-                .create_identity(
-                    identity_id,
-                    validator_id,
-                    self.global_epoch,
-                );
-        }
+        self.identities
+            .create_identity(
+
+                identity_id,
+
+                validator_id,
+
+                self.global_epoch,
+            );
     }
+}
 
     // =========================
     // ✅ IDENTITY SUCCESS
@@ -1041,16 +1004,6 @@ impl NetworkState {
             identity.trust_score += 1.0;
 
             identity.continuity_score += 0.5;
-
-            identity.trust_score =
-                identity
-                    .trust_score
-                    .clamp(0.0, 1000.0);
-
-            identity.continuity_score =
-                identity
-                    .continuity_score
-                    .clamp(0.0, 1000.0);
 
             identity.status =
                 "healthy".into();
