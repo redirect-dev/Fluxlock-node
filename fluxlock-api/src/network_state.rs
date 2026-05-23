@@ -56,6 +56,10 @@ use fluxlock_network::sync::topology_pressure::{
     apply_topology_pressure,
 };
 
+use fluxlock_network::sync::regional_clusters::{
+    evolve_regional_clusters,
+};
+
 use fluxlock_storage::validator_store::{
     save_validator,
 };
@@ -469,6 +473,10 @@ impl NetworkState {
             &mut self.validators
         );
 
+        evolve_regional_clusters(
+            &mut self.validators
+        );
+
         for validator in
             self.validators.iter_mut()
         {
@@ -595,363 +603,210 @@ impl NetworkState {
             validator.adaptive_reputation += 0.01;
         }
     }
+            // =========================
+// 🌐 REGISTER PEER
+// =========================
+pub fn register_peer(
+    &mut self,
+    peer_id: String,
+    address: String,
+    validator_id: u32,
+) {
 
-    // =========================
-    // 🌐 REGISTER PEER
-    // =========================
-    pub fn register_peer(
-        &mut self,
-        peer_id: String,
-        address: String,
-        validator_id: u32,
-    ) {
+    self.peer_state
+        .register_peer(
 
-        self.peer_state
-            .register_peer(
+            PeerNode {
 
-                PeerNode {
-
-                    peer_id,
-
-                    address,
-
-                    validator_id,
-
-                    last_seen_epoch:
-                        self.global_epoch,
-
-                    trust_score: 100.0,
-
-                    active: true,
-                }
-            );
-    }
-
-    // =========================
-    // 💓 HEARTBEAT
-    // =========================
-    pub fn peer_heartbeat(
-        &mut self,
-        peer_id: &str,
-    ) {
-
-        self.peer_state
-            .heartbeat(
                 peer_id,
-                self.global_epoch,
-            );
-    }
 
-    // =========================
-    // 🔁 ROTATION
-    // =========================
-    pub fn perform_epoch_rotation(
-        &mut self,
-        validator_id: u32,
-    ) {
-
-        self.evolve_identity(
-            validator_id
-        );
-    }
-
-    // =========================
-    // 🧬 EVOLVE
-    // =========================
-    pub fn evolve_identity(
-        &mut self,
-        validator_id: u32,
-    ) {
-
-        let validator =
-            match self.validators
-                .iter_mut()
-                .find(|v|
-                    v.id == validator_id
-                )
-        {
-            Some(v) => v,
-            None => return,
-        };
-
-        let rotation_index =
-            validator.identity_chain.len();
-
-        let previous_hash =
-            validator
-                .identity_chain
-                .last()
-                .map(|l|
-                    l.continuity_hash.clone()
-                )
-                .unwrap_or(
-                    "GENESIS".into()
-                );
-
-        let rotated_link =
-            rotate_identity(
+                address,
 
                 validator_id,
 
-                rotation_index,
-
-                validator.governance_weight,
-
-                validator.trust,
-
-                previous_hash.clone(),
-            );
-
-        validator.identity_chain.push(
-
-            IdentityLink {
-
-                public_key:
-                    rotated_link.public_key,
-
-                signature:
-                    rotated_link.signature,
-
-                continuity_hash:
-                    rotated_link
-                        .continuity_hash
-                        .clone(),
-
-                parent_hash:
-                    previous_hash,
-
-                state_hash:
-                    rotated_link
-                        .continuity_hash
-                        .clone(),
-
-                lineage_signature:
-                    None,
-
-                transition_signature:
-                    None,
-
-                epoch:
+                last_seen_epoch:
                     self.global_epoch,
 
-                continuity_epoch:
-                    self.global_epoch,
+                trust_score: 100.0,
 
-                validator_id,
-
-                governance_weight:
-                    validator.governance_weight,
-
-                governance_score:
-                    validator.governance_weight
-                        * 100.0,
-
-                governance_votes:
-                    validator.peer_votes_valid,
-
-                network_alignment:
-                    validator.peer_agreement_ratio,
-
-                continuity_confidence:
-                    validator.confidence
-                        * 100.0,
-
-                peer_agreement_ratio:
-                    validator.peer_agreement_ratio,
-
-                entropy_score:
-                    validator.trust,
-
-                lineage_stability:
-                    validator.lineage_stability,
-
-                fracture_severity:
-                    validator.fracture_severity,
-
-                rehabilitation_factor:
-                    validator.rehabilitation_score,
-
-                quarantine_level:
-                    validator.quarantine_level,
-
-                malicious_reports:
-                    validator.malicious_reports,
-
-                fork_conflicts: 0,
-
-                continuity_verified:
-                    validator.chain_valid,
+                active: true,
             }
         );
+}
 
-        validator.chain_valid =
-            verify_lineage(
-                &validator.identity_chain,
-                validator.id,
-            );
+// =========================
+// 💓 HEARTBEAT
+// =========================
+pub fn peer_heartbeat(
+    &mut self,
+    peer_id: &str,
+) {
 
-        validator.epoch_rotations += 1;
+    self.peer_state
+        .heartbeat(
+            peer_id,
+            self.global_epoch,
+        );
+}
 
-        validator.last_epoch_transition =
-            self.global_epoch;
+// =========================
+// 🔁 ROTATION
+// =========================
+pub fn perform_epoch_rotation(
+    &mut self,
+    validator_id: u32,
+) {
 
-        let _ =
-            save_validator(
-                validator
-            );
+    self.evolve_identity(
+        validator_id
+    );
+}
 
-        let _ =
-            save_identity_chain(
-                validator.id,
-                &validator.identity_chain
-            );
+// =========================
+// ⚡ SPIKE ATTACK
+// =========================
+pub fn spike_attack(
+    &mut self,
+    id: u32,
+) {
+
+    if let Some(v) =
+        self.validators
+            .iter_mut()
+            .find(|v| v.id == id)
+    {
+
+        v.attack_history += 1;
+
+        v.drift += 15.0;
+
+        v.trust *= 0.95;
+
+        v.status =
+            "recovering".into();
     }
+}
 
-    // =========================
-    // ⚡ SPIKE ATTACK
-    // =========================
-    pub fn spike_attack(
-        &mut self,
-        id: u32,
-    ) {
+// =========================
+// ☠ BREACH ATTACK
+// =========================
+pub fn breach_attack(
+    &mut self,
+    id: u32,
+) {
 
-        if let Some(v) =
-            self.validators
-                .iter_mut()
-                .find(|v| v.id == id)
-        {
+    if let Some(v) =
+        self.validators
+            .iter_mut()
+            .find(|v| v.id == id)
+    {
 
-            v.attack_history += 1;
+        v.attack_history += 1;
 
-            v.drift += 15.0;
+        v.drift += 40.0;
 
-            v.trust *= 0.95;
+        v.trust *= 0.70;
 
-            v.status =
-                "recovering".into();
+        v.fracture_severity += 25.0;
+
+        v.network_accepted =
+            false;
+
+        v.status =
+            "quarantined".into();
+    }
+}
+
+// =========================
+// 🧬 FRACTURE ATTACK
+// =========================
+pub fn fracture_attack(
+    &mut self,
+    id: u32,
+) {
+
+    if let Some(v) =
+        self.validators
+            .iter_mut()
+            .find(|v| v.id == id)
+    {
+
+        v.chain_valid = false;
+
+        v.network_accepted = false;
+
+        v.trust *= 0.40;
+
+        v.drift += 65.0;
+
+        v.fracture_severity += 75.0;
+
+        v.status =
+            "fractured".into();
+    }
+}
+
+// =========================
+// 🌊 NETWORK ATTACK
+// =========================
+pub fn network_attack(
+    &mut self
+) {
+
+    for v in
+        &mut self.validators
+    {
+
+        v.drift += 5.0;
+
+        v.trust *= 0.98;
+    }
+}
+
+// =========================
+// 🔁 ACCESS FEEDBACK
+// =========================
+pub fn apply_access_feedback(
+    &mut self,
+    validator_id: u32,
+    allowed: bool,
+    confidence: f64,
+) {
+
+    if let Some(v) =
+        self.validators
+            .iter_mut()
+            .find(|v| v.id == validator_id)
+    {
+
+        if allowed {
+
+            v.confidence +=
+                0.01 * confidence;
+
+            v.trust +=
+                0.10;
+
+        } else {
+
+            v.confidence *= 0.98;
+
+            v.trust *= 0.99;
+
+            v.drift += 1.0;
         }
+
+        v.confidence =
+            v.confidence
+                .clamp(0.0, 1.0);
+
+        v.trust =
+            v.trust
+                .clamp(-100.0, 100.0);
     }
+}
 
-    // =========================
-    // ☠ BREACH ATTACK
-    // =========================
-    pub fn breach_attack(
-        &mut self,
-        id: u32,
-    ) {
-
-        if let Some(v) =
-            self.validators
-                .iter_mut()
-                .find(|v| v.id == id)
-        {
-
-            v.attack_history += 1;
-
-            v.drift += 40.0;
-
-            v.trust *= 0.70;
-
-            v.fracture_severity += 25.0;
-
-            v.network_accepted =
-                false;
-
-            v.status =
-                "quarantined".into();
-        }
-    }
-
-    // =========================
-    // 🧬 FRACTURE ATTACK
-    // =========================
-    pub fn fracture_attack(
-        &mut self,
-        id: u32,
-    ) {
-
-        if let Some(v) =
-            self.validators
-                .iter_mut()
-                .find(|v| v.id == id)
-        {
-
-            v.chain_valid = false;
-
-            v.network_accepted = false;
-
-            v.trust *= 0.40;
-
-            v.drift += 65.0;
-
-            v.fracture_severity += 75.0;
-
-            v.status =
-                "fractured".into();
-        }
-    }
-
-    // =========================
-    // 🌊 NETWORK ATTACK
-    // =========================
-    pub fn network_attack(
-        &mut self
-    ) {
-
-        for v in
-            &mut self.validators
-        {
-
-            v.drift += 5.0;
-
-            v.trust *= 0.98;
-        }
-    }
-
-    // =========================
-    // 🔁 ACCESS FEEDBACK
-    // =========================
-    pub fn apply_access_feedback(
-        &mut self,
-        validator_id: u32,
-        allowed: bool,
-        confidence: f64,
-    ) {
-
-        if let Some(v) =
-            self.validators
-                .iter_mut()
-                .find(|v| v.id == validator_id)
-        {
-
-            if allowed {
-
-                v.confidence +=
-                    0.01 * confidence;
-
-                v.trust +=
-                    0.10;
-
-            } else {
-
-                v.confidence *= 0.98;
-
-                v.trust *= 0.99;
-
-                v.drift += 1.0;
-            }
-
-            v.confidence =
-                v.confidence
-                    .clamp(0.0, 1.0);
-
-            v.trust =
-                v.trust
-                    .clamp(-100.0, 100.0);
-        }
-    }
-
-    // =========================
+// =========================
 // 🔐 GET OR CREATE IDENTITY
 // =========================
 pub fn get_or_create_identity(
@@ -980,60 +835,121 @@ pub fn get_or_create_identity(
     }
 }
 
-    // =========================
-    // ✅ IDENTITY SUCCESS
-    // =========================
-    pub fn identity_success(
-        &mut self,
-        identity_id: &str,
-    ) {
+// =========================
+// ✅ IDENTITY SUCCESS
+// =========================
+pub fn identity_success(
+    &mut self,
+    identity_id: &str,
+) {
 
-        if let Some(identity) =
-            self.identities
-                .identities
-                .get_mut(identity_id)
-        {
+    if let Some(identity) =
+        self.identities
+            .identities
+            .get_mut(identity_id)
+    {
 
-            identity.successful_auths += 1;
+        identity.successful_auths += 1;
 
-            identity.session_count += 1;
+        identity.session_count += 1;
 
-            identity.last_active_epoch =
-                self.global_epoch;
+        identity.last_active_epoch =
+            self.global_epoch;
 
-            identity.trust_score += 1.0;
+        identity.trust_score += 1.0;
 
-            identity.continuity_score += 0.5;
+        identity.continuity_score += 0.5;
 
-            identity.status =
-                "healthy".into();
-        }
+        identity.status =
+            "healthy".into();
     }
+}
 
-    // =========================
-    // ❌ IDENTITY FAILURE
-    // =========================
-    pub fn identity_failure(
-        &mut self,
-        identity_id: &str,
-    ) {
+// =========================
+// ❌ IDENTITY FAILURE
+// =========================
+pub fn identity_failure(
+    &mut self,
+    identity_id: &str,
+) {
 
-        if let Some(identity) =
-            self.identities
-                .identities
-                .get_mut(identity_id)
-        {
+    if let Some(identity) =
+        self.identities
+            .identities
+            .get_mut(identity_id)
+    {
 
-            identity.failed_auths += 1;
+        identity.failed_auths += 1;
 
-            identity.drift_score += 5.0;
+        identity.drift_score += 5.0;
 
-            identity.trust_score *= 0.97;
+        identity.trust_score *= 0.97;
 
-            identity.continuity_score *= 0.98;
+        identity.continuity_score *= 0.98;
 
-            identity.status =
-                "recovering".into();
-        }
+        identity.status =
+            "recovering".into();
     }
+}
+
+// =========================
+// 🧬 EVOLVE IDENTITY
+// =========================
+pub fn evolve_identity(
+    &mut self,
+    validator_id: u32,
+) {
+
+    if let Some(v) =
+        self.validators
+            .iter_mut()
+            .find(|v|
+                v.id == validator_id
+            )
+    {
+
+        let previous_hash =
+            v.identity_chain
+                .last()
+                .map(|l|
+                    l.continuity_hash
+                        .clone()
+                )
+                .unwrap_or_else(
+                    ||
+                    "GENESIS".into()
+                );
+
+        let new_link =
+            rotate_identity(
+
+                validator_id,
+
+                v.identity_chain.len(),
+
+                v.governance_weight,
+
+                v.entropy_output,
+
+                previous_hash,
+            );
+
+        v.identity_chain.push(
+            new_link
+        );
+
+        v.epoch_rotations += 1;
+
+        v.last_epoch_transition =
+            self.global_epoch;
+
+        save_identity_chain(
+            validator_id,
+            &v.identity_chain
+        )
+        .ok();
+
+        save_validator(v).ok();
+    }
+}
 }
