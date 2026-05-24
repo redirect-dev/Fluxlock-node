@@ -135,6 +135,40 @@ pub struct IdentityLink {
 }
 
 // =========================
+// 🧬 CONTINUITY TRANSITION PROOF
+// =========================
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
+pub struct ContinuityTransitionProof {
+
+    pub validator_id: u32,
+
+    pub previous_hash: String,
+
+    pub new_hash: String,
+
+    pub epoch: u64,
+
+    pub mutation_coherence: f64,
+
+    pub continuity_drift: f64,
+
+    pub lineage_authenticity: f64,
+
+    pub continuity_confidence: f64,
+
+    pub governance_weight: f64,
+
+    pub entropy_score: f64,
+
+    pub continuity_verified: bool,
+}
+
+// =========================
 // 🌐 VALIDATOR
 // =========================
 #[derive(
@@ -289,6 +323,19 @@ pub struct Validator {
     pub regional_pressure: f64,
 
     pub trust_gravity: f64,
+
+        // =========================
+    // 🧬 CONTINUITY GOVERNANCE
+    // =========================
+    pub mutation_shock: f64,
+
+    pub continuity_suspicion: f64,
+
+    pub scrutiny_level: f64,
+
+    pub evolutionary_authenticity: f64,
+
+    pub mutation_pressure: f64,
 
     pub status: String,
 }

@@ -26,6 +26,10 @@ use crate::engine::governance::{
     evaluate_governance,
 };
 
+use crate::engine::continuity_transition::{
+    generate_transition_proof,
+};
+
 use crate::engine::peer_governance::{
     propagate_peer_governance,
 };
@@ -404,8 +408,18 @@ impl NetworkState {
 
                     trust_gravity: 25.0,
 
-                    status:
-                        "healthy".into(),
+                    mutation_shock: 0.0,
+
+                    continuity_suspicion: 0.0,
+
+                    scrutiny_level: 1.0,
+
+                    evolutionary_authenticity: 100.0,
+
+                   mutation_pressure: 0.0,
+
+                status:
+                    "healthy".into(),
                 }
             );
 
@@ -601,6 +615,77 @@ impl NetworkState {
             validator.continuity_memory_score += 0.01;
 
             validator.adaptive_reputation += 0.01;
+
+                        // =========================
+            // 🧬 MUTATION GOVERNANCE
+            // =========================
+            validator.mutation_shock =
+                (
+                    validator.entropy_output
+                    * 0.50
+                )
+                +
+                (
+                    validator.fracture_severity
+                    * 0.30
+                )
+                +
+                (
+                    validator.consensus_pressure
+                    * 0.20
+                );
+
+            validator.mutation_pressure +=
+                validator.mutation_shock
+                * 0.002;
+
+            if validator.mutation_shock > 40.0 {
+
+                validator.continuity_suspicion +=
+                    0.50;
+
+                validator.scrutiny_level +=
+                    0.05;
+
+            } else {
+
+                validator.continuity_suspicion *=
+                    0.995;
+
+                validator.scrutiny_level *=
+                    0.999;
+            }
+
+            validator.evolutionary_authenticity =
+                (
+                    validator.lineage_stability
+                    * 0.40
+                )
+                +
+                (
+                    validator.continuity_memory_score
+                    * 0.40
+                )
+                -
+                (
+                    validator.mutation_shock
+                    * 0.20
+                );
+
+            validator.continuity_suspicion =
+                validator
+                    .continuity_suspicion
+                    .clamp(0.0, 100.0);
+
+            validator.scrutiny_level =
+                validator
+                    .scrutiny_level
+                    .clamp(1.0, 10.0);
+
+            validator.evolutionary_authenticity =
+                validator
+                    .evolutionary_authenticity
+                    .clamp(0.0, 100.0);
         }
     }
             // =========================
@@ -931,8 +1016,28 @@ pub fn evolve_identity(
 
                 v.entropy_output,
 
-                previous_hash,
+                previous_hash.clone(),
             );
+
+                let proof =
+            generate_transition_proof(
+
+                v,
+
+                previous_hash.clone(),
+
+                new_link
+                    .continuity_hash
+                    .clone(),
+            );
+
+        println!(
+            "🧬 CONTINUITY PROOF | Validator {} | Confidence {:.2} | Drift {:.2} | Verified {}",
+            validator_id,
+            proof.continuity_confidence,
+            proof.continuity_drift,
+            proof.continuity_verified
+        );
 
         v.identity_chain.push(
             new_link

@@ -5,3 +5,4 @@ pub mod peer_sync;
 pub mod governance;
 pub mod peer_governance;
 pub mod proof_verifier;
+pub mod continuity_transition;
