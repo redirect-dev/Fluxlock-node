@@ -165,6 +165,29 @@ pub struct ContinuityTransitionProof {
 
     pub entropy_score: f64,
 
+    pub transition_signature:
+        Option<String>,
+
+    pub lineage_signature:
+        Option<String>,
+
+    pub proof_hash:
+        String,
+    
+    pub governance_votes: u32,
+
+    pub governance_approvals: u32,
+
+    pub governance_rejections: u32,
+
+    pub network_alignment: f64,
+
+    pub mutation_shock: f64,
+
+    pub evolutionary_authenticity: f64,
+
+    pub continuity_attestation: String,
+
     pub continuity_verified: bool,
 }
 

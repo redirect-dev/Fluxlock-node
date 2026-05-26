@@ -35,9 +35,6 @@ use pqcrypto_traits::sign::{
 )]
 pub struct ContinuityProof {
 
-    // =========================
-    // 🌐 IDENTITY
-    // =========================
     pub validator_id: u32,
 
     pub lineage_depth: usize,
@@ -46,9 +43,6 @@ pub struct ContinuityProof {
 
     pub parent_hash: String,
 
-    // =========================
-    // 🧠 GOVERNANCE
-    // =========================
     pub governance_weight: f64,
 
     pub governance_score: f64,
@@ -57,9 +51,6 @@ pub struct ContinuityProof {
 
     pub peer_agreement_ratio: f64,
 
-    // =========================
-    // 🌊 STABILITY
-    // =========================
     pub trust: f64,
 
     pub drift: f64,
@@ -70,18 +61,20 @@ pub struct ContinuityProof {
 
     pub resilience_score: f64,
 
-    // =========================
-    // 🌐 NETWORK
-    // =========================
+    pub mutation_shock: f64,
+
+    pub continuity_suspicion: f64,
+
+    pub scrutiny_level: f64,
+
+    pub evolutionary_authenticity: f64,
+
     pub network_accepted: bool,
 
     pub chain_valid: bool,
 
     pub status: String,
 
-    // =========================
-    // 🔐 CRYPTO
-    // =========================
     pub proof_hash: String,
 
     pub validator_signature: String,
@@ -89,6 +82,63 @@ pub struct ContinuityProof {
     pub proof_version: u32,
 
     pub signed_epoch: u64,
+}
+
+// =========================
+// 🔐 GENERATE HASH
+// =========================
+fn generate_proof_hash(
+    validator: &Validator,
+    latest: &IdentityLink,
+) -> String {
+
+    let payload =
+        format!(
+
+            "{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}",
+
+            validator.id,
+
+            validator.identity_chain.len(),
+
+            latest.continuity_hash,
+
+            latest.parent_hash,
+
+            validator.governance_weight,
+
+            validator.trust,
+
+            validator.drift,
+
+            validator.fracture_severity,
+
+            validator.peer_agreement_ratio,
+
+            validator.network_accepted,
+
+            validator.mutation_shock,
+
+            validator.continuity_suspicion,
+
+            validator.scrutiny_level,
+
+            validator.evolutionary_authenticity,
+
+            validator.current_epoch
+        );
+
+    let mut hasher =
+        Sha256::new();
+
+    hasher.update(
+        payload.as_bytes()
+    );
+
+    format!(
+        "{:x}",
+        hasher.finalize()
+    )
 }
 
 // =========================
@@ -110,9 +160,6 @@ pub fn build_continuity_proof(
             latest,
         );
 
-    // =========================
-    // 🔐 SIGN HASH
-    // =========================
     let signed =
         dilithium2::sign(
             proof_hash.as_bytes(),
@@ -180,6 +227,22 @@ pub fn build_continuity_proof(
                 validator
                     .resilience_score,
 
+            mutation_shock:
+                validator
+                    .mutation_shock,
+
+            continuity_suspicion:
+                validator
+                    .continuity_suspicion,
+
+            scrutiny_level:
+                validator
+                    .scrutiny_level,
+
+            evolutionary_authenticity:
+                validator
+                    .evolutionary_authenticity,
+
             network_accepted:
                 validator
                     .network_accepted,
@@ -198,61 +261,12 @@ pub fn build_continuity_proof(
             validator_signature:
                 signature,
 
-            proof_version: 1,
+            proof_version: 2,
 
             signed_epoch:
                 validator
                     .current_epoch,
         }
-    )
-}
-
-// =========================
-// 🔐 HASH PROOF
-// =========================
-fn generate_proof_hash(
-    validator: &Validator,
-    latest: &IdentityLink,
-) -> String {
-
-    let payload =
-        format!(
-
-            "{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}",
-
-            validator.id,
-
-            validator.identity_chain.len(),
-
-            latest.continuity_hash,
-
-            latest.parent_hash,
-
-            validator.governance_weight,
-
-            validator.trust,
-
-            validator.drift,
-
-            validator.fracture_severity,
-
-            validator.peer_agreement_ratio,
-
-            validator.network_accepted,
-
-            validator.current_epoch
-        );
-
-    let mut hasher =
-        Sha256::new();
-
-    hasher.update(
-        payload.as_bytes()
-    );
-
-    format!(
-        "{:x}",
-        hasher.finalize()
     )
 }
 
@@ -288,6 +302,10 @@ pub fn verify_proof(
     }
 
     if proof.validator_signature.is_empty() {
+        return false;
+    }
+
+    if proof.evolutionary_authenticity < 10.0 {
         return false;
     }
 

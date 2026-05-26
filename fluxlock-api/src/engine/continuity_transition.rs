@@ -3,6 +3,11 @@ use fluxlock_core::types::{
     ContinuityTransitionProof,
 };
 
+use sha2::{
+    Sha256,
+    Digest,
+};
+
 // =========================
 // 🧬 TRANSITION RESULT
 // =========================
@@ -157,6 +162,51 @@ pub fn validate_transition(
 }
 
 // =========================
+// 🔐 GOVERNANCE HASH
+// =========================
+pub fn governance_attestation_hash(
+
+    validator: &Validator,
+
+    validation: &TransitionValidation,
+) -> String {
+
+    let chain_depth =
+        validator.identity_chain.len();
+
+    let payload = format!(
+
+        "{}:{}:{}:{}:{}:{}:{}",
+
+        validator.id,
+
+        chain_depth,
+
+        validator.governance_weight,
+
+        validator.peer_agreement_ratio,
+
+        validation.mutation_shock,
+
+        validation.evolutionary_authenticity,
+
+        validation.continuity_confidence,
+    );
+
+    let mut hasher =
+        Sha256::new();
+
+    hasher.update(
+        payload.as_bytes()
+    );
+
+    format!(
+        "{:x}",
+        hasher.finalize()
+    )
+}
+
+// =========================
 // 🧬 GENERATE PROOF
 // =========================
 pub fn generate_transition_proof(
@@ -173,14 +223,22 @@ pub fn generate_transition_proof(
             validator
         );
 
+    let attestation =
+        governance_attestation_hash(
+            validator,
+            &validation,
+        );
+
     ContinuityTransitionProof {
 
         validator_id:
             validator.id,
 
-        previous_hash,
+        previous_hash:
+            previous_hash.clone(),
 
-        new_hash,
+        new_hash:
+             new_hash.clone(),
 
         epoch:
             validator.current_epoch,
@@ -208,9 +266,39 @@ pub fn generate_transition_proof(
         entropy_score:
             validator
                 .entropy_output,
+        
+        transition_signature:
+               Some(
+        attestation.clone()
+    ),
 
+        lineage_signature:
+               Some(
+        previous_hash.clone()
+    ),
+
+proof_hash:
+    attestation.clone(),
         continuity_verified:
             validation
                 .continuity_verified,
+
+        governance_votes: 0,
+
+        governance_approvals: 0,
+
+        governance_rejections: 0,
+
+        network_alignment:
+            validator.peer_agreement_ratio,
+
+        mutation_shock:
+            validation.mutation_shock,
+
+        evolutionary_authenticity:
+            validation.evolutionary_authenticity,
+
+        continuity_attestation:
+            attestation,
     }
 }
