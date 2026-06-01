@@ -20,16 +20,14 @@ use base64::{
 
 use pqcrypto_dilithium::dilithium2;
 
-use pqcrypto_traits::sign::{
-    SecretKey,
-    SignedMessage,
-};
+use pqcrypto_traits::sign::SignedMessage;
 
 // =========================
 // 🧬 CONTINUITY PROOF
 // =========================
 #[derive(
     Clone,
+    Debug,
     Serialize,
     Deserialize,
 )]
@@ -73,7 +71,7 @@ pub struct ContinuityProof {
 
     pub chain_valid: bool,
 
-    pub status: String,
+    pub continuity_state: String,
 
     pub proof_hash: String,
 
@@ -88,7 +86,9 @@ pub struct ContinuityProof {
 // 🔐 GENERATE HASH
 // =========================
 fn generate_proof_hash(
+
     validator: &Validator,
+
     latest: &IdentityLink,
 ) -> String {
 
@@ -145,7 +145,9 @@ fn generate_proof_hash(
 // 🧬 BUILD PROOF
 // =========================
 pub fn build_continuity_proof(
+
     validator: &Validator,
+
     signing_key: &dilithium2::SecretKey,
 ) -> Option<ContinuityProof> {
 
@@ -210,10 +212,12 @@ pub fn build_continuity_proof(
                     .peer_agreement_ratio,
 
             trust:
-                validator.trust,
+                validator
+                    .trust,
 
             drift:
-                validator.drift,
+                validator
+                    .drift,
 
             fracture_severity:
                 validator
@@ -251,12 +255,15 @@ pub fn build_continuity_proof(
                 validator
                     .chain_valid,
 
-            status:
-                validator
-                    .status
-                    .clone(),
+            continuity_state:
+                format!(
+                    "{:?}",
+                    validator
+                        .continuity_state
+                ),
 
-            proof_hash,
+            proof_hash:
+                proof_hash.clone(),
 
             validator_signature:
                 signature,

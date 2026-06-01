@@ -1,339 +1,181 @@
 use fluxlock_core::types::{
     Validator,
+    ContinuityState,
 };
 
 // =========================
-// 🌐 DISTANCE
+// 🌐 PEER GOVERNANCE RESULT
 // =========================
-fn topology_distance(
-    a: &Validator,
-    b: &Validator,
-) -> f64 {
+pub struct GovernanceResult {
 
-    let cluster_delta =
-        (a.topology_cluster as i32
-        - b.topology_cluster as i32)
-        .abs() as f64;
+    pub accepted: bool,
 
-    1.0 + cluster_delta
+    pub weighted_score: f64,
+
+    pub approvals: u32,
+
+    pub rejections: u32,
+
+    pub quorum_reached: bool,
 }
 
 // =========================
-// 🌐 PEER GOVERNANCE ENGINE
+// 🌐 PEER GOVERNANCE
 // =========================
-pub fn propagate_peer_governance(
-    validators: &mut Vec<Validator>,
-) {
+pub fn evaluate_peer_governance(
 
-    let snapshot =
-        validators.clone();
+    validator: &mut Validator,
 
-    for validator in
-        validators.iter_mut()
-    {
+    snapshot: &[Validator],
+) -> GovernanceResult {
 
-        let mut support = 0.0;
+    let mut approvals = 0u32;
 
-        let mut opposition = 0.0;
+    let mut rejections = 0u32;
 
-        let mut immune_support = 0.0;
+    let mut weighted_score = 0.0;
 
-        let mut fracture_pressure = 0.0;
+    let mut total_weight = 0.0;
 
-        let mut rehabilitation_pressure = 0.0;
+    // =========================
+    // 🌐 PEER REVIEW
+    // =========================
+    for peer in snapshot.iter() {
 
-        let mut entropy_field = 0.0;
-
-        let mut healing_field = 0.0;
-
-        let mut resonance_gain = 0.0;
-
-        let mut trust_gravity = 0.0;
-
-        for peer in snapshot.iter() {
-
-            if peer.id == validator.id {
-                continue;
-            }
-
-            let distance =
-                topology_distance(
-                    validator,
-                    peer
-                );
-
-            let proximity =
-                1.0 / distance;
-
-            // =========================
-            // 🌟 HEALTHY SUPPORT
-            // =========================
-            if peer.status == "healthy" {
-
-                support +=
-                    peer.peer_reputation
-                    * 0.003
-                    * proximity;
-
-                healing_field +=
-                    peer.healing_wave
-                    * 0.004
-                    * proximity;
-
-                validator.trust +=
-                    peer.stabilization_power
-                    * 0.0015
-                    * proximity;
-
-                validator.consensus_pressure -=
-                    0.015
-                    * proximity;
-            }
-
-            // =========================
-            // 🛡 IMMUNE REINFORCEMENT
-            // =========================
-            if peer.immune_response > 20.0 {
-
-                immune_support +=
-                    peer.immune_strength
-                    * 0.005
-                    * proximity;
-
-                validator.resilience_score +=
-                    0.02
-                    * proximity;
-
-                validator.drift -=
-                    0.01
-                    * proximity;
-            }
-
-            // =========================
-            // ☠ FRACTURE PROPAGATION
-            // =========================
-            if peer.status == "fractured" {
-
-                fracture_pressure +=
-                    peer.fracture_severity
-                    * 0.015
-                    * proximity;
-
-                entropy_field +=
-                    peer.entropy_output
-                    * 0.01
-                    * proximity;
-
-                validator.drift +=
-                    peer.instability_radius
-                    * 0.005
-                    * proximity;
-
-                validator.peer_reputation *=
-                    0.999;
-            }
-
-            // =========================
-            // 🔁 RECOVERY CASCADE
-            // =========================
-            if peer.status == "recovering" {
-
-                rehabilitation_pressure +=
-                    peer.rehabilitation_score
-                    * 0.003
-                    * proximity;
-
-                validator.trust +=
-                    0.015
-                    * proximity;
-            }
-
-            // =========================
-            // 🔴 QUARANTINE PRESSURE
-            // =========================
-            if peer.quarantine_level > 25.0 {
-
-                opposition +=
-                    peer.quarantine_level
-                    * 0.005
-                    * proximity;
-
-                validator.consensus_pressure +=
-                    0.03
-                    * proximity;
-            }
-
-            // =========================
-            // 🌌 TRUST GRAVITY
-            // =========================
-            trust_gravity +=
-                peer.trust_gravity
-                * 0.002
-                * proximity;
-
-            // =========================
-            // 🌊 RESONANCE
-            // =========================
-            resonance_gain +=
-                peer.resonance_score
-                * 0.003
-                * proximity;
+        // =========================
+        // 🚫 SKIP SELF
+        // =========================
+        if peer.id == validator.id {
+            continue;
         }
 
         // =========================
-        // 🌐 GOVERNANCE
+        // 🚫 EXILED PEERS
         // =========================
-        validator.governance_weight +=
-            support * 0.0005;
-
-        validator.governance_weight -=
-            opposition * 0.0005;
-
-        validator.governance_weight =
-            validator
-                .governance_weight
-                .clamp(0.1, 10.0);
+        if peer.continuity_state
+            == ContinuityState::Exiled
+        {
+            continue;
+        }
 
         // =========================
-        // 🛡 IMMUNITY
+        // 🌐 PEER WEIGHT
         // =========================
-        validator.immune_response +=
-            immune_support * 0.001;
+        let peer_weight =
+            peer.governance_weight
+            *
+            (
+                peer.trust / 100.0
+            );
 
-        validator.immune_strength +=
-            immune_support * 0.0005;
-
-        validator.immune_response =
-            validator
-                .immune_response
-                .clamp(0.0, 1000.0);
+        total_weight += peer_weight;
 
         // =========================
-        // ☠ FRACTURE
+        // 🔴 HARD REJECTION
         // =========================
-        validator.fracture_severity +=
-            fracture_pressure * 0.001;
+        if validator.continuity_state
+            == ContinuityState::Fractured
+        ||
+        validator.continuity_state
+            == ContinuityState::Quarantined
+        {
 
-        validator.consensus_pressure +=
-            fracture_pressure * 0.002;
+            rejections += 1;
 
-        // =========================
-        // 🌊 ENTROPY FIELD
-        // =========================
-        validator.regional_pressure +=
-            entropy_field * 0.001;
+            weighted_score -= peer_weight;
 
-        validator.drift +=
-            entropy_field * 0.0005;
-
-        // =========================
-        // 🌟 HEALING FIELD
-        // =========================
-        validator.healing_wave +=
-            healing_field * 0.0005;
-
-        validator.drift -=
-            healing_field * 0.0004;
+            continue;
+        }
 
         // =========================
-        // 🔁 RECOVERY
+        // 🟠 RECOVERING
         // =========================
-        validator.rehabilitation_score +=
-            rehabilitation_pressure
-            * 0.001;
+        if validator.continuity_state
+            == ContinuityState::Recovering
+        ||
+        validator.continuity_state
+            == ContinuityState::Rehabilitating
+        {
+
+            approvals += 1;
+
+            weighted_score +=
+                peer_weight * 0.5;
+
+            continue;
+        }
 
         // =========================
-        // 🌌 RESONANCE
+        // 🟢 HEALTHY
         // =========================
-        validator.resonance_score +=
-            resonance_gain * 0.0005;
+        if validator.continuity_state
+            == ContinuityState::Healthy
+        ||
+        validator.continuity_state
+            == ContinuityState::Evolving
+        {
 
-        // =========================
-        // 🌠 TRUST GRAVITY
-        // =========================
-        validator.trust_gravity +=
-            trust_gravity * 0.0005;
+            approvals += 1;
 
-        // =========================
-        // 🌐 CONSENSUS EVOLUTION
-        // =========================
-        if validator.consensus_pressure > 40.0 {
+            weighted_score +=
+                peer_weight;
 
-            validator.peer_votes_invalid += 1;
+            continue;
+        }
+    }
+
+    // =========================
+    // 🌐 NORMALIZATION
+    // =========================
+    let normalized_score =
+        if total_weight > 0.0 {
+
+            (
+                weighted_score
+                / total_weight
+            )
+            .clamp(-1.0, 1.0)
 
         } else {
 
-            validator.peer_votes_valid += 1;
-        }
+            0.0
+        };
 
-        // =========================
-        // 🧬 SOCIAL ISOLATION
-        // =========================
-        if validator.fracture_severity > 100.0 {
+    // =========================
+    // 🌐 QUORUM
+    // =========================
+    let quorum_reached =
+        approvals + rejections >= 3;
 
-            validator.network_accepted =
-                false;
+    // =========================
+    // 🌐 ACCEPTANCE
+    // =========================
+    let accepted =
+        quorum_reached
+        &&
+        normalized_score > 0.0;
 
-            validator.status =
-                "fractured".into();
+    // =========================
+    // 🌐 STATE EFFECTS
+    // =========================
+    if !accepted {
 
-            validator.isolation_events += 1;
-        }
+        validator.consensus_pressure += 5.0;
 
-        // =========================
-        // 🌟 REHABILITATION
-        // =========================
-        if validator.rehabilitation_score > 200.0
-        && validator.drift < 15.0
-        && validator.chain_valid
-        {
+        validator.continuity_suspicion += 2.0;
+    }
 
-            validator.network_accepted =
-                true;
+    GovernanceResult {
 
-            validator.status =
-                "healthy".into();
-        }
+        accepted,
 
-        // =========================
-        // 🌌 INFLUENCE EVOLUTION
-        // =========================
-        validator.network_influence_score +=
-            validator.peer_reputation
-            * 0.0002;
+        weighted_score:
+            normalized_score,
 
-        validator.network_influence_score -=
-            validator.fracture_severity
-            * 0.0003;
+        approvals,
 
-        validator.network_influence_score +=
-            validator.resonance_score
-            * 0.0002;
+        rejections,
 
-        validator.network_influence_score =
-            validator
-                .network_influence_score
-                .clamp(0.0, 1000.0);
-
-        // =========================
-        // 🌊 ECOLOGY STABILIZATION
-        // =========================
-        validator.drift =
-            validator.drift.max(0.0);
-
-        validator.regional_pressure =
-            validator
-                .regional_pressure
-                .clamp(0.0, 1000.0);
-
-        validator.healing_wave =
-            validator
-                .healing_wave
-                .clamp(0.0, 1000.0);
-
-        validator.entropy_output =
-            validator
-                .entropy_output
-                .clamp(0.0, 1000.0);
+        quorum_reached,
     }
 }

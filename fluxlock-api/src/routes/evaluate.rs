@@ -22,7 +22,7 @@ pub async fn evaluate(
         Json(serde_json::json!({
             "decision": decision.decision,
             "weight": decision.weight,
-            "status": decision.status,
+            "status": decision.state,
             "reason": decision.reason
         }))
     } else {

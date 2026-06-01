@@ -3,14 +3,23 @@ use axum::{
     Json,
 };
 
+use fluxlock_core::types::ContinuityState;
+
 use serde::{
     Deserialize,
     Serialize,
 };
 
 use std::collections::HashSet;
-use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::{
+    Arc,
+    Mutex,
+};
+
+use std::time::{
+    SystemTime,
+    UNIX_EPOCH,
+};
 
 use once_cell::sync::Lazy;
 
@@ -28,8 +37,9 @@ use crate::state::KEY_STORE;
 // =========================
 // 🔐 REPLAY PROTECTION
 // =========================
-static NONCE_STORE: Lazy<Mutex<HashSet<String>>> =
-    Lazy::new(|| Mutex::new(HashSet::new()));
+static NONCE_STORE:
+    Lazy<Mutex<HashSet<String>>> =
+        Lazy::new(|| Mutex::new(HashSet::new()));
 
 const MAX_TIME_WINDOW: u64 = 30;
 
@@ -93,8 +103,12 @@ pub struct AuthResponse {
 // 🔐 AUTH FLOW
 // =========================
 pub async fn auth_flow(
-    State(state): State<Arc<Mutex<NetworkState>>>,
-    Json(payload): Json<AuthRequest>,
+
+    State(state):
+        State<Arc<Mutex<NetworkState>>>,
+
+    Json(payload):
+        Json<AuthRequest>,
 ) -> Json<AuthResponse> {
 
     println!("🔥 AUTH REQUEST RECEIVED");
@@ -107,32 +121,43 @@ pub async fn auth_flow(
             .as_u64()
             .unwrap_or(0);
 
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now =
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
 
-    if now.abs_diff(timestamp) > MAX_TIME_WINDOW {
+    if now.abs_diff(timestamp)
+        > MAX_TIME_WINDOW
+    {
 
         return failure_response(
+
             payload.identity_id,
+
             "timestamp expired",
+
             "expired",
         );
     }
 
     // =========================
-    // 🔁 NONCE
+    // 🔁 NONCE CHECK
     // =========================
     {
         let mut nonce_store =
             NONCE_STORE.lock().unwrap();
 
-        if nonce_store.contains(&payload.nonce) {
+        if nonce_store.contains(
+            &payload.nonce
+        ) {
 
             return failure_response(
+
                 payload.identity_id,
+
                 "replay detected",
+
                 "replay",
             );
         }
@@ -143,12 +168,15 @@ pub async fn auth_flow(
     }
 
     // =========================
-    // 🔐 VALIDATOR KEY
+    // 🔐 FETCH VALIDATOR KEY
     // =========================
-    let store = KEY_STORE.lock().unwrap();
+    let store =
+        KEY_STORE.lock().unwrap();
 
     let (pk, _) =
-        match store.get(&payload.validator_id)
+        match store.get(
+            &payload.validator_id
+        )
     {
 
         Some(pair) => pair,
@@ -156,19 +184,25 @@ pub async fn auth_flow(
         None => {
 
             return failure_response(
+
                 payload.identity_id,
+
                 "validator not found",
+
                 "unknown",
             );
         }
     };
 
     // =========================
-    // 🔓 SIGNATURE DECODE
+    // 🔓 DECODE SIGNATURE
     // =========================
     let decoded =
-        match general_purpose::STANDARD
-            .decode(&payload.signature)
+        match general_purpose
+            ::STANDARD
+            .decode(
+                &payload.signature
+            )
     {
 
         Ok(bytes) => bytes,
@@ -176,18 +210,25 @@ pub async fn auth_flow(
         Err(_) => {
 
             return failure_response(
+
                 payload.identity_id,
+
                 "invalid signature encoding",
+
                 "invalid",
             );
         }
     };
 
     // =========================
-    // 🔓 PARSE SIGNED MESSAGE
+    // 🔓 PARSE MESSAGE
     // =========================
     let signed_msg =
-        match dilithium2::SignedMessage::from_bytes(&decoded)
+        match dilithium2
+            ::SignedMessage
+            ::from_bytes(
+                &decoded
+            )
     {
 
         Ok(msg) => msg,
@@ -195,8 +236,11 @@ pub async fn auth_flow(
         Err(_) => {
 
             return failure_response(
+
                 payload.identity_id,
+
                 "invalid signed message",
+
                 "invalid",
             );
         }
@@ -217,21 +261,29 @@ pub async fn auth_flow(
         Err(_) => {
 
             return failure_response(
+
                 payload.identity_id,
+
                 "signature verification failed",
+
                 "invalid",
             );
         }
     };
 
     let opened_str =
-        String::from_utf8_lossy(&opened);
+        String::from_utf8_lossy(
+            &opened
+        );
 
     if opened_str != payload.message {
 
         return failure_response(
+
             payload.identity_id,
+
             "message mismatch",
+
             "invalid",
         );
     }
@@ -245,7 +297,9 @@ pub async fn auth_flow(
         state.lock().unwrap();
 
     state.get_or_create_identity(
+
         payload.identity_id.clone(),
+
         payload.validator_id,
     );
 
@@ -253,9 +307,14 @@ pub async fn auth_flow(
     // 🔍 VALIDATOR SNAPSHOT
     // =========================
     let validator =
-        match state.validators
+        match state
+            .validators
             .iter()
-            .find(|v| v.id == payload.validator_id)
+            .find(
+                |v|
+                    v.id
+                    == payload.validator_id
+            )
     {
 
         Some(v) => v.clone(),
@@ -263,61 +322,124 @@ pub async fn auth_flow(
         None => {
 
             return failure_response(
+
                 payload.identity_id,
+
                 "validator missing",
+
                 "unknown",
             );
         }
     };
 
     // =========================
-    // 🔗 VALIDATION
+    // 🔗 CONTINUITY VALIDATION
     // =========================
-    let mut allowed = false;
+let mut allowed = false;
 
-    let mut confidence = 0.0;
+let mut confidence = 0.0;
 
-    let reason: String;
+let reason: String;
 
-    if !validator.chain_valid {
+match validator.continuity_state {
 
-        reason =
-            "identity chain invalid".into();
-
-    } else if validator.epoch_age < 120 {
-
-        confidence = 0.2;
+    ContinuityState::Exiled => {
 
         reason =
-            "identity still maturing".into();
+            "continuity permanently rejected"
+                .into();
+    }
 
-    } else if !validator.network_accepted {
-
-        confidence =
-            validator.confidence * 0.5;
+    ContinuityState::Fractured => {
 
         reason =
-            "network rejected identity".into();
+            "continuity fractured"
+                .into();
+    }
 
-    } else {
+    ContinuityState::Quarantined => {
+
+        confidence = 0.10;
+
+        reason =
+            "continuity quarantined"
+                .into();
+    }
+
+    ContinuityState::Rehabilitating => {
+
+        allowed = true;
+
+        confidence = 0.50;
+
+        reason =
+            "continuity rehabilitation active"
+                .into();
+    }
+
+    ContinuityState::Recovering => {
 
         allowed = true;
 
         confidence =
-            validator.confidence
-                .clamp(0.0, 1.0);
+            (
+                validator.confidence * 0.75
+            )
+            .clamp(0.0, 1.0);
 
         reason =
-            "authenticated (fluxlock verified identity)"
+            "continuity recovery active"
                 .into();
     }
+
+    ContinuityState::Evolving => {
+
+        allowed = true;
+
+        confidence = 0.75;
+
+        reason =
+            "identity evolution in progress"
+                .into();
+    }
+
+    ContinuityState::Healthy => {
+
+        if !validator.network_accepted {
+
+            confidence =
+                validator.confidence
+                    * 0.5;
+
+            reason =
+                "network rejected identity"
+                    .into();
+
+        } else {
+
+            allowed = true;
+
+            confidence =
+                validator
+                    .confidence
+                    .clamp(0.0, 1.0);
+
+            reason =
+                "authenticated (continuity verified)"
+                    .into();
+        }
+    }
+}
 
     // =========================
     // 🧠 FEEDBACK
     // =========================
     state.apply_access_feedback(
+
         payload.validator_id,
+
         allowed,
+
         confidence,
     );
 
@@ -327,7 +449,7 @@ pub async fn auth_flow(
     if allowed {
 
         state.identity_success(
-        &payload.identity_id,
+            &payload.identity_id,
         );
 
         state.evolve_identity(
@@ -342,7 +464,7 @@ pub async fn auth_flow(
     }
 
     // =========================
-    // 🔄 FORCE RE-VERIFY
+    // 🔄 REVERIFY LINEAGE
     // =========================
     if let Some(v) =
         state.validators
@@ -387,99 +509,122 @@ pub async fn auth_flow(
     let identity =
         state.identities
             .identities
-            .get(&payload.identity_id)
+            .get(
+                &payload.identity_id
+            )
             .unwrap()
             .clone();
 
     // =========================
     // 📤 RESPONSE
     // =========================
-    Json(AuthResponse {
+    Json(
+        AuthResponse {
 
-        authenticated: allowed,
+            authenticated:
+                allowed,
 
-        signature_valid: true,
+            signature_valid:
+                true,
 
-        identity_valid:
-            evolved_validator
-                .chain_valid,
+            identity_valid:
+                evolved_validator
+                    .chain_valid,
 
-        allowed,
+            allowed,
 
-        confidence,
+            confidence,
 
-        reason,
+            reason,
 
-        epoch_age:
-            evolved_validator.epoch_age,
+            epoch_age:
+                evolved_validator
+                    .epoch_age,
 
-        trust:
-            evolved_validator.trust,
+            trust:
+                evolved_validator
+                    .trust,
 
-        drift:
-            evolved_validator.drift,
+            drift:
+                evolved_validator
+                    .drift,
 
-        status:
-            evolved_validator.status,
+            status:
+                format!(
+                    "{:?}",
+                    evolved_validator
+                        .continuity_state
+                ),
 
-        identity_id:
-            identity.identity_id,
+            identity_id:
+                identity.identity_id,
 
-        continuity_score:
-            identity.continuity_score,
+            continuity_score:
+                identity
+                    .continuity_score,
 
-        session_count:
-            identity.session_count,
+            session_count:
+                identity
+                    .session_count,
 
-        credential_depth:
-            identity.credential_depth,
+            credential_depth:
+                identity
+                    .credential_depth,
 
-        lineage_depth:
-            evolved_validator
-                .identity_chain
-                .len(),
-    })
+            lineage_depth:
+                evolved_validator
+                    .identity_chain
+                    .len(),
+        }
+    )
 }
 
 // =========================
 // ❌ FAILURE RESPONSE
 // =========================
 fn failure_response(
+
     identity_id: String,
+
     reason: &str,
+
     status: &str,
 ) -> Json<AuthResponse> {
 
-    Json(AuthResponse {
+    Json(
+        AuthResponse {
 
-        authenticated: false,
+            authenticated: false,
 
-        signature_valid: false,
+            signature_valid: false,
 
-        identity_valid: false,
+            identity_valid: false,
 
-        allowed: false,
+            allowed: false,
 
-        confidence: 0.0,
+            confidence: 0.0,
 
-        reason: reason.into(),
+            reason:
+                reason.into(),
 
-        epoch_age: 0,
+            epoch_age: 0,
 
-        trust: 0.0,
+            trust: 0.0,
 
-        drift: 0.0,
+            drift: 0.0,
 
-        status: status.into(),
+            status:
+                status.into(),
 
-        identity_id,
+            identity_id,
 
-        continuity_score: 0.0,
+            continuity_score: 0.0,
 
-        session_count: 0,
+            session_count: 0,
 
-        credential_depth: 0,
+            credential_depth: 0,
 
-        lineage_depth: 0,
-    })
+            lineage_depth: 0,
+        }
+    )
 }

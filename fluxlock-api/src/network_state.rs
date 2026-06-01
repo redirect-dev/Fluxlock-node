@@ -3,6 +3,9 @@ use serde::{
     Deserialize,
 };
 
+use crate::engine::continuity_state::
+    evaluate_continuity_state;
+
 use std::fs;
 
 use fluxlock_core::types::{
@@ -11,6 +14,7 @@ use fluxlock_core::types::{
     IdentityRegistry,
     PeerNode,
     FluxIdentity,
+    ContinuityState,
     ContinuityEvent,
 };
 
@@ -31,7 +35,7 @@ use crate::engine::continuity_transition::{
 };
 
 use crate::engine::peer_governance::{
-    propagate_peer_governance,
+    evaluate_peer_governance,
 };
 
 use fluxlock_network::memory::{
@@ -418,8 +422,8 @@ impl NetworkState {
 
                    mutation_pressure: 0.0,
 
-                status:
-                    "healthy".into(),
+                continuity_state:
+                        ContinuityState::Healthy,
                 }
             );
 
@@ -464,9 +468,18 @@ impl NetworkState {
                 self.global_epoch
             );
 
-        propagate_peer_governance(
-            &mut self.validators
-        );
+        let snapshot =
+            self.validators.clone();
+
+            for validator in
+            self.validators.iter_mut()
+{
+
+    evaluate_peer_governance(
+        validator,
+        &snapshot,
+    );
+}
 
         // =========================
         // 🌐 DISTRIBUTED MESH
@@ -494,6 +507,24 @@ impl NetworkState {
         for validator in
             self.validators.iter_mut()
         {
+                // =========================
+                // 🔗 REVERIFY LINEAGE
+                // =========================
+                validator.chain_valid =
+                   verify_lineage(
+                   &validator.identity_chain,
+                  validator.id,
+                );
+
+                println!(
+                "VALIDATOR {} CHAIN VALID = {}",
+                 validator.id,
+                 validator.chain_valid
+                );
+
+                evaluate_continuity_state(
+                     validator
+                );
 
             if let Some(memory) =
                 self.memory_store
@@ -524,15 +555,15 @@ impl NetworkState {
                     memory.network_rejections += 1;
                 }
 
-                if validator.status
-                    == "fractured"
+                if validator.continuity_state
+                    == ContinuityState::Fractured
                 {
 
                     memory.fracture_events += 1;
                 }
 
-                if validator.status
-                    == "recovering"
+                if validator.continuity_state
+                     == ContinuityState::Recovering
                 {
 
                     memory.recovery_events += 1;
@@ -554,6 +585,23 @@ impl NetworkState {
                 evaluate_governance(
                     validator
                 );
+            // =========================
+            // 🌐 NETWORK REACCEPTANCE
+            // =========================
+                if governance.network_reacceptance
+                    && validator.chain_valid
+                    && validator.trust > 50.0
+                    && validator.drift < 50.0 {
+
+                  validator.network_accepted = true;
+
+    if validator.recovery_timer > 0 {
+
+        validator.successful_recoveries += 1;
+
+        validator.recovery_timer = 0;
+    }
+}
 
             validator.drift -=
                 governance
@@ -686,6 +734,23 @@ impl NetworkState {
                 validator
                     .evolutionary_authenticity
                     .clamp(0.0, 100.0);
+            
+                    // =========================
+                    // 🧬 CANONICAL RECOVERY
+                    // =========================
+            if validator.network_accepted
+                && validator.chain_valid
+                && validator.trust > 80.0
+                && validator.drift < 15.0 {
+
+               validator.fracture_severity *= 0.995;
+
+               validator.quarantine_level *= 0.990;
+
+               validator.continuity_suspicion *= 0.995;
+
+               validator.rehabilitation_score += 0.10;
+            }
         }
     }
             // =========================
@@ -767,8 +832,8 @@ pub fn spike_attack(
 
         v.trust *= 0.95;
 
-        v.status =
-            "recovering".into();
+        v.continuity_state =
+                ContinuityState::Recovering;
     }
 }
 
@@ -797,8 +862,8 @@ pub fn breach_attack(
         v.network_accepted =
             false;
 
-        v.status =
-            "quarantined".into();
+        v.continuity_state =
+             ContinuityState::Quarantined;
     }
 }
 
@@ -826,8 +891,8 @@ pub fn fracture_attack(
 
         v.fracture_severity += 75.0;
 
-        v.status =
-            "fractured".into();
+        v.continuity_state =
+             ContinuityState::Fractured;
     }
 }
 

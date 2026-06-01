@@ -6,6 +6,33 @@ use serde::{
 use std::collections::HashMap;
 
 // =========================
+// 🧬 CONTINUITY STATE
+// =========================
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+    PartialEq,
+)]
+pub enum ContinuityState {
+
+    Healthy,
+
+    Evolving,
+
+    Recovering,
+
+    Fractured,
+
+    Quarantined,
+
+    Rehabilitating,
+
+    Exiled,
+}
+
+// =========================
 // 🧠 CONTINUITY EVENT TYPE
 // =========================
 #[derive(
@@ -360,7 +387,8 @@ pub struct Validator {
 
     pub mutation_pressure: f64,
 
-    pub status: String,
+    pub continuity_state:
+    ContinuityState,
 }
 
 // =========================

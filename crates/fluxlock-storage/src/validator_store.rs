@@ -316,7 +316,10 @@ pub fn save_validator(
             validator.regional_pressure,
             validator.trust_gravity,
 
-            validator.status
+            format!(
+                "{:?}",
+                validator.continuity_state
+)
         ]
     )?;
 

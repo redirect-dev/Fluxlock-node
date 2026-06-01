@@ -6,3 +6,4 @@ pub mod governance;
 pub mod peer_governance;
 pub mod proof_verifier;
 pub mod continuity_transition;
+pub mod continuity_state;

@@ -48,20 +48,21 @@ pub fn save_identity_chain(
             "
             INSERT INTO lineage (
 
-                validator_id,
-                link_index,
+            validator_id,
+            link_index,
 
-                continuity_hash,
-                parent_hash,
+            continuity_hash,
+            parent_hash,
 
-                epoch,
+             epoch,
 
-                governance_weight,
-                entropy_score,
+             governance_weight,
+             entropy_score,
 
-                public_key
+            public_key,
 
-            )
+            signature
+)
             VALUES (
 
                 ?1,
@@ -92,6 +93,8 @@ pub fn save_identity_chain(
                 link.entropy_score,
 
                 link.public_key,
+
+                link.signature.clone(),
             ],
         )?;
     }
@@ -128,7 +131,8 @@ pub fn load_identity_chain(
                 epoch,
                 governance_weight,
                 entropy_score,
-                public_key
+                public_key,
+                signature
 
             FROM lineage
 
@@ -170,6 +174,10 @@ pub fn load_identity_chain(
                 let public_key:
                     Vec<u8> =
                     row.get(5)?;
+                
+                let signature:
+                Option<Vec<u8>> =
+                row.get(6)?;
 
                 Ok(
                     IdentityLink {
@@ -179,8 +187,7 @@ pub fn load_identity_chain(
                         // =========================
                         public_key,
 
-                        signature:
-                            None,
+                        signature,
 
                         // =========================
                         // 🔗 CONTINUITY
@@ -305,7 +312,9 @@ fn create_lineage_table(
 
             entropy_score REAL,
 
-            public_key BLOB
+            public_key BLOB,
+
+            signature BLOB
         )
         ",
 

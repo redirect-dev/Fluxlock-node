@@ -1,84 +1,194 @@
 use serde::Serialize;
-use fluxlock_core::types::Validator;
 
+use fluxlock_core::types::{
+    Validator,
+};
+
+use fluxlock_core::types::ContinuityState;
+
+// =========================
+// 🧠 DECISION
+// =========================
 #[derive(Serialize)]
 pub struct Decision {
-    pub decision: String,   // ACCEPT | REJECT | WEIGHTED
-    pub weight: f64,        // 0.0 → 1.0
-    pub status: String,     // healthy | recovering | compromised
+
+    pub decision: String,
+
+    pub weight: f64,
+
+    pub state: String,
+
     pub reason: String,
 }
 
-pub fn evaluate_validator(v: &Validator) -> Decision {
+// =========================
+// 🧠 EVALUATE
+// =========================
+pub fn evaluate_validator(
+    v: &Validator,
+) -> Decision {
+
     // =========================
-    // 🔴 HARD IDENTITY GATE
+    // ☠ EXILED
     // =========================
-    if !v.chain_valid {
+    if v.continuity_state
+        == ContinuityState::Exiled
+    {
+
         return Decision {
-            decision: "REJECT".into(),
+
+            decision:
+                "REJECT".into(),
+
             weight: 0.0,
-            status: "compromised".into(),
-            reason: "identity chain invalid".into(),
+
+            state:
+                "exiled".into(),
+
+            reason:
+                "continuity permanently rejected"
+                    .into(),
         };
     }
 
     // =========================
-    // ⏳ MATURITY GATE
+    // 🔴 FRACTURED
     // =========================
-    if v.epoch_age < 120 {
-        return Decision {
-            decision: "WEIGHTED".into(),
-            weight: 0.2,
-            status: "recovering".into(),
-            reason: "identity still maturing".into(),
-        };
-    }
-
-    // =========================
-    // 🔥 RECOVERY MEMORY GATE
-    // =========================
-    if v.recovery_timer > 0 {
-        let penalty = (v.recovery_timer as f64 / 200.0).min(1.0);
+    if v.continuity_state
+        == ContinuityState::Fractured
+    {
 
         return Decision {
-            decision: "WEIGHTED".into(),
-            weight: (v.trust / 100.0 * (1.0 - penalty)).clamp(0.1, 0.6),
-            status: "recovering".into(),
-            reason: "recent instability (recovery phase)".into(),
-        };
-    }
 
-    // =========================
-    // 🔴 EXTREME INSTABILITY
-    // =========================
-    if v.drift > 120.0 {
-        return Decision {
-            decision: "REJECT".into(),
+            decision:
+                "REJECT".into(),
+
             weight: 0.0,
-            status: "attacked".into(),
-            reason: "extreme instability".into(),
+
+            state:
+                "fractured".into(),
+
+            reason:
+                "continuity fractured"
+                    .into(),
         };
     }
 
     // =========================
-    // 🟡 PARTIAL TRUST ZONE
+    // ⚠ QUARANTINED
     // =========================
-    if v.drift > 40.0 || v.trust < 60.0 {
+    if v.continuity_state
+        == ContinuityState::Quarantined
+    {
+
         return Decision {
-            decision: "WEIGHTED".into(),
-            weight: (v.trust / 100.0 * 0.5).clamp(0.2, 0.7),
-            status: "warning".into(),
-            reason: "unstable identity".into(),
+
+            decision:
+                "WEIGHTED".into(),
+
+            weight: 0.10,
+
+            state:
+                "quarantined".into(),
+
+            reason:
+                "network quarantine active"
+                    .into(),
         };
     }
 
     // =========================
-    // 🟢 FULL ACCEPTANCE
+    // 🧬 REHABILITATING
+    // =========================
+    if v.continuity_state
+        == ContinuityState::Rehabilitating
+    {
+
+        return Decision {
+
+            decision:
+                "WEIGHTED".into(),
+
+            weight: 0.35,
+
+            state:
+                "rehabilitating".into(),
+
+            reason:
+                "continuity recovery in progress"
+                    .into(),
+        };
+    }
+
+    // =========================
+    // 🟠 RECOVERING
+    // =========================
+    if v.continuity_state
+        == ContinuityState::Recovering
+    {
+
+        return Decision {
+
+            decision:
+                "WEIGHTED".into(),
+
+            weight:
+                (
+                    v.trust / 100.0
+                )
+                .clamp(0.2, 0.6),
+
+            state:
+                "recovering".into(),
+
+            reason:
+                "identity instability detected"
+                    .into(),
+        };
+    }
+
+    // =========================
+    // 🔄 EVOLVING
+    // =========================
+    if v.continuity_state
+        == ContinuityState::Evolving
+    {
+
+        return Decision {
+
+            decision:
+                "WEIGHTED".into(),
+
+            weight: 0.75,
+
+            state:
+                "evolving".into(),
+
+            reason:
+                "identity mutation stabilizing"
+                    .into(),
+        };
+    }
+
+    // =========================
+    // 🟢 HEALTHY
     // =========================
     Decision {
-        decision: "ACCEPT".into(),
-        weight: (v.trust / 100.0).clamp(0.6, 1.0),
-        status: "healthy".into(),
-        reason: "identity stable and trusted".into(),
+
+        decision:
+            "ACCEPT".into(),
+
+        weight:
+            (
+                v.trust / 100.0
+            )
+            .clamp(0.6, 1.0),
+
+        state:
+            "healthy".into(),
+
+        reason:
+            "continuity verified"
+                .into(),
     }
 }

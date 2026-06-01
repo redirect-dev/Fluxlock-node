@@ -329,11 +329,28 @@ pub fn verify_lineage(
     // =========================
     for i in 1..chain.len() {
 
+        println!("--------------------");
+        println!("VERIFYING LINK {}", i);
+
+        println!(
+            "PARENT HASH: {}",
+            chain[i].parent_hash
+);
+
+        println!(
+            "EXPECTED HASH: {}",
+            chain[i - 1].continuity_hash
+);
         let previous =
             &chain[i - 1];
 
         let current =
             &chain[i];
+
+        println!(
+             "CURRENT EPOCH: {}",
+             current.continuity_epoch
+);
 
         // =========================
         // 🔗 HASH CONTINUITY
@@ -348,6 +365,26 @@ pub fn verify_lineage(
         // =========================
         // 🔐 SIGNATURE REQUIRED
         // =========================
+        println!(
+            "CHAIN LEN = {}",
+            chain.len()
+);
+
+        println!(
+            "LINK EPOCH = {}",
+            current.continuity_epoch
+);
+
+        println!(
+            "RAW SIGNATURE = {:?}",
+             current.signature
+);
+        
+        println!(
+            "HAS SIGNATURE: {}",
+             current.signature.is_some()
+);
+        
         let signature =
             match &current.signature {
 
@@ -361,11 +398,11 @@ pub fn verify_lineage(
         // =========================
         let message =
             format!(
-                "{}:{}:{}",
+               "{}:{}:{}",
                 validator_id,
-                i,
+                current.continuity_epoch,
                 previous.continuity_hash
-            );
+    );
 
         // =========================
         // 🔐 VERIFY SUCCESSION
@@ -377,10 +414,20 @@ pub fn verify_lineage(
                 signature,
             );
 
-        if !valid {
+println!(
+    "SIGNATURE VALID: {}",
+    valid
+);
 
-            return false;
-        }
+println!(
+    "MESSAGE: {}",
+    message
+);
+
+if !valid {
+
+    return false;
+}
 
         // =========================
         // 🧠 ENTROPY FLOOR

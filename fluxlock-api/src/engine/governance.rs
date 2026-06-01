@@ -2,6 +2,8 @@ use fluxlock_core::types::{
     Validator,
 };
 
+use fluxlock_core::types::ContinuityState;
+
 // =========================
 // 🧠 GOVERNANCE RESPONSE
 // =========================
@@ -190,7 +192,8 @@ pub fn evaluate_governance(
     // =========================
     // 🟡 RECOVERING
     // =========================
-    if validator.status == "recovering" {
+    if validator.continuity_state
+    == ContinuityState::Recovering {
 
         return GovernanceResult {
 
