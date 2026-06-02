@@ -450,6 +450,30 @@ impl NetworkState {
         }
     }
 
+    fn record_event(
+    validator: &mut Validator,
+    epoch: u64,
+    event_type: fluxlock_core::types::ContinuityEventType,
+    severity: f64,
+    trust_delta: f64,
+    continuity_delta: f64,
+    recovery_delta: f64,
+    description: &str,
+) {
+    validator.continuity_events.push(
+        ContinuityEvent {
+            validator_id: validator.id,
+            epoch,
+            event_type,
+            severity,
+            trust_delta,
+            continuity_delta,
+            recovery_delta,
+            description: description.to_string(),
+        }
+    );
+}
+
     // =========================
     // 🔁 ENGINE LOOP
     // =========================
@@ -834,6 +858,17 @@ pub fn spike_attack(
 
         v.continuity_state =
                 ContinuityState::Recovering;
+
+                Self::record_event(
+    v,
+    self.global_epoch,
+    fluxlock_core::types::ContinuityEventType::SpikeAttack,
+    15.0,
+    -5.0,
+    -10.0,
+    0.0,
+    "Spike attack detected",
+);
     }
 }
 
@@ -864,6 +899,17 @@ pub fn breach_attack(
 
         v.continuity_state =
              ContinuityState::Quarantined;
+
+             Self::record_event(
+    v,
+    self.global_epoch,
+    fluxlock_core::types::ContinuityEventType::CriticalBreach,
+    50.0,
+    -30.0,
+    -40.0,
+    0.0,
+    "Critical breach quarantined",
+);
     }
 }
 
@@ -893,6 +939,17 @@ pub fn fracture_attack(
 
         v.continuity_state =
              ContinuityState::Fractured;
+
+             Self::record_event(
+    v,
+    self.global_epoch,
+    fluxlock_core::types::ContinuityEventType::ContinuityFracture,
+    100.0,
+    -60.0,
+    -100.0,
+    0.0,
+    "Continuity chain fractured",
+);
     }
 }
 
@@ -1107,6 +1164,17 @@ pub fn evolve_identity(
         v.identity_chain.push(
             new_link
         );
+
+        Self::record_event(
+    v,
+    self.global_epoch,
+    fluxlock_core::types::ContinuityEventType::EpochRotation,
+    0.0,
+    0.0,
+    5.0,
+    0.0,
+    "Identity epoch rotation",
+);
 
         v.epoch_rotations += 1;
 
