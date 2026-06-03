@@ -274,6 +274,8 @@ pub struct Validator {
 
     pub adaptive_reputation: f64,
 
+    pub continuity_reputation: f64,
+
     pub continuity_survival_score: f64,
 
     pub fracture_history: u64,

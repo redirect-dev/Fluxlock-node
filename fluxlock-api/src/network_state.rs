@@ -312,6 +312,8 @@ impl NetworkState {
 
                     adaptive_reputation: 100.0,
 
+                    continuity_reputation: 100.0,
+
                     continuity_survival_score: 100.0,
 
                     fracture_history: 0,
@@ -450,7 +452,74 @@ impl NetworkState {
         }
     }
 
-    fn record_event(
+    // =========================
+    // 🧬 CONTINUITY REPUTATION
+    // =========================
+fn calculate_reputation(
+    validator: &Validator,
+) -> f64 {
+
+    let mut score: f64 = 100.0;
+
+    use fluxlock_core::types::ContinuityEventType::*;
+
+    for event in &validator.continuity_events {
+
+        match event.event_type {
+
+            EpochRotation => {
+                score += 1.0;
+            }
+
+            NetworkReacceptance => {
+                score += 5.0;
+            }
+
+            GovernanceRecovery => {
+                score += 3.0;
+            }
+
+            IdentitySuccess => {
+                score += 0.5;
+            }
+
+            SpikeAttack => {
+                score -= 2.0;
+            }
+
+            CriticalBreach => {
+                score -= 10.0;
+            }
+
+            ContinuityFracture => {
+                score -= 25.0;
+            }
+
+            IdentityFailure => {
+                score -= 1.0;
+            }
+
+            Quarantine => {
+                score -= 5.0;
+            }
+
+            Rehabilitation => {
+                score += 2.0;
+            }
+
+            ConsensusFailure => {
+                score -= 3.0;
+            }
+        }
+    }
+
+    score.clamp(0.0, 100.0)
+}
+
+// =========================
+// 🧬 RECORD EVENT
+// =========================
+fn record_event(
     validator: &mut Validator,
     epoch: u64,
     event_type: fluxlock_core::types::ContinuityEventType,
@@ -686,7 +755,18 @@ impl NetworkState {
 
             validator.continuity_memory_score += 0.01;
 
-            validator.adaptive_reputation += 0.01;
+            validator.continuity_reputation =
+                Self::calculate_reputation(
+                validator
+    );
+
+            validator.adaptive_reputation =
+    (
+            validator.continuity_reputation
+            +
+            validator.continuity_memory_score
+    )
+            / 2.0;
 
                         // =========================
             // 🧬 MUTATION GOVERNANCE
