@@ -89,6 +89,44 @@ pub fn evaluate_governance(
         )
         .min(2.5);
 
+        // =========================
+// 🏛 AUTHORITY GOVERNANCE
+// =========================
+
+let authority_factor =
+
+    (
+        validator.leadership_score
+        * 0.35
+    )
+
+    +
+
+    (
+        validator.network_influence_score
+        * 0.35
+    )
+
+    +
+
+    (
+        validator.governance_weight
+        * 10.0
+    )
+
+    +
+
+    (
+        validator.peer_reputation
+        * 0.20
+    );
+
+let authority_bonus =
+    (
+        authority_factor / 100.0
+    )
+    .min(5.0);
+
     let stability_memory =
         (
             validator
@@ -307,27 +345,29 @@ pub fn evaluate_governance(
 
         trust_bonus:
             0.08
-            + governance_memory
-            + stability_memory,
+             + governance_memory
+             + stability_memory
+             + authority_bonus * 0.05,
 
         rehabilitation_boost:
             2.5
-            + recovery_strength,
+            + recovery_strength
+            + authority_bonus * 0.20,
 
         scar_reduction:
             0.08,
 
         immune_response_boost:
             0.15
-            + maturity_factor
-            * 0.02,
+            + maturity_factor * 0.02
+            + authority_bonus * 0.03,
 
         network_reacceptance: true,
 
         adaptive_reputation_delta:
             0.20
-            + maturity_factor
-            * 0.05,
+             + maturity_factor * 0.05
+             + authority_bonus * 0.05,
 
         continuity_memory_delta:
             0.15
