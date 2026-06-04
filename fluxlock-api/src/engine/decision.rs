@@ -22,11 +22,50 @@ pub struct Decision {
 }
 
 // =========================
+// 🧬 AUTHORITY SCORE
+// =========================
+fn authority_score(
+    v: &Validator,
+) -> f64 {
+
+    let score =
+
+        // continuity history
+        v.continuity_reputation * 0.30
+
+        // adaptive behavior
+        + v.adaptive_reputation * 0.25
+
+        // memory persistence
+        + v.continuity_memory_score * 0.15
+
+        // authenticity engine
+        + v.evolutionary_authenticity * 0.15
+
+        // governance success
+        + (
+            v.historical_consensus_accuracy
+            * 100.0
+        ) * 0.10
+
+        // peer agreement
+        + (
+            v.peer_agreement_ratio
+            * 100.0
+        ) * 0.05;
+
+    score.clamp(0.0, 100.0)
+}
+
+// =========================
 // 🧠 EVALUATE
 // =========================
 pub fn evaluate_validator(
     v: &Validator,
 ) -> Decision {
+
+    let authority =
+        authority_score(v);
 
     // =========================
     // ☠ EXILED
@@ -86,14 +125,23 @@ pub fn evaluate_validator(
             decision:
                 "WEIGHTED".into(),
 
-            weight: 0.10,
+            weight:
+                (
+                    authority / 100.0
+                )
+                .clamp(
+                    0.05,
+                    0.25
+                ),
 
             state:
                 "quarantined".into(),
 
             reason:
-                "network quarantine active"
-                    .into(),
+                format!(
+                    "authority score {:.2}",
+                    authority
+                ),
         };
     }
 
@@ -109,14 +157,23 @@ pub fn evaluate_validator(
             decision:
                 "WEIGHTED".into(),
 
-            weight: 0.35,
+            weight:
+                (
+                    authority / 100.0
+                )
+                .clamp(
+                    0.20,
+                    0.50
+                ),
 
             state:
                 "rehabilitating".into(),
 
             reason:
-                "continuity recovery in progress"
-                    .into(),
+                format!(
+                    "authority score {:.2}",
+                    authority
+                ),
         };
     }
 
@@ -134,16 +191,21 @@ pub fn evaluate_validator(
 
             weight:
                 (
-                    v.trust / 100.0
+                    authority / 100.0
                 )
-                .clamp(0.2, 0.6),
+                .clamp(
+                    0.20,
+                    0.65
+                ),
 
             state:
                 "recovering".into(),
 
             reason:
-                "identity instability detected"
-                    .into(),
+                format!(
+                    "authority score {:.2}",
+                    authority
+                ),
         };
     }
 
@@ -159,36 +221,66 @@ pub fn evaluate_validator(
             decision:
                 "WEIGHTED".into(),
 
-            weight: 0.75,
+            weight:
+                (
+                    authority / 100.0
+                )
+                .clamp(
+                    0.50,
+                    0.85
+                ),
 
             state:
                 "evolving".into(),
 
             reason:
-                "identity mutation stabilizing"
-                    .into(),
+                format!(
+                    "authority score {:.2}",
+                    authority
+                ),
         };
     }
 
     // =========================
     // 🟢 HEALTHY
     // =========================
+    let weight =
+        (
+            authority / 100.0
+        )
+        .clamp(
+            0.50,
+            1.0
+        );
+
+    let decision =
+        if authority >= 90.0 {
+
+            "ACCEPT"
+
+        } else if authority >= 75.0 {
+
+            "WEIGHTED"
+
+        } else {
+
+            "REJECT"
+        };
+
     Decision {
 
         decision:
-            "ACCEPT".into(),
+            decision.into(),
 
-        weight:
-            (
-                v.trust / 100.0
-            )
-            .clamp(0.6, 1.0),
+        weight,
 
         state:
             "healthy".into(),
 
         reason:
-            "continuity verified"
-                .into(),
+            format!(
+                "authority score {:.2}",
+                authority
+            ),
     }
 }

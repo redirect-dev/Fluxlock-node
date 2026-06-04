@@ -5,11 +5,43 @@ use fluxlock_core::types::{
 use fluxlock_core::types::ContinuityState;
 
 // =========================
+// 🧠 AUTHORITY SCORE
+// =========================
+fn authority_score(
+    validator: &Validator,
+) -> f64 {
+
+    let score =
+
+        validator.trust * 0.20
+
+        + validator.continuity_reputation * 0.25
+
+        + validator.adaptive_reputation * 0.20
+
+        + validator.continuity_memory_score * 0.15
+
+        + validator.evolutionary_authenticity * 0.10
+
+        + (
+            validator.historical_consensus_accuracy
+            * 100.0
+        ) * 0.10;
+
+    score.clamp(0.0, 100.0)
+}
+
+// =========================
 // 🧠 STATE ENGINE
 // =========================
 pub fn evaluate_continuity_state(
     validator: &mut Validator,
 ) {
+
+    let authority =
+        authority_score(
+            validator
+        );
 
     // =========================
     // ☠ EXILED
@@ -24,7 +56,7 @@ pub fn evaluate_continuity_state(
     }
 
     // =========================
-    // 🔴 FRACTURED
+    // 🔴 HARD FRACTURE
     // =========================
     if !validator.chain_valid
     || validator.drift > 120.0 {
@@ -36,9 +68,9 @@ pub fn evaluate_continuity_state(
     }
 
     // =========================
-    // ⚠ QUARANTINED
+    // ⚠ HARD QUARANTINE
     // =========================
-    if validator.quarantine_level > 40.0 {
+    if validator.quarantine_level > 75.0 {
 
         validator.continuity_state =
             ContinuityState::Quarantined;
@@ -47,33 +79,20 @@ pub fn evaluate_continuity_state(
     }
 
     // =========================
-    // 🧬 REHABILITATING
+    // 🧠 AUTHORITY GOVERNANCE
     // =========================
-    if validator.recovery_timer > 0
-    && validator.rehabilitation_score > 20.0 {
+
+    // Healthy
+    if authority >= 85.0 {
 
         validator.continuity_state =
-            ContinuityState::Rehabilitating;
+            ContinuityState::Healthy;
 
         return;
     }
 
-    // =========================
-    // 🟠 RECOVERING
-    // =========================
-    if validator.recovery_timer > 0
-    || validator.drift > 40.0 {
-
-        validator.continuity_state =
-            ContinuityState::Recovering;
-
-        return;
-    }
-
-    // =========================
-    // 🔄 EVOLVING
-    // =========================
-    if validator.epoch_age < 120 {
+    // Evolving
+    if authority >= 70.0 {
 
         validator.continuity_state =
             ContinuityState::Evolving;
@@ -81,9 +100,36 @@ pub fn evaluate_continuity_state(
         return;
     }
 
+    // Recovering
+    if authority >= 50.0 {
+
+        validator.continuity_state =
+            ContinuityState::Recovering;
+
+        return;
+    }
+
+    // Rehabilitating
+    if authority >= 30.0 {
+
+        validator.continuity_state =
+            ContinuityState::Rehabilitating;
+
+        return;
+    }
+
+    // Quarantined
+    if authority >= 10.0 {
+
+        validator.continuity_state =
+            ContinuityState::Quarantined;
+
+        return;
+    }
+
     // =========================
-    // 🟢 HEALTHY
+    // 🔴 AUTHORITY COLLAPSE
     // =========================
     validator.continuity_state =
-        ContinuityState::Healthy;
+        ContinuityState::Fractured;
 }

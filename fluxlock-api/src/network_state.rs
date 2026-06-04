@@ -757,16 +757,38 @@ fn record_event(
 
             validator.continuity_reputation =
                 Self::calculate_reputation(
-                validator
-    );
+                    validator
+            );
 
-            validator.adaptive_reputation =
-    (
-            validator.continuity_reputation
-            +
-            validator.continuity_memory_score
-    )
-            / 2.0;
+            // consensus reward
+            if  validator.network_accepted {
+
+                validator.historical_consensus_accuracy += 0.002;
+
+            } else {
+
+                validator.historical_consensus_accuracy -= 0.005;
+            }
+
+                validator.historical_consensus_accuracy =
+                    validator
+                       .historical_consensus_accuracy
+                       .clamp(0.0, 1.0);
+
+                let consensus_score =
+                    validator
+                   .historical_consensus_accuracy
+                    * 100.0;
+
+                validator.adaptive_reputation =
+            (
+                validator.continuity_reputation
+                    +
+                   validator.continuity_memory_score
+                    +
+                   consensus_score
+            )
+                / 3.0;
 
                         // =========================
             // 🧬 MUTATION GOVERNANCE

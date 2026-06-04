@@ -75,14 +75,45 @@ export default function Dashboard({
       <hr style={styles.hr} />
 
       {/* ================= METRICS ================= */}
-      <div style={styles.section}>
-        <h3>📊 Metrics</h3>
+        <div style={styles.section}>
+           <h3>📊 Metrics</h3>
 
-        <p>Trust: {trust?.toFixed(2)}</p>
-        <p>Drift: {drift?.toFixed(2)}</p>
-        <p>Status: {status}</p>
-        <p>Epoch Age: {epoch_age}</p>
-        <p>Recovery: {recovery_timer}</p>
+       <Metric
+           label="Trust"
+           value={trust}
+         />
+
+       <Metric
+           label="Continuity Reputation"
+           value={node.continuity_reputation}
+         />
+
+       <Metric
+           label="Adaptive Reputation"
+           value={node.adaptive_reputation}
+         />
+
+      <Metric
+         label="Memory Score"
+         value={node.continuity_memory_score}
+         />
+
+     <Metric
+        label="Authenticity"
+        value={node.evolutionary_authenticity}
+         />
+
+     <Metric
+         label="Consensus Accuracy"
+         value={
+         node.historical_consensus_accuracy * 100
+       }
+   />
+
+      <p>Drift: {drift?.toFixed(2)}</p>
+      <p>Status: {status}</p>
+      <p>Epoch Age: {epoch_age}</p>
+      <p>Recovery: {recovery_timer}</p>
       </div>
 
       <hr style={styles.hr} />
@@ -270,6 +301,33 @@ const eventIcon = (type) => {
     default:
       return "🧬";
   }
+};
+
+const Metric = ({
+  label,
+  value,
+}) => {
+
+  const color =
+    value >= 90
+      ? "#00ff88"
+      : value >= 70
+      ? "#ffaa00"
+      : "#ff5555";
+
+  return (
+    <p>
+      {label}:{" "}
+      <span
+        style={{
+          color,
+          fontWeight: "bold",
+        }}
+      >
+        {value?.toFixed?.(2) ?? value}
+      </span>
+    </p>
+  );
 };
 
 const decisionStyle = (d) => {
