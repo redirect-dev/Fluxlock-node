@@ -104,19 +104,71 @@ export default function Dashboard({
          />
 
      <Metric
-         label="Consensus Accuracy"
-         value={
-         node.historical_consensus_accuracy * 100
-       }
-   />
+  label="Consensus Accuracy"
+  value={
+    node.historical_consensus_accuracy * 100
+  }
+/>
 
-      <p>Drift: {drift?.toFixed(2)}</p>
-      <p>Status: {status}</p>
-      <p>Epoch Age: {epoch_age}</p>
-      <p>Recovery: {recovery_timer}</p>
-      </div>
+<hr style={styles.hr} />
 
-      <hr style={styles.hr} />
+<h3>👑 Authority</h3>
+
+<p>
+  Rank:
+  {" "}
+  <span
+    style={{
+      color: "#ffd700",
+      fontWeight: "bold",
+    }}
+  >
+    {node.authority_rank}
+  </span>
+</p>
+
+<p>
+  Authority Points:
+  {" "}
+  {node.authority_points?.toFixed?.(2)}
+</p>
+
+<p>
+  Promotions:
+  {" "}
+  {node.authority_promotions}
+</p>
+
+<p>
+  Demotions:
+  {" "}
+  {node.authority_demotions}
+</p>
+
+<p>
+  Governance Weight:
+  {" "}
+  {node.governance_weight?.toFixed?.(2)}
+</p>
+
+<p>
+  Leadership:
+  {" "}
+  {node.leadership_score?.toFixed?.(2)}
+</p>
+
+<p>
+  Influence:
+  {" "}
+  {node.network_influence_score?.toFixed?.(2)}
+</p>
+
+<p>Drift: {drift?.toFixed(2)}</p>
+<p>Status: {status}</p>
+<p>Epoch Age: {epoch_age}</p>
+<p>Recovery: {recovery_timer}</p>
+
+</div>
 
       {/* ================= CONSENSUS ================= */}
       <div style={styles.section}>

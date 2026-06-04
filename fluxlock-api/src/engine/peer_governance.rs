@@ -20,6 +20,29 @@ pub struct GovernanceResult {
 }
 
 // =========================
+// 👑 RANK MULTIPLIER
+// =========================
+fn rank_multiplier(
+    rank: &str,
+) -> f64 {
+
+    match rank {
+
+        "Archon" => 3.0,
+
+        "Governor" => 2.0,
+
+        "Steward" => 1.5,
+
+        "Senior Validator" => 1.25,
+
+        "Validator" => 1.10,
+
+        _ => 1.0,
+    }
+}
+
+// =========================
 // 🌐 PEER GOVERNANCE
 // =========================
 pub fn evaluate_peer_governance(
@@ -59,6 +82,14 @@ pub fn evaluate_peer_governance(
         }
 
         // =========================
+        // 👑 AUTHORITY MULTIPLIER
+        // =========================
+        let authority_multiplier =
+            rank_multiplier(
+                &peer.authority_rank
+            );
+
+        // =========================
         // 🌐 PEER WEIGHT
         // =========================
         let peer_weight =
@@ -66,7 +97,9 @@ pub fn evaluate_peer_governance(
             *
             (
                 peer.trust / 100.0
-            );
+            )
+            *
+            authority_multiplier;
 
         total_weight += peer_weight;
 

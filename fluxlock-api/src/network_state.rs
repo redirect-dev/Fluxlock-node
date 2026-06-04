@@ -77,6 +77,10 @@ use fluxlock_storage::lineage_store::{
     load_identity_chain,
 };
 
+use fluxlock_network::governance::authority_promotion::{
+    promote_authority,
+};
+
 // =========================
 // 💾 GLOBAL EPOCH STORAGE
 // =========================
@@ -423,6 +427,18 @@ impl NetworkState {
                     evolutionary_authenticity: 100.0,
 
                    mutation_pressure: 0.0,
+
+                   authority_points: 0.0,
+
+                   authority_rank:
+                      "Observer".into(),
+
+                   authority_promotions: 0,
+
+                   authority_demotions: 0,
+
+                   last_promotion_epoch:
+                        restored_epoch,
 
                 continuity_state:
                         ContinuityState::Healthy,
@@ -789,6 +805,14 @@ fn record_event(
                    consensus_score
             )
                 / 3.0;
+
+                // =========================
+                // 👑 AUTHORITY PROMOTION
+                // =========================
+                promote_authority(
+                    validator
+                );
+
             
                 // =========================
                 // 🧠 AUTHORITY GOVERNANCE

@@ -389,6 +389,19 @@ pub struct Validator {
 
     pub mutation_pressure: f64,
 
+    // =========================
+    // 👑 AUTHORITY PROMOTION
+    // =========================
+    pub authority_points: f64,
+
+    pub authority_rank: String,
+
+    pub authority_promotions: u64,
+
+    pub authority_demotions: u64,
+
+    pub last_promotion_epoch: u64,
+
     pub continuity_state:
     ContinuityState,
 }
