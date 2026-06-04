@@ -51,7 +51,7 @@ pub fn evaluate_consensus(
     let mut valid_votes = 0;
 
     let mut invalid_votes = 0;
-
+    
     // =========================
     // 🌐 WEIGHTED CONSENSUS
     // =========================
@@ -60,6 +60,29 @@ pub fn evaluate_consensus(
     let mut weighted_invalid = 0.0;
 
     let mut total_weight = 0.0;
+    
+    fn authority_score(
+    validator: &Validator,
+) -> f64 {
+
+    (
+        validator.trust * 0.20
+        +
+        validator.continuity_reputation * 0.25
+        +
+        validator.adaptive_reputation * 0.20
+        +
+        validator.continuity_memory_score * 0.15
+        +
+        validator.evolutionary_authenticity * 0.10
+        +
+        (
+            validator.historical_consensus_accuracy
+            * 100.0
+        ) * 0.10
+    )
+    .clamp(0.0, 100.0)
+}
 
     for announcement in announcements {
 
@@ -72,8 +95,13 @@ pub fn evaluate_consensus(
         // =========================
         // 🧠 DYNAMIC WEIGHT
         // =========================
+        let authority =
+             authority_score(
+                 validator
+    );
+
         let mut weight =
-            announcement.trust / 100.0;
+            authority / 100.0;
 
         // =========================
         // 🔗 CONTINUITY BONUS

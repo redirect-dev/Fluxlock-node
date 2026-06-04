@@ -789,8 +789,95 @@ fn record_event(
                    consensus_score
             )
                 / 3.0;
+            
+                // =========================
+                // 🧠 AUTHORITY GOVERNANCE
+                // =========================
 
-                        // =========================
+                let authority =
+
+                    validator.trust * 0.20
+
+                        +
+
+                    validator.continuity_reputation * 0.25
+
+                        +
+
+                    validator.adaptive_reputation * 0.20
+
+                        +
+
+                    validator.continuity_memory_score * 0.15
+
+                       +
+
+                    validator.evolutionary_authenticity * 0.10
+
+                       +
+
+            (
+                    validator.historical_consensus_accuracy
+                        * 100.0
+                        ) * 0.10;
+
+// leadership grows with authority
+
+validator.leadership_score +=
+    (
+        authority - 50.0
+    ) * 0.002;
+
+// network influence grows slower
+
+validator.network_influence_score +=
+    (
+        authority - 50.0
+    ) * 0.001;
+
+// governance weight follows authority
+
+validator.governance_weight +=
+    (
+        authority - 50.0
+    ) * 0.0005;
+
+// participation reward
+
+if validator.network_accepted {
+
+    validator.governance_participation +=
+        0.02;
+
+} else {
+
+    validator.governance_participation -=
+        0.01;
+}
+
+// limits
+
+validator.leadership_score =
+    validator
+        .leadership_score
+        .clamp(0.0, 1000.0);
+
+validator.network_influence_score =
+    validator
+        .network_influence_score
+        .clamp(0.0, 1000.0);
+
+validator.governance_weight =
+    validator
+        .governance_weight
+        .clamp(0.1, 10.0);
+
+validator.governance_participation =
+    validator
+        .governance_participation
+        .clamp(0.0, 1000.0);
+
+            // =========================
             // 🧬 MUTATION GOVERNANCE
             // =========================
             validator.mutation_shock =
