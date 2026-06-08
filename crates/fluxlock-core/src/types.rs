@@ -96,6 +96,63 @@ pub struct ContinuityEvent {
 }
 
 // =========================
+// 👑 AUTHORITY EVENT TYPE
+// =========================
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
+pub enum AuthorityEventType {
+
+    Promotion,
+
+    Demotion,
+
+    ElectionWin,
+
+    ElectionLoss,
+
+    ChallengeWon,
+
+    ChallengeLost,
+
+    LegitimacyIncrease,
+
+    LegitimacyCollapse,
+
+    SuccessionGranted,
+
+    SuccessionLost,
+}
+
+// =========================
+// 👑 AUTHORITY EVENT
+// =========================
+#[derive(
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
+pub struct AuthorityEvent {
+
+    pub validator_id: u32,
+
+    pub epoch: u64,
+
+    pub event_type:
+        AuthorityEventType,
+
+    pub authority_before: f64,
+
+    pub authority_after: f64,
+
+    pub description: String,
+}
+
+// =========================
 // 🔑 IDENTITY LINK
 // =========================
 #[derive(
@@ -266,6 +323,9 @@ pub struct Validator {
     pub continuity_events:
         Vec<ContinuityEvent>,
 
+    pub authority_history:
+    Vec<AuthorityEvent>,
+
     pub continuity_memory_score: f64,
 
     pub historical_consensus_accuracy: f64,
@@ -402,8 +462,50 @@ pub struct Validator {
 
     pub last_promotion_epoch: u64,
 
+    pub election_votes_received: u64,
+
+    pub election_votes_cast: u64,
+
+    pub election_wins: u64,
+
+    pub governance_term: u64,
+
+    pub elected_authority: bool,
+
+    pub authority_legitimacy: f64,
+
+    pub effective_authority: f64,
+
+    pub authority_challenges_won: u64,
+
+    pub authority_challenges_lost: u64,
+
+    pub active_challenges: u64,
+
+    pub challenge_resistance: f64,
+
+    pub succession_priority: f64,
+
+    pub governance_approval_ratio: f64,
+
+    pub governance_rejection_ratio: f64,
+
+    // =========================
+    // 👑 AUTHORITY SUCCESSION
+    // =========================
+    pub authority_predecessor: Option<u32>,
+
+    pub authority_successor: Option<u32>,
+
+    pub authority_dynasty_depth: u64,
+
+    pub authority_lineage: Vec<u32>,
+
+    pub succession_count: u64,
+
     pub continuity_state:
     ContinuityState,
+
 }
 
 // =========================

@@ -134,6 +134,18 @@ export default function Dashboard({
 </p>
 
 <p>
+  Legitimacy:
+  {" "}
+  {node.authority_legitimacy?.toFixed?.(2)}
+</p>
+
+<p>
+  Effective Authority:
+  {" "}
+  {node.effective_authority?.toFixed?.(2)}
+</p>
+
+<p>
   Promotions:
   {" "}
   {node.authority_promotions}

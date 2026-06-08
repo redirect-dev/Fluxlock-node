@@ -77,9 +77,32 @@ use fluxlock_storage::lineage_store::{
     load_identity_chain,
 };
 
+use fluxlock_storage::authority_history_store::{
+    load_authority_history,
+};
+
 use fluxlock_network::governance::authority_promotion::{
     promote_authority,
 };
+
+use fluxlock_network::governance::authority_recovery::{
+    recover_authority,
+};
+
+use fluxlock_network::governance::authority_entropy::{
+    apply_authority_entropy,
+};
+
+use fluxlock_network::governance::authority_elections::{
+    run_authority_election,
+};
+
+use fluxlock_network::governance::authority_legitimacy::update_authority_legitimacy;
+
+use fluxlock_network::governance::authority_challenges::{
+    run_authority_challenges,
+};
+
 
 // =========================
 // 💾 GLOBAL EPOCH STORAGE
@@ -308,6 +331,9 @@ impl NetworkState {
                     continuity_events:
                         Vec::<ContinuityEvent>::new(),
 
+                    authority_history:
+                        load_authority_history(i)
+                        .unwrap_or_default(),
                     continuity_memory_score: 100.0,
 
                     historical_consensus_accuracy: 1.0,
@@ -428,20 +454,58 @@ impl NetworkState {
 
                    mutation_pressure: 0.0,
 
-                   authority_points: 0.0,
+                  authority_points: 0.0,
 
-                   authority_rank:
-                      "Observer".into(),
+                    authority_rank:
+                        "Observer".into(),
 
-                   authority_promotions: 0,
+                    authority_promotions: 0,
 
-                   authority_demotions: 0,
+                    authority_demotions: 0,
 
-                   last_promotion_epoch:
-                        restored_epoch,
+                    last_promotion_epoch:
+                    restored_epoch,
 
-                continuity_state:
-                        ContinuityState::Healthy,
+                    election_votes_received: 0,
+
+                    election_votes_cast: 0,
+
+                    election_wins: 0,
+
+                    governance_term: 0,
+
+                    elected_authority: false,
+
+                    authority_legitimacy: 100.0,
+
+                    effective_authority: 0.0,
+
+                    authority_challenges_won: 0,
+
+                    challenge_resistance: 100.0,
+
+                    authority_challenges_lost: 0,
+
+                    active_challenges: 0,
+
+                    succession_priority: 0.0,
+
+                    governance_approval_ratio: 1.0,
+
+                    governance_rejection_ratio: 0.0,
+
+                    authority_predecessor: None,
+
+                    authority_successor: None,
+
+                    authority_dynasty_depth: 0,
+
+                    authority_lineage: Vec::new(),
+
+                    succession_count: 0,
+
+                    continuity_state:
+                    ContinuityState::Healthy,
                 }
             );
 
@@ -583,10 +647,30 @@ fn record_event(
             for validator in
             self.validators.iter_mut()
 {
+        if validator.governance_term > 0 {
+
+        validator.governance_term -= 1;
+
+}       else {
+
+    validator.elected_authority = false;
+}
+
 
     evaluate_peer_governance(
         validator,
         &snapshot,
+    );
+}
+
+if self.global_epoch % 100 == 0 {
+
+    run_authority_election(
+        &mut self.validators
+    );
+
+    run_authority_challenges(
+        &mut self.validators
     );
 }
 
@@ -809,11 +893,23 @@ fn record_event(
                 // =========================
                 // 👑 AUTHORITY PROMOTION
                 // =========================
-                promote_authority(
-                    validator
-                );
+                
+                    promote_authority(
+                        validator
+            );
 
-            
+                    recover_authority(
+                        validator
+            );
+
+                    apply_authority_entropy(
+                        validator
+            );
+
+                     update_authority_legitimacy(
+                         validator
+            );
+                    
                 // =========================
                 // 🧠 AUTHORITY GOVERNANCE
                 // =========================

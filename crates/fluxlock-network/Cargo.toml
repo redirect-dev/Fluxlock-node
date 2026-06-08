@@ -8,3 +8,5 @@ edition = "2021"
 serde = { version = "1", features = ["derive"] }
 
 fluxlock-core = { path = "../fluxlock-core" }
+
+fluxlock-storage = { path = "../fluxlock-storage" }

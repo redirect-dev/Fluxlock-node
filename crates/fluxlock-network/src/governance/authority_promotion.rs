@@ -1,6 +1,12 @@
+use fluxlock_storage::authority_history_store::{
+    save_authority_event,
+};
+
 use fluxlock_core::types::{
     Validator,
     ContinuityState,
+    AuthorityEvent,
+    AuthorityEventType,
 };
 
 // =========================
@@ -10,9 +16,6 @@ pub fn promote_authority(
     validator: &mut Validator,
 ) {
 
-    // =========================
-    // 🧠 AUTHORITY SCORE
-    // =========================
     let authority =
 
         validator.trust * 0.20
@@ -30,24 +33,16 @@ pub fn promote_authority(
             * 100.0
         ) * 0.10;
 
-    // =========================
-    // 📈 AUTHORITY GROWTH
-    // =========================
     validator.authority_points +=
         authority * 0.01;
 
-    // =========================
-    // 📉 AUTHORITY DECAY
-    // =========================
     let mut decay = 0.0;
 
     if validator.trust < 70.0 {
-
         decay += 2.0;
     }
 
     if validator.continuity_reputation < 60.0 {
-
         decay += 2.0;
     }
 
@@ -62,27 +57,22 @@ pub fn promote_authority(
     match validator.continuity_state {
 
         ContinuityState::Recovering => {
-
             decay += 1.0;
         }
 
         ContinuityState::Rehabilitating => {
-
             decay += 0.5;
         }
 
         ContinuityState::Quarantined => {
-
             decay += 3.0;
         }
 
         ContinuityState::Fractured => {
-
             decay += 5.0;
         }
 
         ContinuityState::Exiled => {
-
             decay += 10.0;
         }
 
@@ -92,13 +82,9 @@ pub fn promote_authority(
     validator.authority_points -= decay;
 
     if validator.authority_points < 0.0 {
-
         validator.authority_points = 0.0;
     }
 
-    // =========================
-    // 👑 DETERMINE RANK
-    // =========================
     let new_rank =
 
         if validator.authority_points >= 5000.0 {
@@ -126,9 +112,6 @@ pub fn promote_authority(
             "Observer"
         };
 
-    // =========================
-    // ⬆ PROMOTION
-    // =========================
     let old_rank =
         validator.authority_rank.clone();
 
@@ -150,14 +133,93 @@ pub fn promote_authority(
 
             validator.last_promotion_epoch =
                 validator.current_epoch;
+
+            let event =
+                AuthorityEvent {
+
+                    validator_id:
+                        validator.id,
+
+                    epoch:
+                        validator.current_epoch,
+
+                    event_type:
+                        AuthorityEventType::Promotion,
+
+                    authority_before:
+                        old_value as f64,
+
+                    authority_after:
+                        new_value as f64,
+
+                    description:
+                        format!(
+                            "{} promoted to {}",
+                            old_rank,
+                            new_rank
+                        ),
+                };
+
+            validator.authority_history.push(
+                event.clone()
+            );
+
+            save_authority_event(
+                &event
+            ).ok();
+
+            println!(
+                "👑 AUTHORITY EVENT | Validator {} | PROMOTION {} -> {}",
+                validator.id,
+                old_rank,
+                new_rank
+            );
         }
 
-        // =========================
-        // ⬇ DEMOTION
-        // =========================
         if new_value < old_value {
 
             validator.authority_demotions += 1;
+
+            let event =
+                AuthorityEvent {
+
+                    validator_id:
+                        validator.id,
+
+                    epoch:
+                        validator.current_epoch,
+
+                    event_type:
+                        AuthorityEventType::Demotion,
+
+                    authority_before:
+                        old_value as f64,
+
+                    authority_after:
+                        new_value as f64,
+
+                    description:
+                        format!(
+                            "{} demoted to {}",
+                            old_rank,
+                            new_rank
+                        ),
+                };
+
+            validator.authority_history.push(
+                event.clone()
+            );
+
+            save_authority_event(
+                &event
+            ).ok();
+
+            println!(
+                "⚠ AUTHORITY EVENT | Validator {} | DEMOTION {} -> {}",
+                validator.id,
+                old_rank,
+                new_rank
+            );
         }
 
         validator.authority_rank =

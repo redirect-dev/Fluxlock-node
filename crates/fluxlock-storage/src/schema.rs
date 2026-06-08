@@ -301,9 +301,30 @@ pub fn init_schema() {
 
             details TEXT NOT NULL
         );
+
+                -- =========================
+        -- AUTHORITY EVENTS
+        -- =========================
+        CREATE TABLE IF NOT EXISTS authority_events (
+
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            validator_id INTEGER NOT NULL,
+
+            epoch INTEGER NOT NULL,
+
+            event_type TEXT NOT NULL,
+
+            authority_before REAL NOT NULL,
+
+            authority_after REAL NOT NULL,
+
+            description TEXT NOT NULL
+        );
         "
     )
     .expect(
         "failed to initialize schema"
     );
 }
+ 

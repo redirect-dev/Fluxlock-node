@@ -4,4 +4,5 @@ pub mod schema;
 pub mod validator_store;
 pub mod identity_store;
 pub mod lineage_store;
+pub mod authority_history_store;
 pub mod event_store;

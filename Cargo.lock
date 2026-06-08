@@ -444,6 +444,7 @@ name = "fluxlock-network"
 version = "0.1.0"
 dependencies = [
  "fluxlock-core",
+ "fluxlock-storage",
  "serde",
 ]
 
