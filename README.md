@@ -1,265 +1,112 @@
-# 🔐 Fluxlock
-A self-healing, time-bound identity and trust protocol.
+# Fluxlock
 
-Fluxlock introduces a new security model where identity is not permanent —  
-it must evolve, behave, and remain stable over time or becomes invalid.
+Continuity-Based Adaptive Identity Protocol
 
 ---
 
-## ⚡ Try It
+## What Is Fluxlock?
 
-Run the demo:
+Fluxlock is a cryptographic identity protocol that defines identity through continuity rather than credential ownership.
 
-```bash
-cargo run -p fluxlock-protocol --bin fluxlock-demo
-Watch what happens:
+Traditional systems answer:
 
-Identity rotates
-Identity becomes unstable under attack
-Trust degrades
-Recovery begins
-Identity revalidates
-System returns to a healthy state
-⚔ Attack Mode
+"Do you possess the key?"
 
-Simulate instability and compromise:
+Fluxlock answers:
 
-cargo run -p fluxlock-protocol --bin fluxlock-demo -- --attack
+"Can you prove continuous identity over time?"
 
-Watch how the protocol:
+---
 
-increases drift (instability)
-reduces trust
-invalidates compromised identity
-forces recovery before reuse
-prevents identity reuse without continuity
-🖥 Fluxlock CLI
-cargo run -p fluxlock-protocol --bin fluxlock run
-cargo run -p fluxlock-protocol --bin fluxlock attack
-cargo run -p fluxlock-protocol --bin fluxlock validate
-🧭 What is Fluxlock?
+## Core Innovations
 
-Fluxlock is a protocol-level identity system that enforces:
+### Continuity-Based Identity
 
-time-bound validity
-behavioral continuity
-stability under stress
+Identity survives:
 
-Instead of treating identity as static, Fluxlock ensures:
+- Key rotation
+- Credential evolution
+- Device replacement
+- Recovery events
 
-Identity must continuously prove it is still valid.
+---
 
-🧠 Core Model
+### Identity Lineage
 
-Fluxlock defines identity as:
+Every evolution creates an immutable continuity chain.
 
-identity = key + time + history + behavior + stability
+Trust remains attached to continuity.
 
-This means:
+---
 
-identities must rotate forward (no reuse)
-identity history must remain continuous
-behavior affects trust over time
-instability (drift) can invalidate identity
-identity must recover before regaining validity
-🔄 Identity Lifecycle
+### Governance-Based Validation
 
-A node in Fluxlock follows a full lifecycle:
+Validators evaluate:
 
-Healthy
- → Attacked
- → Unstable (drift ↑, trust ↓)
- → Recovering
- → Key Rotation
- → Pending Signature
- → Revalidated
- → Healthy
+- Continuity
+- Reputation
+- Consensus
+- Legitimacy
 
-This lifecycle is:
+---
 
-deterministic
-enforceable
-repeatable under simulation
-🧪 Validation Engine
+### Adaptive Security
 
-Fluxlock does not just check identity history.
+Fluxlock assumes compromise occurs.
 
-It validates:
+The protocol focuses on:
 
-identity chain integrity
-key continuity (no reuse)
-trust level
-drift (instability)
-signature presence
-recovery state
-Validity Conditions
+- Detection
+- Containment
+- Recovery
+- Trust Preservation
 
-A node is considered locally valid only if:
+---
 
-identity chain is intact
-no key reuse
-drift is below threshold
-trust is sufficient
-signature is present
-⚖️ Stability & Drift
+## Protocol Documentation
 
-Fluxlock introduces a new concept:
+Whitepaper:
 
-Identity stability over time
+docs/FLUXLOCK_WHITEPAPER_V2.md
 
-Drift increases under attack or bad behavior
-Trust decreases with instability
-High drift → identity becomes invalid
-Recovery reduces drift gradually
+Protocol Specification:
 
-This prevents:
+docs/protocol-spec.md
 
-instant recovery exploits
-trust resets
-unstable identities appearing valid
-✍️ Signature System
+Continuity Model:
 
-Currently:
+docs/continuity-model.md
 
-signatures are simulated (autoSign())
+Validator Specification:
 
-Planned:
+docs/validator-spec.md
 
-real post-quantum signatures (Dilithium)
-🌐 Network (In Progress)
+Security Model:
 
-Current system:
+docs/security-model.md
 
-nodes validate themselves (local truth)
+---
 
-Next phase:
+## Status
 
-nodes validate each other (network truth)
-Upcoming: Consensus Layer
+Protocol Version:
 
-Fluxlock will introduce:
+v1.0 Freeze
 
-peer validation
-network voting
-trust-weighted influence
-agreement thresholds
+Status:
 
-Future model:
+Protocol Locked
 
-GLOBAL_VALID = LOCAL_VALID + NETWORK_ACCEPTED
-🔐 Post-Quantum Design
+Research & Commercialization Phase
 
-Fluxlock is designed for post-quantum environments:
+---
 
-supports PQ signatures (Dilithium planned)
-enforces short-lived identity
-reduces replay windows
-limits impact of key compromise
+## Contact
 
-Even if cryptography weakens:
+Seeking:
 
-identity cannot be reused indefinitely
-
-🧱 Where Fluxlock Fits
-
-Fluxlock is not a replacement for cryptography.
-
-It is an enforcement layer between:
-
-key generation
-and system validation
-
-Ensuring identity is:
-
-valid
-current
-stable
-🔥 Why It Matters
-
-Most systems assume:
-
-valid key = valid identity
-
-Fluxlock enforces:
-
-valid key + valid time + valid behavior + stability = valid identity
-
-This reduces the impact of:
-
-key compromise
-credential replay
-long-lived access
-delayed breach detection
-identity spoofing
-🧩 Potential Applications
-
-Fluxlock can be applied to:
-
-🔐 Enterprise Identity
-continuous identity validation
-eliminate stale credentials
-☁️ Cloud & Workloads
-prevent long-lived service identity
-enforce rotation and stability
-⛓ Blockchain / Validators
-prevent identity resets
-enforce behavior-based trust
-enable weighted consensus
-🤖 AI / Agent Systems
-persistent identity with accountability
-trust-aware coordination
-🧪 Example Output
---- ATTACK EVENT ---
-Drift increased → trust decreased
-
---- VALIDATION FAILURE ---
-Node marked INVALID
-
---- RECOVERY ---
-Drift decreasing → trust rebuilding
-
---- ROTATION ---
-New key issued
-
---- RESULT ---
-Identity VALID → state HEALTHY
-⚠️ Project Status
-
-Fluxlock is currently:
-
-a working prototype
-a simulated network environment
-a stable identity engine
-
-Not yet production-ready.
-
-🧭 Vision
-
-Fluxlock explores a future where:
-
-Identity is not something you have —
-it is something you continuously maintain.
-
-🚀 Roadmap
- Network consensus layer
- Real cryptographic signatures (Dilithium)
- Persistent identity storage
- API layer
- Use-case integration
-📬 Contact
-
-If you're working on:
-
-identity systems
-post-quantum security
-distributed networks
-
-and want to explore this model, reach out.
-
-🤝 Contributing
-
-Ideas, feedback, and discussion are welcome.
-
-📜 License
-
-MIT
+- Security Researchers
+- Identity Architects
+- Post-Quantum Researchers
+- Enterprise Security Partners
+- Strategic Investors
